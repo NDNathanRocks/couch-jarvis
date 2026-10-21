@@ -10,6 +10,8 @@ import argparse
 import asyncio
 import contextlib
 import logging
+import os
+import secrets
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -150,10 +152,20 @@ async def amain(args: argparse.Namespace) -> None:
         level=settings.log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
     rt = build_runtime(settings, dry_run=args.dry_run)
-    if args.dry_run and args.hud and rt.room_store is None:
-        # --dry-run normally has no identity; a HUD demo needs one to draw a QR code
-        rt.room_store = RoomStore(Path(tempfile.mkdtemp(prefix="cj-dryrun-")) / "room.json")
+    if args.dry_run and rt.room_store is None:
+        # --dry-run has no real identity, but pairing, LAN auth and the HUD QR all need one. Use a
+        # throwaway store (or the file named by CJ_ROOM_FILE, so scripts can know the secret) and
+        # a local room key, since there is no relay to hand one out.
+        explicit = os.environ.get("CJ_ROOM_FILE")
+        path = (
+            Path(explicit)
+            if explicit
+            else Path(tempfile.mkdtemp(prefix="cj-dryrun-")) / "room.json"
+        )
+        rt.room_store = RoomStore(path)
         rt.room_store.load_or_create()
+        if rt.room_store.identity.room_key is None:
+            rt.room_store.set_room_key(secrets.token_hex(32))
     if args.rotate_secret and rt.room_store is not None:
         rt.room_store.rotate_secret()
         log.warning("room secret rotated: previously printed or shown QR codes no longer pair")
@@ -161,6 +173,9 @@ async def amain(args: argparse.Namespace) -> None:
     host = "127.0.0.1" if args.dry_run else settings.lan_host
     port = args.port or settings.lan_port
     lan_auth = LanAuth(rt.room_store) if rt.room_store is not None else None
+    if lan_auth is not None:
+        rt.service.on_revoke = lan_auth.revoke
+        rt.service.revoked |= set(rt.room_store.identity.revoked)  # type: ignore[union-attr]
     app = create_app(
         rt.service,
         rt.telemetry,
@@ -178,6 +193,7 @@ async def amain(args: argparse.Namespace) -> None:
         host=host,
         port=port,
         log_level="warning",
+        ws_max_size=64 * 1024,  # largest legitimate frame is a ~25 KB audio chunk
         ssl_certfile=str(settings.lan_tls_cert) if settings.lan_tls_enabled else None,
         ssl_keyfile=str(settings.lan_tls_key) if settings.lan_tls_enabled else None,
     )

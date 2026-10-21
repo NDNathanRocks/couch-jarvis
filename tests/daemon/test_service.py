@@ -99,8 +99,8 @@ async def test_duplicate_press_runs_once_and_replays_the_cached_result(
     payload = {"command_id": "c1", "idempotency_key": "k1", "action": "next"}
     await svc.handle_envelope(msg(CmdButton, payload), "d1")
     await settle(svc, "cmd.result")
-    # a second friend double-taps with the same key
-    await svc.handle_envelope(msg(CmdButton, {**payload, "command_id": "c2"}), "d2")
+    # the same phone retries (flaky network) with the same key
+    await svc.handle_envelope(msg(CmdButton, {**payload, "command_id": "c2"}), "d1")
     acks = [e["payload"]["status"] for e in events(svc) if e["type"] == "cmd.ack"]
     assert acks == ["accepted", "duplicate"]
     assert env.browser.calls.count("media:next") == 1

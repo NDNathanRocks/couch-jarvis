@@ -198,20 +198,21 @@ describe("reconnecting", () => {
     expect(delays.size).toBeGreaterThan(1);
   });
 
-  it("three failed handshakes in a row look like a revoked token: report rejected, retry slowly", async () => {
+  it("three failed handshakes in a row: report unreachable (not rejected), retry slowly", async () => {
     const r = setup();
     await r.conn.start(null);
     for (let i = 0; i < 3; i++) {
       FakeSocket.last.drop(1006); // closed before ever opening
       r.advance(30_000);
     }
-    expect(connections(r)).toContain("rejected");
+    expect(connections(r)).toContain("unreachable");
+    expect(connections(r)).not.toContain("rejected"); // never claims the pairing is gone
     const count = FakeSocket.instances.length;
     FakeSocket.last.drop(1006);
-    r.advance(29_999);
+    r.advance(14_999);
     expect(FakeSocket.instances).toHaveLength(count);
     r.advance(1);
-    expect(FakeSocket.instances).toHaveLength(count + 1); // still tries every 30 s
+    expect(FakeSocket.instances).toHaveLength(count + 1); // still tries every 15 s
   });
 
   it("onVisible reconnects immediately when the socket died while the phone slept", async () => {
@@ -292,6 +293,7 @@ describe("sending", () => {
     expect(a?.payload["command_id"]).not.toBe(b?.payload["command_id"]);
     const sentActions = r.actions.filter((x) => x.type === "sent");
     expect(sentActions).toHaveLength(2);
+    expect(sentActions.every((x) => x.type === "sent" && x.at === 1_000_000)).toBe(true); // timestamped for expiry
   });
 
   it("text commands are trimmed and bounded; blanks are ignored", async () => {

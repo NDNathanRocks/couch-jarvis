@@ -48,8 +48,9 @@ class CommandRequest(BaseModel):
 
 class SubmitAck(BaseModel):
     command_id: str
-    status: Literal["accepted", "queued", "duplicate"]
+    status: Literal["accepted", "queued", "duplicate", "rejected"]
     position: int | None = None
+    reason: Literal["rate_limited", "queue_full"] | None = None
     cached_result: CmdResultPayload | None = None
 
 
@@ -64,12 +65,14 @@ class CommandQueue:
         *,
         idempotency_ttl_s: float = 600.0,
         idempotency_max: int = 2000,
+        max_pending: int = 64,
         on_result: ResultListener | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._handler = handler
         self._ttl = idempotency_ttl_s
         self._max = idempotency_max
+        self._max_pending = max_pending
         self._on_result = on_result
         self._clock = clock
         self._queue: asyncio.PriorityQueue[tuple[int, int, CommandRequest]] = (
@@ -108,18 +111,27 @@ class CommandQueue:
 
     # ------------------------------------------------------------------ submit
 
+    @staticmethod
+    def _scoped(req: CommandRequest) -> str:
+        """Keys are per device: one phone can never collide with or pre-empt another phone key."""
+        return f"{req.device_id}\x00{req.idempotency_key}"
+
     def submit(self, req: CommandRequest) -> SubmitAck:
         self._evict_expired()
-        known = self._seen.get(req.idempotency_key)
+        known = self._seen.get(self._scoped(req))
         if known is not None:
             return SubmitAck(command_id=req.command_id, status="duplicate", cached_result=known[1])
 
         prio = req.effective_priority()
+        if prio != Priority.EMERGENCY and len(self._pending) >= self._max_pending:
+            # Back-pressure: a flood must not grow memory without bound. The key is not recorded,
+            # so the phone can retry the same command once the backlog drains.
+            return SubmitAck(command_id=req.command_id, status="rejected", reason="queue_full")
         self._seq += 1
         key = (int(prio), self._seq)
         position = sum(1 for p in self._pending if p < key) + (1 if self._current else 0)
 
-        self._seen[req.idempotency_key] = (self._clock(), None)
+        self._seen[self._scoped(req)] = (self._clock(), None)
         self._trim()
         self._pending.add(key)
         self._queue.put_nowait((key[0], key[1], req))
@@ -167,7 +179,7 @@ class CommandQueue:
             result = result.model_copy(
                 update={"latency_ms": result.latency_ms or (self._clock() - started) * 1000}
             )
-            self._seen[req.idempotency_key] = (self._clock(), result)
+            self._seen[self._scoped(req)] = (self._clock(), result)
             await self._notify(req, result)
 
     def _worker_cancelled(self) -> bool:

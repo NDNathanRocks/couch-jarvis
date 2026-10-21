@@ -113,7 +113,7 @@ CSP, `Referrer-Policy: no-referrer` (the pairing link contains a secret) and the
 3. The QR hides once someone is paired. A friend wants in? Tap **Pair a friend** in the deck (or say "pair a friend")
    and the QR reappears for 90 s.
 4. Lost a QR photo or want to invalidate it? `python pc-daemon\main.py --rotate-secret` issues a new secret
-   (already-paired phones keep working). To remove one phone, revoke it with `Store.revoke_device` (admin UI is not built).
+   (already-paired phones keep working). To remove one phone see the revoke endpoint under Security.
 
 ### Local-network fallback
 
@@ -130,7 +130,7 @@ uv pip install -r requirements-dev.txt
 
 ruff check . ; ruff format --check .
 mypy --strict pc-daemon infra/lambdas
-pytest -m "not (edge or gpu or aws or llm)"        # ~290 tests, no hardware/network needed
+pytest -m "not (edge or gpu or aws or llm or e2e)"  # ~500 tests, no hardware/network needed
 python scripts/export_contracts.py --check          # JSON Schema in sync with contracts.py
 
 cd infra ; sam validate --lint ; sam build ; cd ..
@@ -141,8 +141,9 @@ npm run gen:contracts                                # regenerate src/contracts.
 ```
 
 Test layers: every hardware/network edge (Edge CDP, screen capture, Windows input, Whisper, LLMs, AWS) sits behind a
-`Protocol` with an in-repo fake, so the suite is deterministic. Markers `edge`, `gpu`, `aws`, `llm`, `gui` are for
-opt-in real-device runs (`gui` tests run offscreen in CI).
+`Protocol` with an in-repo fake, so the suite is deterministic. Markers `edge`, `gpu`, `aws`, `llm`, `e2e` are for
+opt-in real-device runs; `gui` tests run offscreen in CI. `pytest -m e2e` drives real Edge with Playwright against a
+live `--dry-run` daemon (build the PWA first); `pytest -m edge` checks the CDP executor against a real browser.
 
 Live-check the daemon without a phone:
 
@@ -162,14 +163,21 @@ curl.exe http://127.0.0.1:8765/api/metrics
 - The relay stamps the real sender on every forwarded message and rejects server-only message types from phones.
 - Pair attempts are rate-limited (5 wrong guesses drop the socket); the QR secret is constant-time compared.
 - Only a fixed allowlist of JS snippets is ever evaluated in the browser; LLM output can name one, never supply code.
-- The `/events`, `/api/*` and `/ws` endpoints trust loopback and otherwise require a device token.
+- The `/events`, `/api/*` and `/ws` endpoints trust loopback and otherwise require a device token. Because
+  browsers do not apply CORS to WebSockets, every request is also checked for a same-origin or allow-listed `Origin`
+  and for an IP/`localhost`/`.local` `Host` (blocks cross-site hijacking and DNS rebinding from web pages you visit).
+- Anything an LLM can ask for is policy-checked in code: only allow-listed media keys, https media-site URLs, and
+  clicks only on media pages. Page titles are quoted to the router as sanitized untrusted data.
+- Flooding is bounded: per-phone rate limit, a capped command backlog, capped audio buffers, 64 KB WebSocket frames.
+- Remove a phone: on the PC, `curl.exe -X POST http://127.0.0.1:8765/api/devices/<device_id>/revoke` (loopback only;
+  `GET /api/devices` lists ids). The relay drops its live connections and the revocation is enforced offline on the LAN.
 
 ## Troubleshooting
 
 | Symptom | Check |
 |---|---|
 | Phone says "PC offline" | Is the daemon running? `CJ_RELAY_WS_URL` set? Log lines `cloud relay: up` |
-| Phone says "Re-pair needed" | Token revoked/expired or the room changed: scan the QR again |
+| Phone says "Can't connect" | Relay unreachable or throttled (it keeps retrying); if it persists the token may be revoked: scan the QR again |
 | Daemon log: `handshake rejected (401)` | Another PC registered this `room_id`, or `pc_key` changed. Delete `%APPDATA%\CouchJarvis\room.json` for a new room |
 | Commands do nothing in Edge | Port 9222 up? `http://127.0.0.1:9222/json/version`; use the "Edge (TV)" shortcut / let the watchdog launch it |
 | Voice button disabled | Mic needs HTTPS (hosted PWA is fine); on the LAN use text or configure TLS |

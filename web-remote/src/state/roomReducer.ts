@@ -1,6 +1,11 @@
 import type { DevicePresence, Incoming, NowPlaying, TimerInfo } from "../protocol";
 
-export type Connection = "idle" | "connecting" | "online" | "offline" | "rejected";
+/**
+ * "rejected" is definitive (the relay or PC said pair.denied). "unreachable" is what repeated
+ * handshake failures look like: a revoked token, an API throttle and a dead Wi-Fi are
+ * indistinguishable from a browser, so it must never claim the pairing is gone.
+ */
+export type Connection = "idle" | "connecting" | "online" | "offline" | "unreachable" | "rejected";
 
 export interface RoomSnapshot {
   pc_online: boolean;
@@ -32,6 +37,8 @@ export interface RoomView {
   relayDevices: DevicePresence[] | null;
   /** command_id -> latest human-readable progress, for commands this phone issued. */
   pending: Record<string, string>;
+  /** command_id -> when it was sent (ms), so a command the PC never answers can time out. */
+  pendingAt: Record<string, number>;
   toasts: Toast[];
   /** A patch arrived with a revision gap: ask the PC for a fresh snapshot. */
   needsSync: boolean;
@@ -41,7 +48,8 @@ export interface RoomView {
 
 export type RoomAction =
   | { type: "connection"; connection: Connection }
-  | { type: "sent"; messageId: string; commandId?: string; label?: string }
+  | { type: "sent"; messageId: string; commandId?: string; label?: string; at?: number }
+  | { type: "expire"; now: number; maxAgeMs: number }
   | { type: "msg"; msg: Incoming }
   | { type: "toast"; toast: Toast }
   | { type: "dismiss"; id: string }
@@ -71,6 +79,7 @@ export const initialView: RoomView = {
   relayPcOnline: null,
   relayDevices: null,
   pending: {},
+  pendingAt: {},
   toasts: [],
   needsSync: false,
   sent: [],
@@ -135,7 +144,36 @@ export function roomReducer(view: RoomView, action: RoomAction): RoomView {
       const pending = action.commandId
         ? { ...view.pending, [action.commandId]: action.label ?? "Sending..." }
         : view.pending;
-      return { ...view, sent, pending };
+      const pendingAt =
+        action.commandId && action.at !== undefined
+          ? { ...view.pendingAt, [action.commandId]: action.at }
+          : view.pendingAt;
+      return { ...view, sent, pending, pendingAt };
+    }
+    case "expire": {
+      // The PC answers within ~25 s (its hard ceiling). A command still pending long after that
+      // lost its result (dropped event, PC restart): stop showing a spinner forever.
+      const stale = Object.keys(view.pending).filter(
+        (id) => (view.pendingAt[id] ?? action.now) < action.now - action.maxAgeMs,
+      );
+      if (stale.length === 0) return view;
+      let pending = view.pending;
+      let pendingAt = view.pendingAt;
+      for (const id of stale) {
+        pending = omit(pending, id);
+        pendingAt = omit(pendingAt, id);
+      }
+      return {
+        ...view,
+        pending,
+        pendingAt,
+        toasts: pushToast(view.toasts, {
+          id: `expired-${action.now}`,
+          kind: "error",
+          text: "No answer from the PC - check the TV and try again",
+          mine: true,
+        }),
+      };
     }
     case "msg":
       return reduceMessage(view, action.msg);
@@ -164,19 +202,25 @@ function reduceMessage(view: RoomView, msg: Incoming): RoomView {
       if (msg.payload.status !== "rejected") return view;
       const mine = msg.payload.command_id in view.pending;
       const pending = omit(view.pending, msg.payload.command_id);
-      return {
-        ...view,
-        pending,
-        toasts: pushToast(view.toasts, { id: msg.id, kind: "error", text: "Command rejected", mine }),
-      };
+      const pendingAt = omit(view.pendingAt, msg.payload.command_id);
+      // Say why: a phone that is too fast, or a TV that is swamped, needs different advice.
+      const text =
+        msg.payload.reason === "rate_limited"
+          ? "Easy there - too many taps. Wait a moment."
+          : msg.payload.reason === "queue_full"
+            ? "The TV is busy. Try again in a few seconds."
+            : "Command rejected";
+      return { ...view, pending, pendingAt, toasts: pushToast(view.toasts, { id: msg.id, kind: "error", text, mine }) };
     }
     case "cmd.result": {
       const { command_id, ok, message } = msg.payload;
       const mine = command_id in view.pending;
       const pending = omit(view.pending, command_id);
+      const pendingAt = omit(view.pendingAt, command_id);
       return {
         ...view,
         pending,
+        pendingAt,
         toasts: pushToast(view.toasts, { id: msg.id, kind: ok ? "ok" : "error", text: message, mine }),
       };
     }

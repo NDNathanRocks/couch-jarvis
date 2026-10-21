@@ -17,6 +17,7 @@ PROTOCOL_VERSION = 1
 MAX_FRAME_BYTES = 32 * 1024  # API Gateway WebSocket frame limit
 ROOM_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
+DEVICE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 # Phone -> relay/PC
 PHONE_TYPES = frozenset(

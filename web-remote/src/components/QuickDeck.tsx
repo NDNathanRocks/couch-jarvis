@@ -16,7 +16,7 @@ export const DECK: readonly DeckButton[] = [
   { action: "vol_down", label: "Volume down", icon: "🔉" },
   { action: "mute", label: "Mute", icon: "🔇" },
   { action: "vol_up", label: "Volume up", icon: "🔊" },
-  { action: "skip_ad", label: "Skip ad", icon: "⏭️" },
+  { action: "skip_ad", label: "Skip ad", icon: "🚫" },
   { action: "close_tab", label: "Close tab", icon: "✖" },
   { action: "sleep_display", label: "Screen off", icon: "🌙" },
 ];

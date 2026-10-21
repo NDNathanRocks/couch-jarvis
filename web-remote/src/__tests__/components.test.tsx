@@ -68,6 +68,9 @@ describe("QRScanner", () => {
     expect(screen.getByText(/point it at the QR code/i)).toBeInTheDocument();
     rerender(<QRScanner connection="connecting" hasPairParams paired={false} />);
     expect(screen.getByText(/Pairing with your TV/)).toBeInTheDocument();
+    rerender(<QRScanner connection="unreachable" hasPairParams={false} paired />);
+    expect(screen.getByRole("status")).toHaveTextContent(/Can't reach your TV/);
+    expect(screen.getByRole("status")).toHaveTextContent(/keep trying/i);
     rerender(<QRScanner connection="rejected" hasPairParams={false} paired />);
     expect(screen.getByRole("alert")).toHaveTextContent(/scan the QR code on the TV again/i);
     rerender(<QRScanner connection="online" hasPairParams={false} paired />);
@@ -80,6 +83,7 @@ describe("ConnectionBadge", () => {
     [{ connection: "idle" as const }, "Not paired"],
     [{ connection: "connecting" as const }, "Connecting…"],
     [{ connection: "offline" as const }, "Reconnecting…"],
+    [{ connection: "unreachable" as const }, "Can't connect"],
     [{ connection: "rejected" as const }, "Re-pair needed"],
   ])("%j -> %s", (patch, label) => {
     expect(badgeInfo({ ...initialView, ...patch }, "cloud").label).toBe(label);
@@ -194,5 +198,20 @@ describe("Toasts", () => {
     expect(onDismiss).toHaveBeenCalledWith("b");
     act(() => void vi.advanceTimersByTime(TOAST_MS));
     expect(onDismiss).toHaveBeenCalledWith("a");
+  });
+});
+
+describe("TextCommand", () => {
+  it("stays editable while offline; only Send is disabled, and the draft is kept", async () => {
+    const { TextCommand } = await import("../components/TextCommand");
+    const onSend = vi.fn(() => true);
+    render(<TextCommand disabled onSend={onSend} />);
+    const input = screen.getByLabelText("Type a command");
+    expect(input).toBeEnabled();
+    fireEvent.change(input, { target: { value: "play lofi" } });
+    expect(input).toHaveValue("play lofi");
+    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+    fireEvent.submit(input.closest("form") as HTMLFormElement); // enter key while offline still routes to onSend
+    expect(onSend).toHaveBeenCalledWith("play lofi");
   });
 });

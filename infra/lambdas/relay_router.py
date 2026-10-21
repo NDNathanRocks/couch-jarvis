@@ -12,6 +12,7 @@ from common.apigw import Gateway
 from common.ddb import Store
 from common.models import (
     COMMAND_TYPES,
+    DEVICE_ID_RE,
     IDEMPOTENT_TYPES,
     PC_BROADCAST_TYPES,
     PHONE_TYPES,
@@ -81,6 +82,8 @@ def _from_pc(store: Store, gw: Gateway, conn_id: str, room_id: str, msg: dict[st
             build("room.key", room_id, {"key": key, "key_id": auth.key_id(key)}, msg["id"]),
         )
         gw.send(conn_id, presence_message(store, room_id))
+    elif kind == "device.revoke":
+        _revoke(store, gw, conn_id, room_id, msg)
     elif kind == "ping":
         gw.send(conn_id, build("pong", room_id, {}, msg["id"]))
     elif kind != "pong":
@@ -92,6 +95,21 @@ def _from_pc(store: Store, gw: Gateway, conn_id: str, room_id: str, msg: dict[st
             f"{kind} is not accepted from the PC",
             reply_to=msg["id"],
         )
+
+
+def _revoke(store: Store, gw: Gateway, conn_id: str, room_id: str, msg: dict[str, Any]) -> None:
+    """Owner action: refuse the device from now on and drop its live connections."""
+    device_id = msg["payload"].get("device_id")
+    if not isinstance(device_id, str) or not DEVICE_ID_RE.match(device_id):
+        _error(gw, conn_id, room_id, "bad_message", "device_id required", reply_to=msg["id"])
+        return
+    if not store.revoke_device(room_id, device_id):
+        _error(gw, conn_id, room_id, "unknown_device", "No such device", reply_to=msg["id"])
+        return
+    for conn in store.list_connections(room_id):
+        if conn.get("device_id") == device_id:
+            gw.close(str(conn["connection_id"]))
+    broadcast_presence(store, gw, room_id)
 
 
 # -------------------------------------------------------------------------- phone
@@ -124,6 +142,12 @@ def _from_phone(
         _error(gw, conn_id, room_id, "unauthorized", "Pair this device first", reply_to=msg["id"])
         return
     device_id = str(conn["device_id"])
+    if kind not in ("audio.chunk", "audio.end"):  # those only follow an audio.begin already vetted
+        device = store.get_device(room_id, device_id)
+        if device is None or device.get("revoked"):
+            _error(gw, conn_id, room_id, "revoked", "This phone was removed", reply_to=msg["id"])
+            gw.close(conn_id)
+            return
 
     if kind == "state.sync":
         _maybe_refresh_token(store, gw, conn, room_id, device_id)

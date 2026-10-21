@@ -421,6 +421,22 @@
           "default": null,
           "title": "Position"
         },
+        "reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "rate_limited",
+                "queue_full"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
         "status": {
           "enum": [
             "accepted",
@@ -764,6 +780,81 @@
         "last_seen"
       ],
       "title": "DevicePresence",
+      "type": "object"
+    },
+    "DeviceRevoke": {
+      "additionalProperties": false,
+      "description": "PC -> relay: cut a phone off (live connections are closed, future tokens refused).",
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/DeviceRevokePayload"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "device.revoke",
+          "default": "device.revoke",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "DeviceRevoke",
+      "type": "object"
+    },
+    "DeviceRevokePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "device_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Device Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "device_id"
+      ],
+      "title": "DeviceRevokePayload",
       "type": "object"
     },
     "Empty": {
@@ -1316,6 +1407,14 @@
           "default": false,
           "title": "Pc Online",
           "type": "boolean"
+        },
+        "revoked": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Revoked",
+          "type": "array"
         }
       },
       "required": [
@@ -1694,6 +1793,7 @@
       "cmd.button": "#/$defs/CmdButton",
       "cmd.result": "#/$defs/CmdResult",
       "cmd.text": "#/$defs/CmdText",
+      "device.revoke": "#/$defs/DeviceRevoke",
       "error": "#/$defs/ErrorMsg",
       "pair.denied": "#/$defs/PairDenied",
       "pair.granted": "#/$defs/PairGranted",
@@ -1756,6 +1856,9 @@
     },
     {
       "$ref": "#/$defs/RoomKey"
+    },
+    {
+      "$ref": "#/$defs/DeviceRevoke"
     },
     {
       "$ref": "#/$defs/Ping"

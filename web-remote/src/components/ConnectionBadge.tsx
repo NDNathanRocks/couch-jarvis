@@ -14,6 +14,8 @@ export function badgeInfo(view: RoomView, transport: Transport): BadgeInfo {
       return { label: "Connecting…", tone: "warn" };
     case "offline":
       return { label: "Reconnecting…", tone: "warn" };
+    case "unreachable":
+      return { label: "Can't connect", tone: "bad" };
     case "rejected":
       return { label: "Re-pair needed", tone: "bad" };
     case "online":

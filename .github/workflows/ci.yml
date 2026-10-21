@@ -43,7 +43,7 @@ jobs:
       - name: Pytest (daemon + infra, no real hardware or network)
         env:
           QT_QPA_PLATFORM: offscreen
-        run: pytest -q -m "not (edge or gpu or aws or llm)" --timeout=120
+        run: pytest -q -m "not (edge or gpu or aws or llm or e2e)" --timeout=120
 
   web:
     name: Web remote - types, lint, tests, build

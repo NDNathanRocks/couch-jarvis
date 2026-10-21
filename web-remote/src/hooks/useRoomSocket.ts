@@ -11,6 +11,9 @@ import type { Recording } from "../utils/audioRecorder";
 import type { Endpoint } from "../utils/config";
 import { browserPairingStorage, guessDeviceName, type Pairing, type PairingStorage } from "../utils/storage";
 
+/** The PC's own hard ceiling per command is 25 s; allow slack for slow networks. */
+export const PENDING_MAX_AGE_MS = 45_000;
+
 export interface RoomSocketOptions {
   endpoint: Endpoint;
   pairParams: PairParams | null;
@@ -65,6 +68,13 @@ export function useRoomSocket(options: RoomSocketOptions): { view: RoomView; act
       connection.current = null;
     };
   }, []);
+
+  const hasPending = Object.keys(view.pending).length > 0;
+  useEffect(() => {
+    if (!hasPending) return;
+    const id = setInterval(() => dispatch({ type: "expire", now: Date.now(), maxAgeMs: PENDING_MAX_AGE_MS }), 5000);
+    return () => clearInterval(id);
+  }, [hasPending]);
 
   useEffect(() => {
     if (view.needsSync) {

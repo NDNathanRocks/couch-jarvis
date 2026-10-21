@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+/** The input stays editable while offline (a blip must not dismiss the keyboard); only Send is gated. */
 export function TextCommand({ disabled, onSend }: { disabled: boolean; onSend: (text: string) => boolean }) {
   const [text, setText] = useState("");
   return (
@@ -14,12 +15,11 @@ export function TextCommand({ disabled, onSend }: { disabled: boolean; onSend: (
         value={text}
         onChange={(e) => setText(e.target.value)}
         maxLength={500}
-        disabled={disabled}
-        placeholder="Or type: “play lofi on YouTube”"
+        placeholder="Or type a command…"
         aria-label="Type a command"
         enterKeyHint="send"
         autoCapitalize="none"
-        className="min-h-12 min-w-0 flex-1 rounded-xl bg-zinc-900 px-4 text-base text-zinc-100 ring-1 ring-zinc-700 placeholder:text-zinc-500 focus:outline-none focus:ring-sky-500 disabled:opacity-40"
+        className="min-h-12 min-w-0 flex-1 rounded-xl bg-zinc-900 px-4 text-base text-zinc-100 ring-1 ring-zinc-700 placeholder:text-zinc-500 focus:outline-none focus:ring-sky-500"
       />
       <button
         type="submit"

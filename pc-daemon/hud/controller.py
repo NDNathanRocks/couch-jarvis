@@ -30,6 +30,8 @@ class HudController:
         async with self._service.bus.subscribe() as queue:
             while True:
                 event = await queue.get()
+                if self._service.bus.consume_lag(queue):
+                    self._vm.handle_event("state.snapshot", self._service.state.state.model_dump())
                 try:
                     payload = json.loads(event.data)["payload"]
                     self._vm.handle_event(event.type, payload)

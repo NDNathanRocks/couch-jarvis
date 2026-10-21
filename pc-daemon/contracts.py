@@ -134,6 +134,8 @@ class CmdAckPayload(_Model):
     command_id: str
     status: Literal["accepted", "queued", "duplicate", "rejected"]
     position: int | None = None
+    # why a command was rejected: "rate_limited" (this phone is too fast) or "queue_full"
+    reason: Literal["rate_limited", "queue_full"] | None = None
 
 
 class AgentProgressPayload(_Model):
@@ -154,6 +156,13 @@ class CmdResultPayload(_Model):
 class PresencePayload(_Model):
     devices: list[DevicePresence]
     pc_online: bool = False
+    revoked: list[str] = Field(
+        default_factory=list, max_length=100
+    )  # device ids, for offline LAN auth
+
+
+class DeviceRevokePayload(_Model):
+    device_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
 
 
 class RoomKeyPayload(_Model):
@@ -258,6 +267,13 @@ class Presence(_EnvelopeBase):
     payload: PresencePayload
 
 
+class DeviceRevoke(_EnvelopeBase):
+    """PC -> relay: cut a phone off (live connections are closed, future tokens refused)."""
+
+    type: Literal["device.revoke"] = "device.revoke"
+    payload: DeviceRevokePayload
+
+
 class RoomKey(_EnvelopeBase):
     type: Literal["room.key"] = "room.key"
     payload: RoomKeyPayload
@@ -295,6 +311,7 @@ Message = Annotated[
     | StateSync
     | Presence
     | RoomKey
+    | DeviceRevoke
     | Ping
     | Pong
     | ErrorMsg,

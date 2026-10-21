@@ -12,6 +12,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 from urllib.parse import quote_plus, urlparse
 
+from agent.policy import url_allowed
 from executors.base import ActionResult, BrowserSnapshot, MediaCommand, Tier
 
 log = logging.getLogger(__name__)
@@ -171,6 +172,9 @@ class EdgeCDP:
     # ------------------------------------------------------------------ actions
 
     async def navigate(self, url: str) -> ActionResult:
+        if not url_allowed(url):  # defense in depth: the agent already checks this
+            return ActionResult(False, "dom", "url is not on the media allowlist", "blocked")
+
         async def go(page: Any) -> ActionResult:
             await page.goto(url, wait_until="domcontentloaded", timeout=15000)
             return ActionResult(True, "dom")
@@ -287,7 +291,13 @@ class EdgeCDP:
                 )
             finally:
                 await session.detach()
-            return ActionResult(True, "js")
+            # The call only starts the request; report what actually happened, not that no
+            # exception was raised (a pending or rejected request is not a success).
+            await asyncio.sleep(0.3)
+            entered = bool(await page.evaluate("() => !!document.fullscreenElement"))
+            if entered:
+                return ActionResult(True, "js")
+            return ActionResult(False, "js", "fullscreen did not engage", "no_user_gesture")
 
         return await self._guard(run, "js")
 

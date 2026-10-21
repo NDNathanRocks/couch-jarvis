@@ -13,6 +13,7 @@ import sys
 from collections.abc import Callable
 from typing import Any
 
+from agent.policy import key_allowed
 from executors.base import ActionResult, MediaKey
 
 log = logging.getLogger(__name__)
@@ -96,6 +97,9 @@ class WindowsOS:
         return await self._run(do_click)
 
     async def key_combo(self, *keys: str) -> ActionResult:
+        if not key_allowed("+".join(keys)):  # second line of defense behind the agent policy
+            return ActionResult(False, "os", "key combination is not allowed")
+
         def press() -> ActionResult:
             import pyautogui
 

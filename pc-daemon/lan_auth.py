@@ -11,6 +11,7 @@ from __future__ import annotations
 import hmac
 import secrets
 import time
+from collections import deque
 from collections.abc import Callable
 
 import jwt
@@ -20,12 +21,25 @@ from room import RoomStore, sha256_hex
 
 ISSUER = "couch-jarvis"
 TOKEN_TTL_S = 180 * 24 * 3600
+LOCKOUT_FAILURES = 10
+LOCKOUT_WINDOW_S = 60.0
 
 
 class LanAuth:
     def __init__(self, store: RoomStore, clock: Callable[[], float] = time.time) -> None:
         self._store = store
         self._clock = clock
+        self._failures: deque[float] = deque()
+
+    def revoke(self, device_id: str) -> None:
+        self._store.add_revoked([device_id])
+
+    def _locked_out(self) -> bool:
+        """Too many wrong QR secrets recently (from any connection): stop answering for a while."""
+        now = self._clock()
+        while self._failures and now - self._failures[0] > LOCKOUT_WINDOW_S:
+            self._failures.popleft()
+        return len(self._failures) >= LOCKOUT_FAILURES
 
     @property
     def ready(self) -> bool:
@@ -54,6 +68,8 @@ class LanAuth:
         sub = claims.get("sub")
         if claims.get("rid") != ident.room_id or not isinstance(sub, str):
             return None
+        if sub in ident.revoked:  # cut off by the PC owner: tokens alone are not enough
+            return None
         if float(claims["exp"]) <= self._clock():
             return None
         return sub
@@ -63,7 +79,10 @@ class LanAuth:
         ident = self._store.identity
         if ident.room_key is None or not 0 < len(device_name) <= 64:
             return None
+        if self._locked_out():  # reconnecting does not reset this: it is global, not per socket
+            return None
         if not hmac.compare_digest(sha256_hex(room_secret), ident.room_secret_hash):
+            self._failures.append(self._clock())
             return None
         now = self._clock()
         device_id = f"lan-{secrets.token_hex(6)}"

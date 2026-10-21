@@ -19,6 +19,7 @@ export type Message =
   | StateSync
   | Presence
   | RoomKey
+  | DeviceRevoke
   | Ping
   | Pong
   | ErrorMsg;
@@ -118,6 +119,7 @@ export type From8 = string;
 export type Id8 = string;
 export type CommandId5 = string;
 export type Position = number | null;
+export type Reason1 = ("rate_limited" | "queue_full") | null;
 export type Status = "accepted" | "queued" | "duplicate" | "rejected";
 export type ReplyTo8 = string | null;
 export type RoomId8 = string;
@@ -195,6 +197,10 @@ export type From14 = string;
 export type Id14 = string;
 export type Devices1 = DevicePresence[];
 export type PcOnline1 = boolean;
+/**
+ * @maxItems 100
+ */
+export type Revoked = string[];
 export type ReplyTo14 = string | null;
 export type RoomId14 = string;
 export type Ts14 = number;
@@ -211,28 +217,36 @@ export type Type15 = "room.key";
 export type V15 = 1;
 export type From16 = string;
 export type Id16 = string;
+export type DeviceId2 = string;
 export type ReplyTo16 = string | null;
 export type RoomId16 = string;
 export type Ts16 = number;
-export type Type16 = "ping";
+export type Type16 = "device.revoke";
 export type V16 = 1;
 export type From17 = string;
 export type Id17 = string;
 export type ReplyTo17 = string | null;
 export type RoomId17 = string;
 export type Ts17 = number;
-export type Type17 = "pong";
+export type Type17 = "ping";
 export type V17 = 1;
 export type From18 = string;
 export type Id18 = string;
-export type Code = string;
-export type Message2 = string;
-export type Retryable = boolean;
 export type ReplyTo18 = string | null;
 export type RoomId18 = string;
 export type Ts18 = number;
-export type Type18 = "error";
+export type Type18 = "pong";
 export type V18 = 1;
+export type From19 = string;
+export type Id19 = string;
+export type Code = string;
+export type Message2 = string;
+export type Retryable = boolean;
+export type ReplyTo19 = string | null;
+export type RoomId19 = string;
+export type Ts19 = number;
+export type Type19 = "error";
+export type V19 = 1;
 
 export interface PairRequest {
   from: From;
@@ -369,6 +383,7 @@ export interface CmdAck {
 export interface CmdAckPayload {
   command_id: CommandId5;
   position?: Position;
+  reason?: Reason1;
   status: Status;
 }
 export interface AgentProgress {
@@ -486,6 +501,7 @@ export interface Presence {
 export interface PresencePayload {
   devices: Devices1;
   pc_online?: PcOnline1;
+  revoked?: Revoked;
 }
 export interface RoomKey {
   from: From15;
@@ -504,17 +520,23 @@ export interface RoomKeyPayload {
   key: Key;
   key_id: KeyId;
 }
-export interface Ping {
+/**
+ * PC -> relay: cut a phone off (live connections are closed, future tokens refused).
+ */
+export interface DeviceRevoke {
   from: From16;
   id: Id16;
-  payload?: Empty;
+  payload: DeviceRevokePayload;
   reply_to?: ReplyTo16;
   room_id: RoomId16;
   ts: Ts16;
   type?: Type16;
   v?: V16;
 }
-export interface Pong {
+export interface DeviceRevokePayload {
+  device_id: DeviceId2;
+}
+export interface Ping {
   from: From17;
   id: Id17;
   payload?: Empty;
@@ -524,15 +546,25 @@ export interface Pong {
   type?: Type17;
   v?: V17;
 }
-export interface ErrorMsg {
+export interface Pong {
   from: From18;
   id: Id18;
-  payload: ErrorPayload;
+  payload?: Empty;
   reply_to?: ReplyTo18;
   room_id: RoomId18;
   ts: Ts18;
   type?: Type18;
   v?: V18;
+}
+export interface ErrorMsg {
+  from: From19;
+  id: Id19;
+  payload: ErrorPayload;
+  reply_to?: ReplyTo19;
+  room_id: RoomId19;
+  ts: Ts19;
+  type?: Type19;
+  v?: V19;
 }
 export interface ErrorPayload {
   code: Code;

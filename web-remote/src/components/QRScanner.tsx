@@ -30,6 +30,17 @@ interface Props {
 
 /** Explains pairing: the QR itself is scanned by the phone's own camera app, which opens this page. */
 export function QRScanner({ connection, hasPairParams, paired }: Props) {
+  if (connection === "unreachable") {
+    // Soft failure: the remote stays on screen (disabled) and we keep retrying in the background.
+    return (
+      <section className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-center" role="status">
+        <h2 className="text-base font-semibold">Can't reach your TV</h2>
+        <p className="mt-1 text-sm text-zinc-300">
+          Check your connection - we'll keep trying. If this keeps happening, scan the QR code on the TV again.
+        </p>
+      </section>
+    );
+  }
   if (paired && connection !== "rejected") return null;
   if (connection === "rejected") {
     return (

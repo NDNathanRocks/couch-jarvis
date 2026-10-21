@@ -376,3 +376,37 @@ async def test_oversize_events_are_dropped_not_sent(rig: Rig, relay: FakeRelay) 
     await asyncio.sleep(0.2)
     assert all(len(json.dumps(m)) < 32 * 1024 for m in relay.received)
     assert rig.statuses == ["up"]  # connection survived
+
+
+async def test_relay_revocation_list_is_enforced_locally_for_offline_use(
+    rig: Rig, relay: FakeRelay
+) -> None:
+    await until(lambda: "state.snapshot" in relay.types())
+    presence = envelope(
+        Presence,
+        rig.store.identity.room_id,
+        {"devices": [], "pc_online": True, "revoked": ["dev-evicted"]},
+        from_="relay",
+    )
+    await relay.push(presence)
+    await until(lambda: "dev-evicted" in rig.store.identity.revoked)
+    assert "dev-evicted" in rig.service.revoked
+    (err,) = await rig.service.handle_envelope(
+        envelope(
+            CmdText,
+            rig.store.identity.room_id,
+            {"command_id": "c", "idempotency_key": "k", "text": "pause"},
+            from_="dev-evicted",
+        ),
+        "dev-evicted",
+    )
+    assert err.payload.code == "revoked"  # type: ignore[union-attr]
+    assert RoomStore(rig.store._path).load_or_create().revoked == {"dev-evicted"}  # noqa: SLF001
+
+
+async def test_owner_revocation_is_forwarded_to_the_relay(rig: Rig, relay: FakeRelay) -> None:
+    await until(lambda: "state.snapshot" in relay.types())
+    rig.service.revoke_device("dev-gone")
+    await until(lambda: "device.revoke" in relay.types())
+    sent = next(m for m in relay.received if m["type"] == "device.revoke")
+    assert sent["payload"] == {"device_id": "dev-gone"}

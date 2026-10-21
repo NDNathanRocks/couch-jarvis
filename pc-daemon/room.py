@@ -13,6 +13,7 @@ import os
 import secrets
 import sys
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from pathlib import Path
 from urllib.parse import urlencode
@@ -60,6 +61,7 @@ class RoomIdentity:
     created_at: float
     # Per-room HS256 key handed to us by the relay; lets us verify device tokens offline (LAN).
     room_key: str | None = None
+    revoked: frozenset[str] = frozenset()  # device ids that may no longer connect
 
     @property
     def room_secret_hash(self) -> str:
@@ -107,6 +109,7 @@ class RoomStore:
             pc_key=current.pc_key,
             created_at=current.created_at,
             room_key=current.room_key,
+            revoked=current.revoked,
         )
         self._write(self._identity)
         return self._identity
@@ -116,6 +119,15 @@ class RoomStore:
         current = self.identity
         if current.room_key != room_key:
             self._identity = replace(current, room_key=room_key)
+            self._write(self._identity)
+        return self.identity
+
+    def add_revoked(self, device_ids: Iterable[str]) -> RoomIdentity:
+        """Remember revoked device ids (a set that only grows; the relay is authoritative)."""
+        current = self.identity
+        merged = current.revoked | frozenset(device_ids)
+        if merged != current.revoked:
+            self._identity = replace(current, revoked=merged)
             self._write(self._identity)
         return self.identity
 
@@ -129,6 +141,7 @@ class RoomStore:
             pc_key=sec["pc_key"],
             created_at=float(doc["created_at"]),
             room_key=sec.get("room_key"),
+            revoked=frozenset(doc.get("revoked", [])),
         )
 
     def _write(self, ident: RoomIdentity) -> None:
@@ -139,6 +152,7 @@ class RoomStore:
         doc = {
             "room_id": ident.room_id,
             "created_at": ident.created_at,
+            "revoked": sorted(ident.revoked),
             "secrets": base64.b64encode(protect_bytes(sec)).decode("ascii"),
         }
         tmp = self._path.with_suffix(".tmp")

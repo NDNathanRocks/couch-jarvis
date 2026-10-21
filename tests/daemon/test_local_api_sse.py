@@ -176,7 +176,7 @@ async def test_non_loopback_clients_need_a_valid_token(live: Live) -> None:
         live.rt.service, live.rt.telemetry, token_verifier=lambda t: "dev1" if t == "good" else None
     )
     transport = httpx.ASGITransport(app=app, client=("10.0.0.5", 5555))
-    async with httpx.AsyncClient(transport=transport, base_url="http://pc") as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://192.168.1.9:8765") as client:
         assert (await client.get("/api/metrics")).status_code == 401
         assert (await client.get("/api/metrics", params={"token": "bad"})).status_code == 401
         assert (await client.get("/api/metrics", params={"token": "good"})).status_code == 200
@@ -192,7 +192,7 @@ async def test_non_loopback_clients_need_a_valid_token(live: Live) -> None:
 async def test_cors_only_allows_configured_origins(live: Live) -> None:
     app = create_app(live.rt.service, live.rt.telemetry, allowed_origins=["https://remote.example"])
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://pc"
+        transport=httpx.ASGITransport(app=app), base_url="http://192.168.1.9:8765"
     ) as client:
         good = await client.get("/healthz", headers={"Origin": "https://remote.example"})
         bad = await client.get("/healthz", headers={"Origin": "https://evil.example"})
@@ -248,9 +248,9 @@ async def test_lan_websocket_rejects_garbage_and_forbidden_types(live: Live) -> 
 async def test_loopback_trust_can_be_switched_off(live: Live) -> None:
     app = create_app(live.rt.service, live.rt.telemetry, trust_loopback=False)
     transport = httpx.ASGITransport(app=app, client=("127.0.0.1", 5555))
-    async with httpx.AsyncClient(transport=transport, base_url="http://pc") as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://192.168.1.9:8765") as client:
         assert (await client.get("/api/metrics")).status_code == 401
     trusted = create_app(live.rt.service, live.rt.telemetry)
     transport = httpx.ASGITransport(app=trusted, client=("127.0.0.1", 5555))
-    async with httpx.AsyncClient(transport=transport, base_url="http://pc") as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://192.168.1.9:8765") as client:
         assert (await client.get("/api/metrics")).status_code == 200

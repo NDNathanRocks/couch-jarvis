@@ -14,6 +14,9 @@ comtypes>=1.4; sys_platform == "win32"
 pillow>=10,<13
 PyJWT>=2.9,<3
 faster-whisper>=1.0,<2
+# faster-whisper 1.2 calls av.open(metadata_errors=...), which PyAV 19 removed: voice decoding
+# fails on every request with a TypeError. Found by decoding real browser audio in Phase 3.
+av>=14,<19
 PySide6>=6.7,<7
 qasync>=0.27,<1
 segno>=1.6,<2

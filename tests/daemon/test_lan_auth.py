@@ -198,3 +198,31 @@ async def test_wrong_secret_is_denied_and_repeated_guessing_is_cut_off(lan: Lan)
                     if json.loads(await ws.recv())["type"] == "pair.denied":
                         denied += 1
         assert denied == 5 and closed.value.rcvd is not None and closed.value.rcvd.code == 4403
+
+
+async def test_a_browser_on_the_pc_itself_can_pair_with_pair_flag(tmp_path: Path) -> None:
+    """Regression: loopback is trusted, which used to skip pairing and strand the PWA on 'Pairing…'."""
+    store = RoomStore(tmp_path / "room.json")
+    store.load_or_create()
+    store.set_room_key("k" * 64)
+    rt = build_runtime(Settings(_env_file=None), dry_run=True)
+    auth = LanAuth(store)
+    app = create_app(rt.service, rt.telemetry, token_verifier=auth.verify_token, pairing=auth.pair)
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    server = uvicorn.Server(uvicorn.Config(app, log_level="warning"))
+    await rt.service.start()
+    task = asyncio.create_task(server.serve(sockets=[sock]))
+    async with asyncio.timeout(5):
+        while not server.started:
+            await asyncio.sleep(0.01)
+    try:
+        uri = f"ws://127.0.0.1:{sock.getsockname()[1]}/ws?pair=1"
+        async with websockets.connect(uri) as ws:
+            await ws.send(pair_msg(store.identity.room_secret))
+            granted = await recv_until(ws, "pair.granted")
+            assert granted["payload"]["device_id"].startswith("lan-")  # type: ignore[index]
+    finally:
+        server.should_exit = True
+        await task
+        await rt.service.stop()

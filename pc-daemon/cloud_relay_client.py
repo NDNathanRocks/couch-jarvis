@@ -175,6 +175,8 @@ class CloudRelayClient:
         async with self._bus.subscribe() as queue:
             while True:
                 event = await queue.get()
+                if self._bus.consume_lag(queue):  # events were dropped: resync the phones
+                    await self._send_snapshot(ws)
                 if len(event.data.encode("utf-8")) > MAX_FRAME_BYTES:
                     log.warning(
                         "dropping oversize %s event (%d bytes)", event.type, len(event.data)
@@ -192,6 +194,10 @@ class CloudRelayClient:
             if isinstance(msg, RoomKey):
                 self._store.set_room_key(msg.payload.key)
             elif isinstance(msg, Presence):
+                if msg.payload.revoked:
+                    self._store.add_revoked(msg.payload.revoked)  # keep LAN auth in step
+                    for device_id in msg.payload.revoked:
+                        self._service.revoked.add(device_id)
                 self._service.set_cloud_devices(msg.payload.devices)
             elif isinstance(msg, PHONE_MESSAGES):
                 replies = await self._service.handle_envelope(msg, msg.from_)

@@ -53,7 +53,9 @@ type Mode =
   | { kind: "pair"; roomId: string; secret: string };
 
 const TOKEN_FAILURES_BEFORE_REPAIR_HINT = 3;
-const SLOW_RETRY_MS = 30_000;
+// After repeated handshake failures keep trying, but gently: 15 s is quick enough to feel
+// recovered once an outage ends, cheap enough that a revoked token costs almost nothing.
+const SLOW_RETRY_MS = 15_000;
 
 export class RoomConnection {
   private mode: Mode = { kind: "none" };
@@ -191,9 +193,9 @@ export class RoomConnection {
       // The handshake itself failed: a revoked/expired token looks exactly like this.
       this.handshakeFailures++;
     }
-    const rejected = this.handshakeFailures >= TOKEN_FAILURES_BEFORE_REPAIR_HINT;
-    this.opts.dispatch({ type: "connection", connection: rejected ? "rejected" : "offline" });
-    this.scheduleReconnect(rejected ? SLOW_RETRY_MS : undefined);
+    const unreachable = this.handshakeFailures >= TOKEN_FAILURES_BEFORE_REPAIR_HINT;
+    this.opts.dispatch({ type: "connection", connection: unreachable ? "unreachable" : "offline" });
+    this.scheduleReconnect(unreachable ? SLOW_RETRY_MS : undefined);
   }
 
   private scheduleReconnect(fixedDelayMs?: number): void {
@@ -286,7 +288,7 @@ export class RoomConnection {
     const commandId = uuid();
     const id = this.send("cmd.button", { command_id: commandId, idempotency_key: uuid(), action, args: {} });
     if (!id) return this.notConnected();
-    this.opts.dispatch({ type: "sent", messageId: id, commandId, label: "Sending..." });
+    this.opts.dispatch({ type: "sent", messageId: id, commandId, label: "Sending...", at: this.now() });
     return true;
   }
 
@@ -296,7 +298,7 @@ export class RoomConnection {
     const commandId = uuid();
     const id = this.send("cmd.text", { command_id: commandId, idempotency_key: uuid(), text: trimmed });
     if (!id) return this.notConnected();
-    this.opts.dispatch({ type: "sent", messageId: id, commandId, label: "Sending..." });
+    this.opts.dispatch({ type: "sent", messageId: id, commandId, label: "Sending...", at: this.now() });
     return true;
   }
 
@@ -310,7 +312,7 @@ export class RoomConnection {
       total_chunks: rec.chunks.length,
       duration_ms: rec.durationMs,
     });
-    this.opts.dispatch({ type: "sent", messageId: end ?? begin, commandId, label: "Listening..." });
+    this.opts.dispatch({ type: "sent", messageId: end ?? begin, commandId, label: "Listening...", at: this.now() });
     return true;
   }
 

@@ -130,3 +130,26 @@ describe("returning phone", () => {
     expect(screen.getByRole("button", { name: "Hold to talk" })).toBeDisabled();
   });
 });
+
+describe("transient outages", () => {
+  it("keeps the remote on screen (disabled) and never claims the pairing is gone", async () => {
+    localStorage.setItem(
+      "cj.pairing",
+      JSON.stringify({ roomId: "room-abcdef123", deviceId: "dev-1", deviceToken: "t", expiresAt: 2_000_000_000, deviceName: "P" }),
+    );
+    vi.useFakeTimers();
+    render(<App />);
+    for (let i = 0; i < 3; i++) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(31_000);
+      });
+      await act(async () => FakeSocket.last.drop(1006)); // handshake never completed (e.g. throttled)
+    }
+    vi.useRealTimers();
+    expect(await screen.findByText(/Can't reach your TV/)).toBeInTheDocument();
+    expect(screen.queryByText(/no longer paired/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Play / Pause" })).toBeDisabled(); // visible, not hidden
+    expect(screen.getByRole("button", { name: "Forget this phone" })).toBeEnabled(); // escape hatch stays
+    expect(localStorage.getItem("cj.pairing")).not.toBeNull(); // the pairing is kept
+  });
+});

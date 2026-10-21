@@ -11,6 +11,7 @@ from common.models import build
 
 def presence_message(store: Store, room_id: str) -> str:
     conns = store.list_connections(room_id)
+    all_devices = store.list_devices(room_id)
     online = {c.get("device_id") for c in conns if c.get("role") == "phone" and c.get("authed")}
     devices: list[dict[str, Any]] = [
         {
@@ -19,11 +20,14 @@ def presence_message(store: Store, room_id: str) -> str:
             "online": d["device_id"] in online,
             "last_seen": float(d.get("last_seen", 0)),
         }
-        for d in store.list_devices(room_id)
+        for d in all_devices
         if not d.get("revoked")
     ]
     pc_online = any(c.get("role") == "pc" for c in conns)
-    return build("presence", room_id, {"devices": devices, "pc_online": pc_online})
+    revoked = sorted(str(d["device_id"]) for d in all_devices if d.get("revoked"))[:100]
+    return build(
+        "presence", room_id, {"devices": devices, "pc_online": pc_online, "revoked": revoked}
+    )
 
 
 def broadcast_presence(

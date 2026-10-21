@@ -20,6 +20,7 @@ from langgraph.graph import END, StateGraph
 from pydantic import ValidationError
 
 from agent.fastpath import plan_button, plan_text
+from agent.policy import key_allowed, normalize_keys, on_media_site, sanitize_untrusted, url_allowed
 from agent.prompts import (
     ROUTER_SYSTEM,
     router_repair_prompt,
@@ -125,9 +126,12 @@ def build_graph(deps: AgentDeps) -> Any:
 
     async def route_with_llm(state: AgentState, span: Span) -> IntentPlan | None:
         snap = await deps.browser.snapshot()
+        # The tab title is page-controlled text: quote it as bounded, markup-free untrusted data
+        # and never include the URL.
+        title = sanitize_untrusted(snap.title)
         context = (
-            f"url={snap.url or 'none'} title={snap.title!r} playing={snap.is_playing} "
-            f"fullscreen={snap.is_fullscreen}"
+            f"<untrusted_page_title>{title}</untrusted_page_title> "
+            f"playing={snap.is_playing} fullscreen={snap.is_fullscreen}"
         )
         user = router_user_prompt(state.utterance, context)
         bad_reply, error = "", ""
@@ -185,7 +189,10 @@ def build_graph(deps: AgentDeps) -> Any:
                 return await deps.browser.search_and_play(
                     str(a["query"]), str(a.get("source", "youtube"))
                 )
-            return await deps.browser.navigate(str(a.get("url", "")))
+            url = str(a.get("url", ""))
+            if not url_allowed(url):  # LLM output is untrusted: only https media sites
+                return ActionResult(False, "dom", "url is not on the media allowlist", "blocked")
+            return await deps.browser.navigate(url)
         if op == "media_key":
             return await run_media_key(a)
         if op == "volume_set":
@@ -202,9 +209,18 @@ def build_graph(deps: AgentDeps) -> Any:
             deps.show_qr()
             return ActionResult(True, "os")
         if op == "click_selector":
+            if not on_media_site((await deps.browser.snapshot()).url):
+                return ActionResult(
+                    False, "dom", "clicks are only allowed on media sites", "blocked"
+                )
             return await deps.browser.click_selector(str(a["selector"]), step.timeout_ms)
         if op == "key":
-            return await deps.os_ctl.key_combo(*str(a["keys"]).split("+"))
+            keys = normalize_keys(str(a.get("keys", "")))
+            if not key_allowed(keys):  # never let model output press arbitrary OS shortcuts
+                return ActionResult(
+                    False, "os", f"key combination {keys!r} is not allowed", "blocked"
+                )
+            return await deps.os_ctl.key_combo(*keys.split("+"))
         if op == "js_eval_allowlisted":
             return await deps.browser.eval_allowlisted(str(a.get("name", "")))
         if op == "wait_for":
@@ -218,6 +234,10 @@ def build_graph(deps: AgentDeps) -> Any:
             )
             return ActionResult(True, "os")
         if op == "vision_click":
+            if not on_media_site((await deps.browser.snapshot()).url):
+                return ActionResult(
+                    False, "dom", "clicks are only allowed on media sites", "blocked"
+                )
             return ActionResult(False, "dom", "vision-only step", "vision_only")
         return ActionResult(False, "dom", f"unsupported op: {op}", "unsupported")
 
@@ -269,7 +289,7 @@ def build_graph(deps: AgentDeps) -> Any:
                 cursor += 1
                 tier_used = res.tier
                 continue
-            if step.op in VISION_ELIGIBLE:
+            if step.op in VISION_ELIGIBLE and res.fallback_reason != "blocked":
                 return {
                     "cursor": cursor,
                     "outcomes": outcomes,
@@ -299,6 +319,8 @@ def build_graph(deps: AgentDeps) -> Any:
         started = time.perf_counter()
         if step.op in ("fullscreen", "close_ad"):
             res = await deps.fullscreener.vision_tier(step.op)
+        elif not on_media_site((await deps.browser.snapshot()).url):
+            res = ActionResult(False, "vision", "clicks are only allowed on media sites", "blocked")
         else:
             target = str(
                 step.args.get("target")

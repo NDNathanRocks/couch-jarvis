@@ -223,12 +223,20 @@ class Store:
             if not _is(err, "ConditionalCheckFailedException"):
                 raise
 
-    def revoke_device(self, room_id: str, device_id: str) -> None:
-        self._devices.update_item(
-            Key={"room_id": room_id, "device_id": device_id},
-            UpdateExpression="SET revoked = :t",
-            ExpressionAttributeValues={":t": True},
-        )
+    def revoke_device(self, room_id: str, device_id: str) -> bool:
+        """Mark a device revoked. False if it does not exist (no ghost records are created)."""
+        try:
+            self._devices.update_item(
+                Key={"room_id": room_id, "device_id": device_id},
+                UpdateExpression="SET revoked = :t",
+                ConditionExpression="attribute_exists(device_id)",
+                ExpressionAttributeValues={":t": True},
+            )
+            return True
+        except ClientError as err:
+            if _is(err, "ConditionalCheckFailedException"):
+                return False
+            raise
 
     def list_devices(self, room_id: str) -> list[dict[str, Any]]:
         resp = self._devices.query(

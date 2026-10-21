@@ -18,7 +18,7 @@ select = ["E", "F", "I", "B", "UP", "ASYNC", "SIM"]
 "pc-daemon/executors/edge_cdp.py" = ["E501"]
 "pc-daemon/agent/prompts.py" = ["E501"]
 # polling helpers in tests are clearer than Events
-"tests/**" = ["ASYNC109", "ASYNC110"]
+"tests/**" = ["ASYNC109", "ASYNC110", "E501"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -43,4 +43,5 @@ markers = [
   "aws: needs deployed AWS resources",
   "llm: needs a live Ollama/Gemini/Groq endpoint",
   "gui: needs a display (PySide6)",
+  "e2e: drives real Microsoft Edge with Playwright against a live daemon",
 ]

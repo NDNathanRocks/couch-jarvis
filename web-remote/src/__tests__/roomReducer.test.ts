@@ -146,3 +146,49 @@ describe("commands, progress and toasts", () => {
     expect(progressText("mystery", "start", "")).toBe("mystery...");
   });
 });
+
+describe("back-pressure and lost answers", () => {
+  const sent = (commandId: string, at: number): RoomAction => ({
+    type: "sent", messageId: `m-${commandId}`, commandId, label: "Sending...", at,
+  });
+
+  it.each([
+    ["rate_limited", /too many taps/i],
+    ["queue_full", /TV is busy/i],
+    [undefined, /rejected/i],
+  ])("a rejected ack with reason %s tells the user what to do", (reason, pattern) => {
+    const payload = { command_id: "c", status: "rejected" as const, ...(reason ? { reason } : {}) };
+    const v = run(run(initialView, sent("c", 0)), msg("cmd.ack", payload as never));
+    expect(v.toasts[0]?.text).toMatch(pattern);
+    expect(v.pending).toEqual({});
+    expect(v.pendingAt).toEqual({});
+  });
+
+  it("a command the PC never answers times out instead of spinning forever", () => {
+    let v = run(initialView, sent("old", 1_000), sent("fresh", 40_000));
+    v = run(v, { type: "expire", now: 50_000, maxAgeMs: 45_000 });
+    expect(Object.keys(v.pending)).toEqual(["fresh"]); // 49 s old expired, 10 s old kept
+    expect(v.pendingAt).toEqual({ fresh: 40_000 });
+    expect(v.toasts.at(-1)).toMatchObject({ kind: "error", text: expect.stringMatching(/No answer/) });
+  });
+
+  it("expire is a no-op (same reference) when nothing is stale", () => {
+    const v = run(initialView, sent("c", 10_000));
+    expect(run(v, { type: "expire", now: 20_000, maxAgeMs: 45_000 })).toBe(v);
+    expect(run(initialView, { type: "expire", now: 1, maxAgeMs: 1 })).toBe(initialView);
+  });
+
+  it("a late result after expiry is harmless", () => {
+    let v = run(initialView, sent("c", 0));
+    v = run(v, { type: "expire", now: 100_000, maxAgeMs: 45_000 });
+    v = run(v, msg("cmd.result", { command_id: "c", ok: true, message: "Done", tier_used: "dom", latency_ms: 1 }));
+    expect(v.pending).toEqual({});
+    expect(v.toasts.some((t) => t.text === "Done")).toBe(true);
+  });
+
+  it("results clear the sent timestamp too", () => {
+    let v = run(initialView, sent("c", 5));
+    v = run(v, msg("cmd.result", { command_id: "c", ok: true, message: "ok", tier_used: "dom", latency_ms: 1 }));
+    expect(v.pendingAt).toEqual({});
+  });
+});

@@ -12,13 +12,14 @@ import binascii
 import contextlib
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from pydantic import BaseModel
 
 from agent.graph import AgentRunner
-from command_queue import CommandQueue, CommandRequest, SubmitAck
+from command_queue import CommandQueue, CommandRequest, Priority, SubmitAck
 from contracts import (
     PHONE_TO_SERVER_TYPES,
     AgentProgress,
@@ -33,6 +34,7 @@ from contracts import (
     CmdResultPayload,
     CmdText,
     DevicePresence,
+    DeviceRevoke,
     ErrorMsg,
     ErrorPayload,
     Message,
@@ -53,6 +55,9 @@ from timers import TimerService
 log = logging.getLogger(__name__)
 
 MAX_AUDIO_BYTES = 2 * 1024 * 1024
+MAX_AUDIO_PER_DEVICE = 2
+MAX_AUDIO_TOTAL = 8
+MAX_CONCURRENT_STT = 2
 AUDIO_TTL_S = 30.0
 
 
@@ -95,6 +100,28 @@ def _plain(value: Any) -> Any:
     return value
 
 
+class TokenBucket:
+    """Per-key rate limiter: burst immediate actions, refilled at rate per second."""
+
+    def __init__(
+        self, rate: float, burst: float, clock: Callable[[], float] = time.monotonic
+    ) -> None:
+        self._rate, self._burst, self._clock = rate, burst, clock
+        self._state: dict[str, tuple[float, float]] = {}
+
+    def allow(self, key: str) -> bool:
+        now = self._clock()
+        tokens, last = self._state.get(key, (self._burst, now))
+        tokens = min(self._burst, tokens + (now - last) * self._rate)
+        if tokens < 1:
+            self._state[key] = (tokens, now)
+            return False
+        self._state[key] = (tokens - 1, now)
+        if len(self._state) > 1024:  # forget idle keys: bounded memory
+            self._state = {k: v for k, v in self._state.items() if now - v[1] < 60}
+        return True
+
+
 @dataclass
 class _AudioBuffer:
     device_id: str
@@ -132,9 +159,13 @@ class CommandService:
         self._timers = timers
         self._poll_s = state_poll_s
         self.queue = CommandQueue(self._run_command, on_result=self._on_result)
-        self._audio: dict[str, _AudioBuffer] = {}
+        self._audio: dict[tuple[str, str], _AudioBuffer] = {}  # (device_id, command_id)
+        self._limiter = TokenBucket(rate=4.0, burst=12.0)
+        self._stt_slots = asyncio.Semaphore(MAX_CONCURRENT_STT)
         self._devices: dict[str, DevicePresence] = {}
         self._cloud_devices: list[DevicePresence] = []
+        self.revoked: set[str] = set()
+        self.on_revoke: Callable[[str], None] = lambda _device_id: None
         self._bg: set[asyncio.Task[None]] = set()
         self._poller: asyncio.Task[None] | None = None
 
@@ -170,6 +201,15 @@ class CommandService:
         )
 
     # ------------------------------------------------------------------ devices
+
+    def revoke_device(self, device_id: str) -> None:
+        """Cut a phone off everywhere: LAN sockets, offline tokens and (via the bus) the relay."""
+        self.revoked.add(device_id)
+        self.on_revoke(device_id)
+        self._devices.pop(device_id, None)
+        self._cloud_devices = [d for d in self._cloud_devices if d.device_id != device_id]
+        self._push_devices()
+        self.bus.publish(envelope(DeviceRevoke, self.room_id, {"device_id": device_id}))
 
     def set_cloud_devices(self, devices: list[DevicePresence]) -> None:
         """Relay presence is authoritative for cloud-paired phones."""
@@ -211,6 +251,8 @@ class CommandService:
         ]
 
     async def _dispatch(self, msg: Message, device_id: str) -> list[Message]:
+        if device_id in self.revoked:
+            return [self._error("revoked", "This phone was removed")]
         if msg.type not in PHONE_TO_SERVER_TYPES:
             return [self._error("forbidden_type", f"{msg.type} is not accepted from phones")]
         if msg.type == "ping":
@@ -248,12 +290,22 @@ class CommandService:
         return []
 
     def submit(self, req: CommandRequest) -> SubmitAck:
-        ack = self.queue.submit(req)
+        if req.effective_priority() != Priority.EMERGENCY and not self._limiter.allow(
+            req.device_id
+        ):
+            ack = SubmitAck(command_id=req.command_id, status="rejected", reason="rate_limited")
+        else:
+            ack = self.queue.submit(req)
         self.bus.publish(
             envelope(
                 CmdAck,
                 self.room_id,
-                CmdAckPayload(command_id=req.command_id, status=ack.status, position=ack.position),
+                CmdAckPayload(
+                    command_id=req.command_id,
+                    status=ack.status,
+                    position=ack.position,
+                    reason=ack.reason,
+                ),
             )
         )
         if ack.status == "duplicate" and ack.cached_result is not None:
@@ -275,15 +327,22 @@ class CommandService:
 
     def _gc_audio(self) -> None:
         now = time.monotonic()
-        for cid in [c for c, b in self._audio.items() if now - b.started > AUDIO_TTL_S]:
-            del self._audio[cid]
+        for key in [k for k, b in self._audio.items() if now - b.started > AUDIO_TTL_S]:
+            del self._audio[key]
 
     def _audio_begin(self, msg: AudioBegin, device_id: str) -> list[Message]:
         self._gc_audio()
         p = msg.payload
         if self._stt is None:
             return [self._error("stt_unavailable", "Voice is not available on this PC")]
-        self._audio[p.command_id] = _AudioBuffer(
+        # Buffers are namespaced by sender so one phone can never touch another phone recording,
+        # and capped so a flood of audio.begin cannot exhaust memory (oldest are dropped first).
+        mine = [k for k in self._audio if k[0] == device_id]
+        while len(mine) >= MAX_AUDIO_PER_DEVICE:
+            del self._audio[mine.pop(0)]
+        while len(self._audio) >= MAX_AUDIO_TOTAL:
+            del self._audio[next(iter(self._audio))]
+        self._audio[(device_id, p.command_id)] = _AudioBuffer(
             device_id, p.idempotency_key, p.mime, time.monotonic()
         )
         self.bus.publish(
@@ -295,25 +354,25 @@ class CommandService:
 
     def _audio_chunk(self, msg: AudioChunk, device_id: str) -> list[Message]:
         p = msg.payload
-        buf = self._audio.get(p.command_id)
-        if buf is None or buf.device_id != device_id:
+        buf = self._audio.get((device_id, p.command_id))
+        if buf is None:
             return [self._error("unknown_audio", "No audio stream in progress")]
         try:
             data = base64.b64decode(p.b64, validate=True)
         except (binascii.Error, ValueError):
-            self._audio.pop(p.command_id, None)
+            self._audio.pop((device_id, p.command_id), None)
             return [self._error("bad_audio", "Audio chunk was not valid base64")]
         buf.size += len(data)
         if buf.size > MAX_AUDIO_BYTES:
-            self._audio.pop(p.command_id, None)
+            self._audio.pop((device_id, p.command_id), None)
             return [self._error("too_large", "Recording too long")]
         buf.chunks[p.seq] = data
         return []
 
     def _audio_end(self, msg: AudioEnd, device_id: str) -> list[Message]:
         p = msg.payload
-        buf = self._audio.pop(p.command_id, None)
-        if buf is None or buf.device_id != device_id:
+        buf = self._audio.pop((device_id, p.command_id), None)
+        if buf is None:
             return [self._error("unknown_audio", "No audio stream in progress")]
         if sorted(buf.chunks) != list(range(p.total_chunks)):
             self._publish_result(p.command_id, False, "Recording was incomplete, try again")
@@ -332,7 +391,8 @@ class CommandService:
         assert self._stt is not None
         self.progress(command_id, "stt", "start", "")
         try:
-            transcript = await self._stt.transcribe(audio, buf.mime, audio_ms=duration_ms)
+            async with self._stt_slots:  # bound GPU/API concurrency however many phones talk
+                transcript = await self._stt.transcribe(audio, buf.mime, audio_ms=duration_ms)
         except STTError:
             self._publish_result(command_id, False, "I could not hear that.")
             return

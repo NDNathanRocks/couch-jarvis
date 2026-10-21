@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
+import re
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Annotated, Literal
@@ -34,6 +36,7 @@ from contracts import (
     parse_message,
 )
 from event_bus import BusEvent
+from guard import GuardMiddleware
 from service import CommandService
 from telemetry import Telemetry
 
@@ -61,7 +64,6 @@ class ApiCommandBody(BaseModel):
     text: str | None = Field(None, min_length=1, max_length=500)
     action: QuickAction | None = None
     command_id: str | None = None
-    device_id: str | None = None
 
 
 def _bearer(request: Request, token: str | None = Query(None)) -> str:
@@ -73,6 +75,26 @@ def _bearer(request: Request, token: str | None = Query(None)) -> str:
 
 
 DeviceId = Annotated[str, Depends(_bearer)]
+
+
+def _require_local(request: Request) -> None:
+    """Owner-only actions: the request must really come from this PC (tokens are not enough)."""
+    host = request.client.host if request.client else None
+    if host not in LOOPBACK_HOSTS:
+        raise HTTPException(status_code=403, detail="only available on the PC itself")
+
+
+Local = Annotated[None, Depends(_require_local)]  # module level so FastAPI can resolve it
+
+
+def _revokes(event: BusEvent, device_id: str) -> bool:
+    """True if this bus event is the owner revoking exactly this device."""
+    if event.type != "device.revoke":
+        return False
+    try:
+        return bool(json.loads(event.data)["payload"]["device_id"] == device_id)
+    except (ValueError, KeyError, TypeError):
+        return False
 
 
 def create_app(
@@ -94,6 +116,8 @@ def create_app(
             allow_methods=["GET", "POST"],
             allow_headers=["authorization", "content-type", "last-event-id"],
         )
+    # Outermost layer (added last): reject cross-site and DNS-rebinding traffic first.
+    app.add_middleware(GuardMiddleware, allowed_origins=allowed_origins or [])
     bus = service.bus
 
     def authenticate(host: str | None, token: str | None) -> str:
@@ -112,6 +136,21 @@ def create_app(
     async def healthz() -> dict[str, object]:
         return {"ok": True, "queue_depth": service.queue.depth, "rev": service.state.state.rev}
 
+    @app.get("/api/devices")
+    async def devices(_: Local) -> dict[str, object]:
+        state = service.state.state
+        return {
+            "devices": [d.model_dump() for d in state.devices],
+            "revoked": sorted(service.revoked),
+        }
+
+    @app.post("/api/devices/{device_id}/revoke")
+    async def revoke(device_id: str, _: Local) -> dict[str, object]:
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", device_id):
+            raise HTTPException(status_code=422, detail="bad device id")
+        service.revoke_device(device_id)
+        return {"revoked": device_id}
+
     @app.get("/api/metrics")
     async def metrics(_: DeviceId) -> dict[str, object]:
         return telemetry.rollup()
@@ -125,7 +164,7 @@ def create_app(
             req = CommandRequest(
                 command_id=command_id,
                 idempotency_key=body.idempotency_key,
-                device_id=body.device_id or device,
+                device_id=device,
                 kind="text",
                 text=body.text,
             )
@@ -135,7 +174,7 @@ def create_app(
             req = CommandRequest(
                 command_id=command_id,
                 idempotency_key=body.idempotency_key,
-                device_id=body.device_id or device,
+                device_id=device,
                 kind="button",
                 action=body.action,
             )
@@ -143,7 +182,7 @@ def create_app(
         return {"command_id": command_id, "status": ack.status, "position": ack.position}
 
     @app.get("/events")
-    async def events(request: Request, _: DeviceId) -> StreamingResponse:
+    async def events(request: Request, device: DeviceId) -> StreamingResponse:
         last_header = request.headers.get("last-event-id", "")
         resume_from = int(last_header) if last_header.isdigit() else None
 
@@ -163,6 +202,11 @@ def create_app(
                     except TimeoutError:
                         yield ": keepalive\n\n"
                         continue
+                    if _revokes(event, device):
+                        return  # this phone was removed: end its stream
+                    if bus.consume_lag(queue):  # this client fell behind: events were dropped
+                        fresh = service.state.snapshot_message()
+                        yield BusEvent(bus.last_seq, "state.snapshot", dump_message(fresh)).to_sse()
                     if event.seq > seen:
                         seen = event.seq
                         yield event.to_sse()
@@ -173,10 +217,14 @@ def create_app(
     async def lan_ws(ws: WebSocket) -> None:
         host = ws.client.host if ws.client else None
         device_id: str | None = None
-        try:
-            device_id = authenticate(host, ws.query_params.get("token"))
-        except HTTPException:
-            if pairing is None or ws.query_params.get("pair") != "1":
+        if pairing is not None and ws.query_params.get("pair") == "1":
+            # An explicit ?pair=1 always runs the pairing flow, even from loopback: a browser on
+            # the PC itself must be able to pair like any phone.
+            pass
+        else:
+            try:
+                device_id = authenticate(host, ws.query_params.get("token"))
+            except HTTPException:
                 await ws.close(code=4401)
                 return
         await ws.accept()
@@ -188,7 +236,13 @@ def create_app(
             async with bus.subscribe() as queue:
                 await ws.send_text(dump_message(service.state.snapshot_message()))
                 while True:
-                    await ws.send_text((await queue.get()).data)
+                    event = await queue.get()
+                    if device_id is not None and _revokes(event, device_id):
+                        await ws.close(code=4403)  # removed by the PC owner
+                        return
+                    if bus.consume_lag(queue):  # missed events: resend full state first
+                        await ws.send_text(dump_message(service.state.snapshot_message()))
+                    await ws.send_text(event.data)
 
         def start_session(did: str) -> None:
             nonlocal pump_task
@@ -230,6 +284,9 @@ def create_app(
                     await ws.send_text(dump_message(ok))
                     start_session(device_id)
                     continue
+                if device_id in service.revoked:
+                    await ws.close(code=4403)
+                    return
                 for reply in await service.handle_envelope(msg, device_id):
                     await ws.send_text(dump_message(reply))
         except WebSocketDisconnect:
