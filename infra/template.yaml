@@ -1,0 +1,323 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  CouchJarvis serverless relay. API Gateway WebSocket + Lambda (Python 3.12) + DynamoDB (on-demand, TTL).
+  Phones and the PC daemon exchange typed envelopes through it; no accounts, no servers.
+  Deploy:  sam build && sam deploy --guided   (then put the WebSocketUrl output in CJ_RELAY_WS_URL)
+
+Parameters:
+  StageName:
+    Type: String
+    Default: prod
+    AllowedPattern: "[a-z][a-z0-9]{1,15}"
+  LogRetentionDays:
+    Type: Number
+    Default: 3
+    Description: CloudWatch log retention. Kept short so logs never leave the free tier.
+  BudgetEmail:
+    Type: String
+    Default: ""
+    Description: Optional. If set, a 1 USD/month AWS Budget alarm emails this address at 80% actual spend.
+  ThrottleRatePerSecond:
+    Type: Number
+    Default: 20
+  ThrottleBurst:
+    Type: Number
+    Default: 40
+
+Conditions:
+  HasBudgetEmail: !Not [!Equals [!Ref BudgetEmail, ""]]
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [arm64]
+    Timeout: 10
+    MemorySize: 256
+    CodeUri: lambdas/
+    Environment:
+      Variables:
+        ROOMS_TABLE: !Ref RoomsTable
+        CONNECTIONS_TABLE: !Ref ConnectionsTable
+        DEVICES_TABLE: !Ref DevicesTable
+        IDEMPOTENCY_TABLE: !Ref IdempotencyTable
+        CONFIG_TABLE: !Ref ConfigTable
+        LOG_LEVEL: INFO
+
+Resources:
+  # ------------------------------------------------------------------ DynamoDB (on-demand, always-free tier friendly)
+  RoomsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: room_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: room_id
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+
+  ConnectionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: connection_id
+          AttributeType: S
+        - AttributeName: room_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: connection_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: room-index
+          KeySchema:
+            - AttributeName: room_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  DevicesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: room_id
+          AttributeType: S
+        - AttributeName: device_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: room_id
+          KeyType: HASH
+        - AttributeName: device_id
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  IdempotencyTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # Holds the per-deployment master secret (created on first use by the relay).
+  ConfigTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+
+  # ------------------------------------------------------------------ WebSocket API
+  RelayApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub "${AWS::StackName}-relay"
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: "$request.body.type"
+
+  ConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref RelayApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConnectFunction.Arn}/invocations"
+
+  DisconnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref RelayApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DisconnectFunction.Arn}/invocations"
+
+  RouterIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref RelayApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RouterFunction.Arn}/invocations"
+
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref RelayApi
+      RouteKey: $connect
+      AuthorizationType: NONE # the handler authenticates (pc_key header / device JWT / pairing)
+      Target: !Sub "integrations/${ConnectIntegration}"
+
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref RelayApi
+      RouteKey: $disconnect
+      Target: !Sub "integrations/${DisconnectIntegration}"
+
+  DefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref RelayApi
+      RouteKey: $default
+      Target: !Sub "integrations/${RouterIntegration}"
+
+  RelayStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref RelayApi
+      StageName: !Ref StageName
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingRateLimit: !Ref ThrottleRatePerSecond
+        ThrottlingBurstLimit: !Ref ThrottleBurst
+        DataTraceEnabled: false # never log message bodies (they carry tokens)
+        LoggingLevel: "OFF"
+    DependsOn: [ConnectRoute, DisconnectRoute, DefaultRoute]
+
+  # ------------------------------------------------------------------ Lambdas
+  ConnectLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: !Ref LogRetentionDays
+
+  DisconnectLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: !Ref LogRetentionDays
+
+  RouterLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: !Ref LogRetentionDays
+
+  ConnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: connect_handler.handler
+      Description: WebSocket $connect - authenticates PCs (pc_key) and phones (device JWT / pairing)
+      LoggingConfig:
+        LogGroup: !Ref ConnectLogGroup
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref RoomsTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref ConnectionsTable }
+        - DynamoDBReadPolicy: { TableName: !Ref ConnectionsTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref DevicesTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref ConfigTable }
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:Query
+              Resource: !Sub "${ConnectionsTable.Arn}/index/room-index"
+            - Effect: Allow
+              Action: execute-api:ManageConnections
+              Resource: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${RelayApi}/${StageName}/*/@connections/*"
+
+  DisconnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: disconnect_handler.handler
+      Description: WebSocket $disconnect - prunes the connection and broadcasts presence
+      LoggingConfig:
+        LogGroup: !Ref DisconnectLogGroup
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref RoomsTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref ConnectionsTable }
+        - DynamoDBReadPolicy: { TableName: !Ref DevicesTable }
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:Query
+              Resource: !Sub "${ConnectionsTable.Arn}/index/room-index"
+            - Effect: Allow
+              Action: execute-api:ManageConnections
+              Resource: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${RelayApi}/${StageName}/*/@connections/*"
+
+  RouterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: relay_router.handler
+      Description: WebSocket $default - pairing, command relay (phone to PC) and fan-out (PC to phones)
+      LoggingConfig:
+        LogGroup: !Ref RouterLogGroup
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref RoomsTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref ConnectionsTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref DevicesTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref IdempotencyTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref ConfigTable }
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:Query
+              Resource: !Sub "${ConnectionsTable.Arn}/index/room-index"
+            - Effect: Allow
+              Action: execute-api:ManageConnections
+              Resource: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${RelayApi}/${StageName}/*/@connections/*"
+
+  ConnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ConnectFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${RelayApi}/*/$connect"
+
+  DisconnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref DisconnectFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${RelayApi}/*/$disconnect"
+
+  RouterPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref RouterFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${RelayApi}/*/$default"
+
+  # ------------------------------------------------------------------ Cost guard (optional)
+  CostBudget:
+    Type: AWS::Budgets::Budget
+    Condition: HasBudgetEmail
+    Properties:
+      Budget:
+        BudgetName: !Sub "${AWS::StackName}-monthly"
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: 1
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetEmail
+
+Outputs:
+  WebSocketUrl:
+    Description: Put this in the daemon's CJ_RELAY_WS_URL and the PWA's VITE_RELAY_WS_URL
+    Value: !Sub "wss://${RelayApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"

@@ -1,0 +1,1770 @@
+{
+  "$defs": {
+    "AgentProgress": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/AgentProgressPayload"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "agent.progress",
+          "default": "agent.progress",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "AgentProgress",
+      "type": "object"
+    },
+    "AgentProgressPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "command_id": {
+          "title": "Command Id",
+          "type": "string"
+        },
+        "detail": {
+          "default": "",
+          "title": "Detail",
+          "type": "string"
+        },
+        "node": {
+          "title": "Node",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command_id",
+        "node",
+        "status"
+      ],
+      "title": "AgentProgressPayload",
+      "type": "object"
+    },
+    "AudioBegin": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/AudioBeginPayload"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "audio.begin",
+          "default": "audio.begin",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "AudioBegin",
+      "type": "object"
+    },
+    "AudioBeginPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "command_id": {
+          "title": "Command Id",
+          "type": "string"
+        },
+        "idempotency_key": {
+          "title": "Idempotency Key",
+          "type": "string"
+        },
+        "mime": {
+          "title": "Mime",
+          "type": "string"
+        },
+        "sample_rate": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sample Rate"
+        }
+      },
+      "required": [
+        "command_id",
+        "idempotency_key",
+        "mime"
+      ],
+      "title": "AudioBeginPayload",
+      "type": "object"
+    },
+    "AudioChunk": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/AudioChunkPayload"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "audio.chunk",
+          "default": "audio.chunk",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "AudioChunk",
+      "type": "object"
+    },
+    "AudioChunkPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "b64": {
+          "maxLength": 24576,
+          "title": "B64",
+          "type": "string"
+        },
+        "command_id": {
+          "title": "Command Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command_id",
+        "seq",
+        "b64"
+      ],
+      "title": "AudioChunkPayload",
+      "type": "object"
+    },
+    "AudioEnd": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/AudioEndPayload"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "audio.end",
+          "default": "audio.end",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "AudioEnd",
+      "type": "object"
+    },
+    "AudioEndPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "command_id": {
+          "title": "Command Id",
+          "type": "string"
+        },
+        "duration_ms": {
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "total_chunks": {
+          "minimum": 0,
+          "title": "Total Chunks",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command_id",
+        "total_chunks",
+        "duration_ms"
+      ],
+      "title": "AudioEndPayload",
+      "type": "object"
+    },
+    "CmdAck": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/CmdAckPayload"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "cmd.ack",
+          "default": "cmd.ack",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "CmdAck",
+      "type": "object"
+    },
+    "CmdAckPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "command_id": {
+          "title": "Command Id",
+          "type": "string"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Position"
+        },
+        "status": {
+          "enum": [
+            "accepted",
+            "queued",
+            "duplicate",
+            "rejected"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command_id",
+        "status"
+      ],
+      "title": "CmdAckPayload",
+      "type": "object"
+    },
+    "CmdButton": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/CmdButtonPayload"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "cmd.button",
+          "default": "cmd.button",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "CmdButton",
+      "type": "object"
+    },
+    "CmdButtonPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "play_pause",
+            "next",
+            "prev",
+            "vol_up",
+            "vol_down",
+            "mute",
+            "fullscreen",
+            "skip_ad",
+            "close_tab",
+            "seek_fwd_10",
+            "seek_back_10",
+            "sleep_display",
+            "show_qr",
+            "panic"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "args": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "title": "Args",
+          "type": "object"
+        },
+        "command_id": {
+          "title": "Command Id",
+          "type": "string"
+        },
+        "idempotency_key": {
+          "title": "Idempotency Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command_id",
+        "idempotency_key",
+        "action"
+      ],
+      "title": "CmdButtonPayload",
+      "type": "object"
+    },
+    "CmdResult": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/CmdResultPayload"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "cmd.result",
+          "default": "cmd.result",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "CmdResult",
+      "type": "object"
+    },
+    "CmdResultPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "command_id": {
+          "title": "Command Id",
+          "type": "string"
+        },
+        "latency_ms": {
+          "default": 0.0,
+          "title": "Latency Ms",
+          "type": "number"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "tier_used": {
+          "default": "none",
+          "enum": [
+            "dom",
+            "js",
+            "vision",
+            "os",
+            "none"
+          ],
+          "title": "Tier Used",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command_id",
+        "ok",
+        "message"
+      ],
+      "title": "CmdResultPayload",
+      "type": "object"
+    },
+    "CmdText": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/CmdTextPayload"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "cmd.text",
+          "default": "cmd.text",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "CmdText",
+      "type": "object"
+    },
+    "CmdTextPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "command_id": {
+          "title": "Command Id",
+          "type": "string"
+        },
+        "idempotency_key": {
+          "title": "Idempotency Key",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command_id",
+        "idempotency_key",
+        "text"
+      ],
+      "title": "CmdTextPayload",
+      "type": "object"
+    },
+    "DevicePresence": {
+      "additionalProperties": false,
+      "properties": {
+        "device_id": {
+          "title": "Device Id",
+          "type": "string"
+        },
+        "last_seen": {
+          "title": "Last Seen",
+          "type": "number"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "online": {
+          "title": "Online",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "device_id",
+        "name",
+        "online",
+        "last_seen"
+      ],
+      "title": "DevicePresence",
+      "type": "object"
+    },
+    "Empty": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "Empty",
+      "type": "object"
+    },
+    "ErrorMsg": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ErrorPayload"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "error",
+          "default": "error",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "ErrorMsg",
+      "type": "object"
+    },
+    "ErrorPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ErrorPayload",
+      "type": "object"
+    },
+    "NowPlaying": {
+      "additionalProperties": false,
+      "properties": {
+        "duration_s": {
+          "default": 0.0,
+          "title": "Duration S",
+          "type": "number"
+        },
+        "is_playing": {
+          "default": false,
+          "title": "Is Playing",
+          "type": "boolean"
+        },
+        "position_s": {
+          "default": 0.0,
+          "title": "Position S",
+          "type": "number"
+        },
+        "source": {
+          "default": "other",
+          "enum": [
+            "youtube",
+            "ytmusic",
+            "other"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "thumbnail_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Thumbnail Url"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "title": "NowPlaying",
+      "type": "object"
+    },
+    "PairDenied": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/PairDeniedPayload"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "pair.denied",
+          "default": "pair.denied",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "PairDenied",
+      "type": "object"
+    },
+    "PairDeniedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "title": "PairDeniedPayload",
+      "type": "object"
+    },
+    "PairGranted": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/PairGrantedPayload"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "pair.granted",
+          "default": "pair.granted",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "PairGranted",
+      "type": "object"
+    },
+    "PairGrantedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "device_id": {
+          "title": "Device Id",
+          "type": "string"
+        },
+        "device_token": {
+          "title": "Device Token",
+          "type": "string"
+        },
+        "expires_at": {
+          "title": "Expires At",
+          "type": "number"
+        }
+      },
+      "required": [
+        "device_id",
+        "device_token",
+        "expires_at"
+      ],
+      "title": "PairGrantedPayload",
+      "type": "object"
+    },
+    "PairRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/PairRequestPayload"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "pair.request",
+          "default": "pair.request",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "PairRequest",
+      "type": "object"
+    },
+    "PairRequestPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "device_name": {
+          "maxLength": 64,
+          "title": "Device Name",
+          "type": "string"
+        },
+        "room_secret": {
+          "title": "Room Secret",
+          "type": "string"
+        }
+      },
+      "required": [
+        "room_secret",
+        "device_name"
+      ],
+      "title": "PairRequestPayload",
+      "type": "object"
+    },
+    "Ping": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/Empty"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "ping",
+          "default": "ping",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from"
+      ],
+      "title": "Ping",
+      "type": "object"
+    },
+    "Pong": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/Empty"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "pong",
+          "default": "pong",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from"
+      ],
+      "title": "Pong",
+      "type": "object"
+    },
+    "Presence": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/PresencePayload"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "presence",
+          "default": "presence",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "Presence",
+      "type": "object"
+    },
+    "PresencePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "devices": {
+          "items": {
+            "$ref": "#/$defs/DevicePresence"
+          },
+          "title": "Devices",
+          "type": "array"
+        },
+        "pc_online": {
+          "default": false,
+          "title": "Pc Online",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "devices"
+      ],
+      "title": "PresencePayload",
+      "type": "object"
+    },
+    "RoomKey": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/RoomKeyPayload"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "room.key",
+          "default": "room.key",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "RoomKey",
+      "type": "object"
+    },
+    "RoomKeyPayload": {
+      "additionalProperties": false,
+      "description": "Per-room HS256 key the relay hands to the PC so it can verify device tokens offline.",
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "key_id": {
+          "title": "Key Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "key_id"
+      ],
+      "title": "RoomKeyPayload",
+      "type": "object"
+    },
+    "RoomState": {
+      "additionalProperties": false,
+      "properties": {
+        "devices": {
+          "items": {
+            "$ref": "#/$defs/DevicePresence"
+          },
+          "title": "Devices",
+          "type": "array"
+        },
+        "driver": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Driver"
+        },
+        "mode": {
+          "default": "cloud",
+          "enum": [
+            "cloud",
+            "lan"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "muted": {
+          "default": false,
+          "title": "Muted",
+          "type": "boolean"
+        },
+        "now_playing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NowPlaying"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "pc_online": {
+          "default": false,
+          "title": "Pc Online",
+          "type": "boolean"
+        },
+        "queue_depth": {
+          "default": 0,
+          "title": "Queue Depth",
+          "type": "integer"
+        },
+        "rev": {
+          "default": 0,
+          "title": "Rev",
+          "type": "integer"
+        },
+        "timers": {
+          "items": {
+            "$ref": "#/$defs/TimerInfo"
+          },
+          "title": "Timers",
+          "type": "array"
+        },
+        "volume": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Volume",
+          "type": "integer"
+        }
+      },
+      "title": "RoomState",
+      "type": "object"
+    },
+    "StatePatch": {
+      "additionalProperties": false,
+      "description": "JSON-merge-patch (RFC 7386) of RoomState; rev must be included.",
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "additionalProperties": true,
+          "title": "Payload",
+          "type": "object"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "state.patch",
+          "default": "state.patch",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "StatePatch",
+      "type": "object"
+    },
+    "StateSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/RoomState"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "state.snapshot",
+          "default": "state.snapshot",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "StateSnapshot",
+      "type": "object"
+    },
+    "StateSync": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/Empty"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "state.sync",
+          "default": "state.sync",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from"
+      ],
+      "title": "StateSync",
+      "type": "object"
+    },
+    "TimerInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "default": "notify",
+          "title": "Action",
+          "type": "string"
+        },
+        "ends_at": {
+          "title": "Ends At",
+          "type": "number"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "timer_id": {
+          "title": "Timer Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "timer_id",
+        "label",
+        "ends_at"
+      ],
+      "title": "TimerInfo",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "agent.progress": "#/$defs/AgentProgress",
+      "audio.begin": "#/$defs/AudioBegin",
+      "audio.chunk": "#/$defs/AudioChunk",
+      "audio.end": "#/$defs/AudioEnd",
+      "cmd.ack": "#/$defs/CmdAck",
+      "cmd.button": "#/$defs/CmdButton",
+      "cmd.result": "#/$defs/CmdResult",
+      "cmd.text": "#/$defs/CmdText",
+      "error": "#/$defs/ErrorMsg",
+      "pair.denied": "#/$defs/PairDenied",
+      "pair.granted": "#/$defs/PairGranted",
+      "pair.request": "#/$defs/PairRequest",
+      "ping": "#/$defs/Ping",
+      "pong": "#/$defs/Pong",
+      "presence": "#/$defs/Presence",
+      "room.key": "#/$defs/RoomKey",
+      "state.patch": "#/$defs/StatePatch",
+      "state.snapshot": "#/$defs/StateSnapshot",
+      "state.sync": "#/$defs/StateSync"
+    },
+    "propertyName": "type"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/PairRequest"
+    },
+    {
+      "$ref": "#/$defs/PairGranted"
+    },
+    {
+      "$ref": "#/$defs/PairDenied"
+    },
+    {
+      "$ref": "#/$defs/CmdButton"
+    },
+    {
+      "$ref": "#/$defs/CmdText"
+    },
+    {
+      "$ref": "#/$defs/AudioBegin"
+    },
+    {
+      "$ref": "#/$defs/AudioChunk"
+    },
+    {
+      "$ref": "#/$defs/AudioEnd"
+    },
+    {
+      "$ref": "#/$defs/CmdAck"
+    },
+    {
+      "$ref": "#/$defs/AgentProgress"
+    },
+    {
+      "$ref": "#/$defs/CmdResult"
+    },
+    {
+      "$ref": "#/$defs/StateSnapshot"
+    },
+    {
+      "$ref": "#/$defs/StatePatch"
+    },
+    {
+      "$ref": "#/$defs/StateSync"
+    },
+    {
+      "$ref": "#/$defs/Presence"
+    },
+    {
+      "$ref": "#/$defs/RoomKey"
+    },
+    {
+      "$ref": "#/$defs/Ping"
+    },
+    {
+      "$ref": "#/$defs/Pong"
+    },
+    {
+      "$ref": "#/$defs/ErrorMsg"
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+"""Executor interfaces. Real Windows/Edge implementations and in-repo fakes both satisfy these."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Literal, Protocol
+
+from pydantic import BaseModel, Field
+
+Tier = Literal["dom", "js", "vision", "os"]
+MediaCommand = Literal["play", "pause", "play_pause", "next", "prev"]
+MediaKey = Literal["play_pause", "next", "prev", "vol_up", "vol_down", "mute"]
+
+
+@dataclass(frozen=True)
+class ActionResult:
+    ok: bool
+    tier: Tier
+    error: str | None = None
+    # why the cheaper tier failed: iframe_cross_origin | overlay | selector_timeout | ...
+    fallback_reason: str | None = None
+    observed: dict[str, Any] = field(default_factory=dict)
+
+
+class BrowserSnapshot(BaseModel):
+    url: str = ""
+    title: str = ""
+    source: Literal["youtube", "ytmusic", "other"] = "other"
+    is_playing: bool | None = None
+    is_fullscreen: bool = False
+    ad_showing: bool = False
+    position_s: float = 0.0
+    duration_s: float = 0.0
+    thumbnail_url: str | None = None
+    tab_count: int = Field(default=1, ge=0)
+
+
+@dataclass(frozen=True)
+class Screenshot:
+    """A screen capture in PHYSICAL pixels.
+
+    left/top is the capture origin in virtual-screen coordinates (negative for monitors placed
+    left of / above the primary). width/height are the pixel dimensions of png.
+    """
+
+    png: bytes
+    left: int
+    top: int
+    width: int
+    height: int
+
+
+class Browser(Protocol):
+    async def is_alive(self) -> bool: ...
+    async def navigate(self, url: str) -> ActionResult: ...
+    async def search_and_play(self, query: str, source: str) -> ActionResult: ...
+    async def click_selector(self, selector: str, timeout_ms: int) -> ActionResult: ...
+    async def media_command(self, cmd: MediaCommand) -> ActionResult: ...
+    async def seek(self, delta_s: int) -> ActionResult: ...
+    async def close_tab(self) -> ActionResult: ...
+    async def close_ad_dom(self) -> ActionResult: ...
+    async def close_ad_js(self) -> ActionResult: ...
+    async def fullscreen_dom(self) -> ActionResult: ...
+    async def fullscreen_js(self) -> ActionResult: ...
+    async def eval_allowlisted(self, name: str) -> ActionResult: ...
+    async def snapshot(self) -> BrowserSnapshot: ...
+    async def refocus(self) -> None: ...
+    async def reload(self) -> None: ...
+    async def dismiss_overlays(self) -> None: ...
+
+
+class Screen(Protocol):
+    def capture(self) -> Screenshot: ...
+
+
+class OSController(Protocol):
+    async def press_media_key(self, key: MediaKey) -> ActionResult: ...
+    async def set_volume(self, level: int) -> ActionResult: ...
+    async def get_volume(self) -> tuple[int, bool]: ...
+    async def click(self, x: int, y: int) -> ActionResult: ...
+    async def key_combo(self, *keys: str) -> ActionResult: ...
+    async def sleep_display(self) -> ActionResult: ...
+    def keep_awake(self, enabled: bool) -> None: ...

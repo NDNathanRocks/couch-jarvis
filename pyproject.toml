@@ -1,0 +1,46 @@
+[project]
+name = "couch-jarvis"
+version = "0.1.0"
+description = "AegisRemote / CouchJarvis - hybrid cloud-to-edge voice & vision PC agent"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["web-remote", ".aws-sam"]
+src = ["pc-daemon", "infra/lambdas", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# long one-line JS snippets and prompts are clearer unwrapped
+"pc-daemon/executors/edge_cdp.py" = ["E501"]
+"pc-daemon/agent/prompts.py" = ["E501"]
+# polling helpers in tests are clearer than Events
+"tests/**" = ["ASYNC109", "ASYNC110"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = ["pc-daemon", "infra/lambdas"]
+explicit_package_bases = true
+namespace_packages = true
+
+[[tool.mypy.overrides]]
+module = ["faster_whisper.*", "ctranslate2.*", "comtypes.*", "boto3.*", "botocore.*", "moto.*", "jwt.*", "pycaw.*", "pyautogui.*", "mss.*", "segno.*", "qasync.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["pc-daemon", "infra/lambdas", "tests"]
+addopts = "--import-mode=importlib"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+  "edge: needs a real Microsoft Edge with CDP on :9222",
+  "gpu: needs a CUDA GPU",
+  "aws: needs deployed AWS resources",
+  "llm: needs a live Ollama/Gemini/Groq endpoint",
+  "gui: needs a display (PySide6)",
+]

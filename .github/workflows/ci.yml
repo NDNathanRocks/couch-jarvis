@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "24"
+  SAM_CLI_TELEMETRY: "0"
+  AWS_DEFAULT_REGION: us-east-1
+
+jobs:
+  daemon:
+    name: Daemon (Windows) - lint, types, tests
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Install
+        run: python -m pip install -r requirements-dev.txt
+      - name: Ruff
+        run: |
+          ruff check .
+          ruff format --check .
+      - name: Mypy (strict)
+        run: mypy --strict pc-daemon infra/lambdas
+      - name: Contracts are up to date
+        run: python scripts/export_contracts.py --check
+      - name: Pytest (daemon + infra, no real hardware or network)
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: pytest -q -m "not (edge or gpu or aws or llm)" --timeout=120
+
+  web:
+    name: Web remote - types, lint, tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web-remote
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web-remote/package-lock.json
+      - run: npm ci
+      - run: npm run gen:contracts -- --check
+      - run: npx tsc --noEmit
+      - run: npm run lint
+      - run: npx vitest run
+      - run: npm run build
+
+  infra:
+    name: Infra - SAM validate and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+      - name: SAM validate (lint) and build
+        working-directory: infra
+        run: |
+          sam validate --lint --region "$AWS_DEFAULT_REGION"
+          sam build
+
+  scripts:
+    name: PowerShell scripts - PSScriptAnalyzer
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Analyze
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+          $findings = Invoke-ScriptAnalyzer -Path scripts -Recurse -Severity Error, Warning
+          $findings | Format-Table ScriptName, Line, Severity, RuleName, Message -AutoSize
+          if ($findings) { throw "$($findings.Count) PSScriptAnalyzer finding(s)" }

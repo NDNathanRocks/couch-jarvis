@@ -1,0 +1,517 @@
+"""LangGraph plan-act-verify state machine.
+
+intent_router -> dom_executor -> (vision_fallback) -> post_action_verifier -> (recovery_node)
+
+``max_attempts`` is the number of recovery rounds allowed after the first try.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import re
+import time
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from typing import Any
+
+from langgraph.graph import END, StateGraph
+from pydantic import ValidationError
+
+from agent.fastpath import plan_button, plan_text
+from agent.prompts import (
+    ROUTER_SYSTEM,
+    router_repair_prompt,
+    router_user_prompt,
+)
+from agent.state import (
+    ActionStep,
+    AgentState,
+    Intent,
+    IntentPlan,
+    StepOutcome,
+    VerifyResult,
+)
+from command_queue import CommandRequest
+from contracts import CmdResultPayload
+from executors.base import ActionResult, Browser, MediaKey, OSController
+from executors.video_fullscreener import VideoFullscreener
+from executors.vision_grounding import VisionGrounder
+from llm.base import LLMError, TextLLM
+from telemetry import AttrValue, Span, Telemetry, new_trace_id
+from timers import TimerService
+
+log = logging.getLogger(__name__)
+
+ProgressFn = Callable[[str, str, str, str], None]  # command_id, node, status, detail
+
+VISION_ELIGIBLE = {"click_selector", "fullscreen", "close_ad", "vision_click"}
+BROWSER_MEDIA = {"play", "pause", "play_pause", "next", "prev"}
+OS_FALLBACK_KEYS: dict[str, MediaKey] = {"play_pause": "play_pause", "next": "next", "prev": "prev"}
+FAIL_MESSAGE = "Sorry, that did not work. Try again."
+
+
+@dataclass
+class AgentDeps:
+    router: TextLLM
+    browser: Browser
+    os_ctl: OSController
+    fullscreener: VideoFullscreener
+    grounder: VisionGrounder
+    telemetry: Telemetry
+    timers: TimerService | None = None
+    show_qr: Callable[[], None] = lambda: None  # set by main when a HUD exists
+    progress: ProgressFn = lambda *_: None
+    verify_delays_s: tuple[float, ...] = (0.0, 0.4, 0.8)
+
+
+def extract_json(text: str) -> str:
+    fenced = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
+    start, end = fenced.find("{"), fenced.rfind("}")
+    if start == -1 or end < start:
+        raise ValueError("no JSON object in reply")
+    return fenced[start : end + 1]
+
+
+def success_message(plan: IntentPlan) -> str:
+    if plan.intent is Intent.MEDIA_PLAY:
+        return f"Playing {plan.slots.get('query', 'your request')}"
+    return {
+        Intent.VOLUME: "Volume updated",
+        Intent.FULLSCREEN: "Fullscreen",
+        Intent.TIMER: "Timer set",
+        Intent.TAB: "Tab closed",
+        Intent.SYSTEM: "Done",
+    }.get(plan.intent, "Done")
+
+
+def _overall_tier(outcomes: list[StepOutcome]) -> str:
+    tiers = {o.tier for o in outcomes if o.ok}
+    for tier in ("vision", "js", "dom", "os"):
+        if tier in tiers:
+            return tier
+    return "none"
+
+
+def build_graph(deps: AgentDeps) -> Any:
+    tele = deps.telemetry
+
+    # ------------------------------------------------------------------ helpers
+
+    def node(
+        name: str,
+    ) -> Callable[
+        [Callable[[AgentState, Span], Awaitable[dict[str, Any]]]],
+        Callable[[AgentState], Awaitable[dict[str, Any]]],
+    ]:
+        def deco(
+            fn: Callable[[AgentState, Span], Awaitable[dict[str, Any]]],
+        ) -> Callable[[AgentState], Awaitable[dict[str, Any]]]:
+            async def wrapped(state: AgentState) -> dict[str, Any]:
+                deps.progress(state.command_id, name, "start", "")
+                attrs: dict[str, AttrValue] = {
+                    "cj.command_id": state.command_id,
+                    "cj.attempt": state.attempts,
+                }
+                with tele.span(f"agent.node.{name}", attributes=attrs) as span:
+                    update = await fn(state, span)
+                deps.progress(state.command_id, name, "done", str(update.get("status", "")))
+                return update
+
+            return wrapped
+
+        return deco
+
+    async def route_with_llm(state: AgentState, span: Span) -> IntentPlan | None:
+        snap = await deps.browser.snapshot()
+        context = (
+            f"url={snap.url or 'none'} title={snap.title!r} playing={snap.is_playing} "
+            f"fullscreen={snap.is_fullscreen}"
+        )
+        user = router_user_prompt(state.utterance, context)
+        bad_reply, error = "", ""
+        for attempt in range(2):  # one repair retry
+            prompt = (
+                user if attempt == 0 else router_repair_prompt(state.utterance, bad_reply, error)
+            )
+            with tele.span("llm.call", attributes={"cj.purpose": "router"}) as llm_span:
+                reply = await deps.router.complete(ROUTER_SYSTEM, prompt)
+                llm_span.set_attribute("gen_ai.system", reply.system)
+                llm_span.set_attribute("gen_ai.request.model", reply.model)
+                llm_span.set_attribute("gen_ai.usage.input_tokens", reply.input_tokens)
+                llm_span.set_attribute("gen_ai.usage.output_tokens", reply.output_tokens)
+            try:
+                plan = IntentPlan.model_validate(json.loads(extract_json(reply.text)))
+                return plan.model_copy(update={"source": "llm"})
+            except (ValueError, ValidationError) as exc:
+                bad_reply, error = reply.text, str(exc)
+                span.set_attribute("cj.router_repairs", attempt + 1)
+        return None
+
+    # ------------------------------------------------------------------ nodes
+
+    @node("intent_router")
+    async def intent_router(state: AgentState, span: Span) -> dict[str, Any]:
+        plan = state.plan
+        if plan is None:
+            plan = plan_text(state.utterance)
+        if plan is None:
+            try:
+                plan = await route_with_llm(state, span)
+            except LLMError as exc:
+                span.set_error(exc)
+                return {"status": "failed", "final_message": "My brain is offline right now."}
+        span.set_attribute("cj.intent", plan.intent.value if plan else "unknown")
+        span.set_attribute("cj.intent_source", plan.source if plan else "llm")
+        if (
+            plan is None
+            or plan.intent is Intent.UNKNOWN
+            or not plan.steps
+            or plan.confidence < 0.35
+        ):
+            return {
+                "plan": plan,
+                "status": "failed",
+                "final_message": "Sorry, I did not catch that.",
+            }
+        return {"plan": plan, "status": "executing"}
+
+    async def run_step(step: ActionStep) -> ActionResult:
+        a = step.args
+        op = step.op
+        if op == "navigate":
+            if "query" in a:
+                return await deps.browser.search_and_play(
+                    str(a["query"]), str(a.get("source", "youtube"))
+                )
+            return await deps.browser.navigate(str(a.get("url", "")))
+        if op == "media_key":
+            return await run_media_key(a)
+        if op == "volume_set":
+            return await deps.os_ctl.set_volume(int(a["level"]))
+        if op == "seek":
+            return await deps.browser.seek(int(a["delta_s"]))
+        if op in ("fullscreen", "close_ad"):
+            return await deps.fullscreener.dom_js_tiers(op)
+        if op == "close_tab":
+            return await deps.browser.close_tab()
+        if op == "sleep_display":
+            return await deps.os_ctl.sleep_display()
+        if op == "show_qr":
+            deps.show_qr()
+            return ActionResult(True, "os")
+        if op == "click_selector":
+            return await deps.browser.click_selector(str(a["selector"]), step.timeout_ms)
+        if op == "key":
+            return await deps.os_ctl.key_combo(*str(a["keys"]).split("+"))
+        if op == "js_eval_allowlisted":
+            return await deps.browser.eval_allowlisted(str(a.get("name", "")))
+        if op == "wait_for":
+            await asyncio.sleep(min(float(a.get("ms", 500)), 5000) / 1000)
+            return ActionResult(True, "dom")
+        if op == "timer_start":
+            if deps.timers is None:
+                return ActionResult(False, "os", "timers unavailable")
+            deps.timers.start(
+                float(a["minutes"]), str(a.get("label", "timer")), str(a.get("action", "notify"))
+            )
+            return ActionResult(True, "os")
+        if op == "vision_click":
+            return ActionResult(False, "dom", "vision-only step", "vision_only")
+        return ActionResult(False, "dom", f"unsupported op: {op}", "unsupported")
+
+    async def run_media_key(a: dict[str, str | int | float | bool]) -> ActionResult:
+        key = str(a["key"])
+        if key in BROWSER_MEDIA:
+            res = await deps.browser.media_command(key)  # type: ignore[arg-type]
+            if res.ok or key not in OS_FALLBACK_KEYS:
+                return res
+            return await deps.os_ctl.press_media_key(OS_FALLBACK_KEYS[key])  # OS media key fallback
+        if key == "mute":
+            wanted = str(a.get("state", "toggle"))
+            _, muted = await deps.os_ctl.get_volume()
+            if wanted == "toggle" or (wanted == "on") != muted:
+                return await deps.os_ctl.press_media_key("mute")
+            return ActionResult(True, "os")
+        result = ActionResult(True, "os")
+        for _ in range(max(1, min(int(a.get("repeat", 1)), 25))):
+            result = await deps.os_ctl.press_media_key(key)  # type: ignore[arg-type]
+            if not result.ok:
+                break
+        return result
+
+    @node("dom_executor")
+    async def dom_executor(state: AgentState, span: Span) -> dict[str, Any]:
+        assert state.plan is not None
+        steps = state.plan.steps
+        outcomes = list(state.outcomes)
+        cursor, tier_used = state.cursor, state.tier_used
+        while cursor < len(steps):
+            step = steps[cursor]
+            started = time.perf_counter()
+            with tele.span("executor.step", attributes={"cj.op": step.op}) as step_span:
+                res = await run_step(step)
+                step_span.set_attribute("cj.tier", res.tier)
+                if not res.ok:
+                    step_span.set_attribute("cj.fallback_reason", res.fallback_reason)
+                    step_span.set_error(res.error or "step failed")
+            outcomes.append(
+                StepOutcome(
+                    step_index=cursor,
+                    tier=res.tier,
+                    ok=res.ok,
+                    error=res.error,
+                    latency_ms=(time.perf_counter() - started) * 1000,
+                )
+            )
+            if res.ok:
+                cursor += 1
+                tier_used = res.tier
+                continue
+            if step.op in VISION_ELIGIBLE:
+                return {
+                    "cursor": cursor,
+                    "outcomes": outcomes,
+                    "needs_vision": True,
+                    "fallback_reason": res.fallback_reason,
+                    "status": "vision",
+                }
+            return {
+                "cursor": cursor,
+                "outcomes": outcomes,
+                "status": "verifying",
+                "tier_used": tier_used,
+            }
+        return {
+            "cursor": cursor,
+            "outcomes": outcomes,
+            "status": "verifying",
+            "tier_used": tier_used,
+            "needs_vision": False,
+        }
+
+    @node("vision_fallback")
+    async def vision_fallback(state: AgentState, span: Span) -> dict[str, Any]:
+        assert state.plan is not None
+        step = state.plan.steps[state.cursor]
+        span.set_attribute("cj.fallback_reason", state.fallback_reason)
+        started = time.perf_counter()
+        if step.op in ("fullscreen", "close_ad"):
+            res = await deps.fullscreener.vision_tier(step.op)
+        else:
+            target = str(
+                step.args.get("target")
+                or step.args.get("description")
+                or step.args.get("selector", "")
+            )
+            point = await deps.grounder.ground(target)
+            if point is None:
+                res = ActionResult(False, "vision", "target not found by VLM", "vlm_not_found")
+            else:
+                clicked = await deps.os_ctl.click(point.x, point.y)
+                res = ActionResult(clicked.ok, "vision", clicked.error)
+        outcomes = [
+            *state.outcomes,
+            StepOutcome(
+                step_index=state.cursor,
+                tier="vision",
+                ok=res.ok,
+                error=res.error,
+                latency_ms=(time.perf_counter() - started) * 1000,
+            ),
+        ]
+        if res.ok:
+            return {
+                "cursor": state.cursor + 1,
+                "outcomes": outcomes,
+                "needs_vision": False,
+                "tier_used": "vision",
+                "status": "executing",
+            }
+        return {"outcomes": outcomes, "needs_vision": False, "status": "verifying"}
+
+    async def check_predicate(predicate: str, plan: IntentPlan) -> VerifyResult:
+        snap = await deps.browser.snapshot()
+        observed: dict[str, Any] = {
+            "is_playing": snap.is_playing,
+            "is_fullscreen": snap.is_fullscreen,
+            "ad_showing": snap.ad_showing,
+        }
+        passed: bool
+        if predicate == "video_playing":
+            passed = snap.is_playing is True
+        elif predicate == "paused":
+            passed = snap.is_playing is not True
+        elif predicate == "is_fullscreen":
+            passed = snap.is_fullscreen
+        elif predicate == "no_ad":
+            passed = not snap.ad_showing
+        elif predicate in ("volume_set", "muted", "unmuted"):
+            level, muted = await deps.os_ctl.get_volume()
+            observed.update(volume=level, muted=muted)
+            if predicate == "volume_set":
+                want = next(
+                    (int(s.args["level"]) for s in plan.steps if s.op == "volume_set"), level
+                )
+                passed = abs(level - want) <= 2
+            else:
+                passed = muted if predicate == "muted" else not muted
+        elif predicate == "navigated":
+            passed = bool(snap.url)
+        else:
+            passed = True  # unknown predicates never block a command
+        return VerifyResult(passed=passed, predicate=predicate, observed=observed)
+
+    @node("post_action_verifier")
+    async def post_action_verifier(state: AgentState, span: Span) -> dict[str, Any]:
+        assert state.plan is not None
+        plan = state.plan
+        if state.cursor < len(plan.steps):
+            result = VerifyResult(passed=False, predicate="execution_incomplete")
+        else:
+            predicate = next((s.expect for s in reversed(plan.steps) if s.expect), None)
+            if predicate is None:
+                result = VerifyResult(passed=True, predicate="none")
+            else:
+                result = await check_predicate(predicate, plan)
+                for delay in deps.verify_delays_s[1:]:  # state often lags the action by a moment
+                    if result.passed:
+                        break
+                    await asyncio.sleep(delay)
+                    result = await check_predicate(predicate, plan)
+        span.set_attribute("cj.verify_passed", result.passed)
+        span.set_attribute("cj.verify_predicate", result.predicate)
+        if result.passed:
+            return {
+                "verify": result,
+                "status": "done",
+                "final_message": success_message(plan),
+                "tier_used": _overall_tier(state.outcomes),
+            }
+        terminal = state.attempts >= state.max_attempts
+        return {
+            "verify": result,
+            "status": "failed" if terminal else "verifying",
+            "final_message": FAIL_MESSAGE if terminal else None,
+        }
+
+    @node("recovery_node")
+    async def recovery_node(state: AgentState, span: Span) -> dict[str, Any]:
+        assert state.plan is not None
+        await deps.browser.refocus()
+        await deps.browser.dismiss_overlays()
+        if state.attempts >= 1:
+            await deps.browser.reload()
+        # verification failures re-run the last step; execution failures retry the failed step
+        cursor = max(0, min(state.cursor, len(state.plan.steps) - 1))
+        return {
+            "attempts": state.attempts + 1,
+            "cursor": cursor,
+            "needs_vision": False,
+            "verify": None,
+            "status": "recovering",
+        }
+
+    # ------------------------------------------------------------------ edges
+
+    def after_router(state: AgentState) -> str:
+        return "dom_executor" if state.status == "executing" else END
+
+    def after_executor(state: AgentState) -> str:
+        return "vision_fallback" if state.needs_vision else "post_action_verifier"
+
+    def after_vision(state: AgentState) -> str:
+        assert state.plan is not None
+        if state.status == "executing" and state.cursor < len(state.plan.steps):
+            return "dom_executor"
+        return "post_action_verifier"
+
+    def after_verifier(state: AgentState) -> str:
+        return "recovery_node" if state.status == "verifying" else END
+
+    graph = StateGraph(AgentState)
+
+    def add_node(name: str, fn: Callable[[AgentState], Awaitable[dict[str, Any]]]) -> None:
+        # langgraph's overloads reject decorated closures that return partial-state dicts
+        graph.add_node(name, fn)  # type: ignore[call-overload]
+
+    add_node("intent_router", intent_router)
+    add_node("dom_executor", dom_executor)
+    add_node("vision_fallback", vision_fallback)
+    add_node("post_action_verifier", post_action_verifier)
+    add_node("recovery_node", recovery_node)
+    graph.set_entry_point("intent_router")
+    graph.add_conditional_edges("intent_router", after_router, ["dom_executor", END])
+    graph.add_conditional_edges(
+        "dom_executor", after_executor, ["vision_fallback", "post_action_verifier"]
+    )
+    graph.add_conditional_edges(
+        "vision_fallback", after_vision, ["dom_executor", "post_action_verifier"]
+    )
+    graph.add_conditional_edges("post_action_verifier", after_verifier, ["recovery_node", END])
+    graph.add_edge("recovery_node", "dom_executor")
+    return graph.compile()
+
+
+class AgentRunner:
+    """Runs one command through the graph under a hard time ceiling."""
+
+    def __init__(self, deps: AgentDeps, *, timeout_s: float = 25.0, max_attempts: int = 2) -> None:
+        self._deps = deps
+        self._graph = build_graph(deps)
+        self._timeout_s = timeout_s
+        self._max_attempts = max_attempts
+
+    def set_progress(self, progress: ProgressFn) -> None:
+        self._deps.progress = progress
+
+    def initial_state(self, req: CommandRequest) -> AgentState:
+        plan = plan_button(req.action) if req.kind == "button" and req.action else None
+        utterance = f"button:{req.action}" if plan else (req.text or "")
+        return AgentState(
+            trace_id=new_trace_id(),
+            command_id=req.command_id,
+            utterance=utterance,
+            issued_by=req.device_id,
+            plan=plan,
+            max_attempts=self._max_attempts,
+        )
+
+    async def run(self, req: CommandRequest) -> CmdResultPayload:
+        state = self.initial_state(req)
+        started = time.perf_counter()
+        tele = self._deps.telemetry
+        with tele.span(
+            "cmd.lifecycle",
+            trace_id=state.trace_id,
+            attributes={
+                "cj.command_id": req.command_id,
+                "cj.device_id": req.device_id,
+                "cj.kind": req.kind,
+            },
+        ) as span:
+            try:
+                async with asyncio.timeout(self._timeout_s):
+                    raw = await self._graph.ainvoke(state, config={"recursion_limit": 40})
+            except TimeoutError:
+                span.set_error("timeout")
+                return CmdResultPayload(
+                    command_id=req.command_id,
+                    ok=False,
+                    message="That took too long.",
+                    latency_ms=self._timeout_s * 1000,
+                )
+            final = raw if isinstance(raw, AgentState) else AgentState.model_validate(raw)
+            ok = final.status == "done"
+            span.set_attribute("cj.tier", final.tier_used)
+            span.set_attribute("cj.ok", ok)
+            if not ok:
+                span.set_error(final.final_message or "failed")
+            return CmdResultPayload(
+                command_id=req.command_id,
+                ok=ok,
+                message=final.final_message or FAIL_MESSAGE,
+                tier_used=final.tier_used if ok else _overall_tier(final.outcomes),  # type: ignore[arg-type]
+                latency_ms=(time.perf_counter() - started) * 1000,
+            )
