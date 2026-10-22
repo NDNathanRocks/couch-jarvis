@@ -13,10 +13,10 @@ from common.ddb import Store
 from common.models import (
     COMMAND_TYPES,
     DEVICE_ID_RE,
-    HIGH_RATE_TYPES,
     IDEMPOTENT_TYPES,
     PC_BROADCAST_TYPES,
     PHONE_TYPES,
+    VETTED_FOLLOWUP_TYPES,
     EnvelopeError,
     build,
     parse_envelope,
@@ -143,7 +143,7 @@ def _from_phone(
         _error(gw, conn_id, room_id, "unauthorized", "Pair this device first", reply_to=msg["id"])
         return
     device_id = str(conn["device_id"])
-    if kind not in HIGH_RATE_TYPES:  # the live connection is closed on revoke: no per-message read
+    if kind not in VETTED_FOLLOWUP_TYPES:  # audio parts follow an already-vetted audio.begin
         device = store.get_device(room_id, device_id)
         if device is None or device.get("revoked"):
             _error(gw, conn_id, room_id, "revoked", "This phone was removed", reply_to=msg["id"])

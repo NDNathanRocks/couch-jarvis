@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import time
 
+import pytest
+
 from common import auth
 from infra_support import ROOM, World, button, msg
 
@@ -56,6 +58,27 @@ def test_messages_from_a_still_open_revoked_connection_are_refused(world: World)
     assert err["payload"]["code"] == "revoked"
     assert "p1" in world.api.closed
     assert world.api.to("pc-1", "cmd.button") == []  # never forwarded to the PC
+
+
+@pytest.mark.parametrize(
+    ("kind", "payload"),
+    [
+        ("input.pointer", {"dx": 5, "dy": 5}),
+        ("input.key", {"key": "a", "mods": []}),
+        ("input.text", {"text": "hello"}),
+    ],
+)
+def test_keyboard_and_mouse_from_a_revoked_open_connection_never_reach_the_pc(
+    world: World, kind: str, payload: dict[str, object]
+) -> None:
+    """Input is the most privileged message type: it must fail closed even if the close is lost."""
+    ann, _bob, _ = setup(world)
+    world.store.revoke_device(ROOM, ann)  # flag flipped without the close happening
+    world.send("p1", msg(kind, payload))
+    (err,) = world.api.to("p1", "error")
+    assert err["payload"]["code"] == "revoked"
+    assert "p1" in world.api.closed
+    assert world.api.to("pc-1", kind) == []
 
 
 def test_a_revoked_phone_cannot_refresh_its_token(world: World) -> None:

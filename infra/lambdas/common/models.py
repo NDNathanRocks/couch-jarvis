@@ -49,10 +49,10 @@ COMMAND_TYPES = frozenset(
         "audio.end",
     }
 )
-# High-rate message types: the connection is closed on revoke, so skip the per-message DB check
-HIGH_RATE_TYPES = frozenset(
-    {"audio.chunk", "audio.end", "input.pointer", "input.key", "input.text"}
-)
+# Only these skip the per-message revocation read: they follow an audio.begin that was already
+# vetted. Everything else (keyboard and mouse included) is re-checked on every message so a
+# revoked phone fails closed even if the close of its socket was lost.
+VETTED_FOLLOWUP_TYPES = frozenset({"audio.chunk", "audio.end"})
 # Commands carrying an idempotency key that the relay de-duplicates
 IDEMPOTENT_TYPES = frozenset({"cmd.button", "cmd.text", "audio.begin"})
 # PC -> every phone in the room
