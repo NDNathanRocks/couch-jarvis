@@ -22,7 +22,7 @@ import uvicorn
 from agent.graph import AgentDeps, AgentRunner
 from cloud_relay_client import CloudRelayClient
 from command_queue import CommandRequest
-from config import Settings, get_settings, init_dpi_awareness
+from config import Settings, get_settings, init_dpi_awareness, resource_root
 from contracts import TimerInfo, new_id
 from event_bus import EventBus
 from executors.base import Browser, OSController, Screen
@@ -43,7 +43,7 @@ from timers import TimerService
 from watchdog import EdgeWatchdog, make_edge_launcher, make_http_probe
 
 log = logging.getLogger("couch-jarvis")
-PWA_DIST = Path(__file__).resolve().parent.parent / "web-remote" / "dist"
+PWA_DIST = resource_root() / "web-remote" / "dist"
 
 
 @dataclass
@@ -223,7 +223,7 @@ async def amain(args: argparse.Namespace) -> None:
         background.append(asyncio.create_task(cloud.run(), name="cloud-relay"))
     elif not args.dry_run:
         log.warning("CJ_RELAY_WS_URL is not set: running in LAN-only mode")
-    if rt.room_store is not None and sys.stdout.isatty():
+    if rt.room_store is not None and sys.stdout is not None and sys.stdout.isatty():
         # The URL embeds the room secret: show it on the console, never write it to log files.
         print("Pair a phone:", rt.room_store.identity.pairing_url(settings.pwa_base_url))
     log.info(

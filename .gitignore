@@ -12,3 +12,8 @@ dist/
 
 .playwright-mcp/
 tests/e2e/.shots/
+
+# installer build output (defaults.env holds your relay URLs)
+installer/dist/
+installer/build/
+installer/defaults.env

@@ -34,9 +34,24 @@ def _default_edge_path() -> Path:
     return Path(_EDGE_CANDIDATES[0])
 
 
+def resource_root() -> Path:
+    """Where bundled resources live: the repo root, or PyInstaller's unpack directory."""
+    frozen = getattr(sys, "_MEIPASS", None)
+    return Path(frozen) if frozen else Path(__file__).resolve().parent.parent
+
+
+def user_config_file() -> Path:
+    """Per-user settings written by the installer / first run (edit this to change settings)."""
+    return _roaming_app_dir() / "config.env"
+
+
 class Settings(BaseSettings):
+    # Later files win: a .env in the working directory (development) overrides the user config.
     model_config = SettingsConfigDict(
-        env_prefix="CJ_", env_file=".env", env_file_encoding="utf-8", extra="ignore"
+        env_prefix="CJ_",
+        env_file=(user_config_file(), ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
     )
 
     # Cloud relay / PWA

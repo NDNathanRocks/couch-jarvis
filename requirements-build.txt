@@ -1,0 +1,2 @@
+# Only needed to build the installer (installer\build.ps1)
+pyinstaller>=6.10,<7
