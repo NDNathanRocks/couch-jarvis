@@ -33,6 +33,7 @@ Source: "dist\CouchJarvis\*"; DestDir: "{app}"; Flags: recursesubdirs createalls
 
 [Icons]
 Name: "{autoprograms}\Couch Jarvis"; Filename: "{app}\CouchJarvis.exe"
+Name: "{autoprograms}\Couch Jarvis settings"; Filename: "{app}\CouchJarvis.exe"; Parameters: "--open-settings"; Comment: "Open your settings file (add your own Groq or Gemini key here)"
 Name: "{autodesktop}\Couch Jarvis"; Filename: "{app}\CouchJarvis.exe"; Tasks: desktopicon
 
 [Registry]

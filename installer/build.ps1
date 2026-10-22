@@ -103,7 +103,33 @@ Write-Host '==> freezing the daemon (this takes a few minutes)'
     --distpath $dist --workpath (Join-Path $PSScriptRoot 'build') (Join-Path $PSScriptRoot 'couch_jarvis.spec')
 if ($LASTEXITCODE -ne 0) { throw 'PyInstaller failed' }
 
+function Assert-NoSecrets {
+    # Fail the build if this machine's API keys (CJ_GROQ_API_KEY, CJ_GEMINI_API_KEY, ...) ended up
+    # in the app, or if any settings file was bundled. Users add their own keys after installing.
+    param([string]$Dir)
+    $bundled = Get-ChildItem -LiteralPath $Dir -Recurse -File -Force |
+        Where-Object { $_.Name -in '.env', 'config.env' -or $_.Name -like '.env.*' }
+    if ($bundled) { throw "Settings file(s) bundled into the app: $($bundled.FullName -join ', ')" }
+    $secrets = @{}
+    foreach ($name in 'CJ_GROQ_API_KEY', 'CJ_GEMINI_API_KEY') {
+        if ($env_.ContainsKey($name) -and $env_[$name].Length -ge 8) { $secrets[$name] = $env_[$name] }
+    }
+    if ($secrets.Count -eq 0) { return }
+    $binary = '.dll', '.pyd', '.exe', '.png', '.ico', '.woff2', '.node', '.zip'
+    $files = Get-ChildItem -LiteralPath $Dir -Recurse -File |
+        Where-Object { $binary -notcontains $_.Extension.ToLower() -and $_.Length -lt 20MB }
+    foreach ($file in $files) {
+        foreach ($name in $secrets.Keys) {
+            if (Select-String -LiteralPath $file.FullName -Pattern $secrets[$name] -SimpleMatch -Quiet) {
+                throw "$name was found inside the build ($($file.FullName)). Refusing to ship it."
+            }
+        }
+    }
+    Write-Host '==> secret scan: no API key or settings file in the build'
+}
+
 $app = Join-Path $dist 'CouchJarvis'
+Assert-NoSecrets $app
 $size = (Get-ChildItem -LiteralPath $app -Recurse -File | Measure-Object Length -Sum).Sum / 1MB
 Write-Host ('==> built {0} ({1:N0} MB)' -f $app, $size)
 

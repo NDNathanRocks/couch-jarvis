@@ -68,3 +68,14 @@ def test_resource_root_follows_pyinstaller(monkeypatch: pytest.MonkeyPatch, tmp_
     assert (resource_root() / "pc-daemon").is_dir()  # running from the repo
     monkeypatch.setattr("sys._MEIPASS", str(tmp_path), raising=False)
     assert resource_root() == tmp_path
+
+
+def test_open_settings_creates_the_file_then_opens_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    opened: list[str] = []
+    monkeypatch.setattr("sys.platform", "win32")
+    monkeypatch.setattr("os.startfile", lambda p: opened.append(str(p)), raising=False)
+    target = tmp_path / "config.env"
+    assert app_entry.open_settings(target, tmp_path / "missing.env") == 0
+    assert target.is_file() and opened == [str(target)]

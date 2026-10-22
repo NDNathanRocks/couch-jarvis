@@ -1,0 +1,7 @@
+# One line-ending convention in the repo (LF) regardless of the OS that edited the file.
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.ico binary
+*.woff2 binary
+*.zip binary

@@ -69,6 +69,12 @@ else the app needs an AI model:
 `%APPDATA%\CouchJarvis\config.env` (paste that into the File Explorer address bar). It's a plain text file of `NAME=value`
 lines; lines starting with `#` are ignored. **Restart Couch Jarvis after editing**: end `CouchJarvis.exe` in Task Manager, then start it from the Start menu. All settings are listed in the [README](../README.md#settings).
 
+The Start menu has a **Couch Jarvis settings** shortcut that opens this file for you.
+
+**API keys are never shipped inside the app.** The installer contains no Groq or Gemini key (the build refuses to finish if
+it finds the builder's keys in it). If you want cloud speech or cloud understanding, get your own free key and add a line
+to your settings file: `CJ_GROQ_API_KEY=gsk_...` and/or `CJ_GEMINI_API_KEY=...`. Both are optional.
+
 Logs are in `%LOCALAPPDATA%\CouchJarvis\logs`. They never contain pairing links or secrets.
 
 ## Updating and uninstalling

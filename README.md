@@ -13,9 +13,10 @@ can scan the same QR and get their own remote.
 
 ### Talk to it
 
-Hold the big **Hold to talk** button, say a command, release. Or type it in the text box. Commands that don't
-need any thinking are matched instantly; anything else goes to the AI router (needs Ollama or a Gemini key, see
-[Settings](#settings)).
+Tap the round **mic** in the bar at the bottom, say a command, then tap **Tap to send** (or **Cancel**). Or type in
+the same bar. Prefer press-and-hold? Switch with the small "Mic mode" link at the bottom of the Remote tab. Commands
+that don't need any thinking are matched instantly; anything else goes to the AI router (needs Ollama or a Gemini key,
+see [Settings](#settings)).
 
 | You say | What happens |
 |---|---|
@@ -31,7 +32,9 @@ need any thinking are matched instantly; anything else goes to the AI router (ne
 | "go back" / "go forward" / "previous page" | Browser history |
 | "reload" / "refresh the page" | Reload the page |
 | "scroll down" / "scroll up a bit" | Scroll the page |
-| "search for bruno mars" / "search uptown funk on YouTube Music" | Shows the **search results and waits**, so you choose |
+| "search big bang theory" | Types it into the **search bar of the page you're on** and submits it. If the page has no search bar, you get a one-tap prompt: **Open a new tab and search YouTube** / Not now |
+| "search for bruno mars on YouTube" / "search uptown funk on YouTube Music" | Shows **YouTube's search results and waits**, so you choose |
+| "turn on subtitles" / "subtitles off" / "spanish subtitles" / "captions in german" | Turns subtitles on or off. **English by default** (`CJ_SUBTITLE_LANG`). Works on YouTube and on custom players such as Heartive's, including ones inside an iframe; players with unlabelled icons are found by looking at the screen |
 | "play bruno mars on YouTube" / "play lofi on YouTube Music" | Searches and plays the first result |
 | "play episode 5" / "play the third episode" | Plays that episode from the list on the page you're looking at |
 | "open the second result" / "click the first video" / "play number 3" | Picks the Nth item on the current page |
@@ -45,8 +48,8 @@ items on the current page and picks one. It stays on the current site unless you
 
 ### Press buttons (Remote tab)
 
-- **Quick deck:** previous, play/pause, next, back/forward 10 s, fullscreen, volume down/mute/up, skip ad, close tab,
-  screen off, and a red **Stop** that pauses everything immediately (it jumps the queue).
+- **Quick deck:** previous, play/pause, next, back/forward 10 s, fullscreen, **subtitles**, volume down/mute/up, skip ad,
+  close tab, screen off, and a red **Stop** that pauses everything immediately (it jumps the queue).
 - **Browser row:** back page, forward page, reload, new tab, tab left/right, scroll up/down.
 - **Pair a friend:** shows the QR on the TV.
 - **Now playing** card, **timers** with live countdowns, and a **Connected friends** list.
@@ -120,6 +123,7 @@ run from source overrides it. Restart the app after changing anything. The usefu
 | `CJ_ROUTER_PROVIDER` | `ollama` | `ollama` (local) or `gemini` for understanding free-form commands |
 | `CJ_OLLAMA_TEXT_MODEL` / `CJ_OLLAMA_VLM_MODEL` | `qwen2.5:7b` / `qwen2.5vl:7b` | Local models (`ollama pull ...`) |
 | `CJ_GEMINI_API_KEY` | none | Free Gemini key for understanding commands / finding buttons on screen |
+| `CJ_SUBTITLE_LANG` | `en` | Language "turn on subtitles" picks when you don't name one (`en`, `es`, `fr`, `de`...) |
 | `CJ_REMOTE_INPUT` | `true` | Let paired phones move the cursor and type |
 | `CJ_HUD_SCREEN_INDEX` | `0` | Which monitor shows the QR overlay (the TV) |
 | `CJ_EDGE_PATH` | auto | Path to `msedge.exe` if it isn't found |
