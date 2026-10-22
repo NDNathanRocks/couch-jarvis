@@ -41,6 +41,14 @@ class VideoFullscreener:
         self._telemetry = telemetry
         self._settle_s = settle_s
 
+    async def _wake(self, op: Op) -> None:
+        """Players hide their control bar until the pointer moves over them."""
+        if op != "fullscreen":
+            return
+        await self._browser.wake_controls()
+        if self._settle_s:
+            await asyncio.sleep(self._settle_s)
+
     async def _verified(self, op: Op) -> bool:
         if self._settle_s:
             await asyncio.sleep(self._settle_s)
@@ -69,6 +77,7 @@ class VideoFullscreener:
         """Tiers 1 and 2. A failure carries the DOM-tier (root cause) fallback reason."""
         if _satisfied(op, await self._browser.snapshot()):
             return ActionResult(True, "dom", observed={"already": True})
+        await self._wake(op)
         dom = self._browser.fullscreen_dom if op == "fullscreen" else self._browser.close_ad_dom
         js = self._browser.fullscreen_js if op == "fullscreen" else self._browser.close_ad_js
         first = await self._attempt(op, "dom", dom)
@@ -85,6 +94,7 @@ class VideoFullscreener:
         """Tier 3: ground the control visually and click it with PyAutoGUI."""
 
         async def act() -> ActionResult:
+            await self._wake(op)  # the VLM can only see a control bar that is showing
             point = await self._grounder.ground(VISION_TARGETS[op])
             if point is None:
                 return ActionResult(False, "vision", "target not found by VLM", "vlm_not_found")

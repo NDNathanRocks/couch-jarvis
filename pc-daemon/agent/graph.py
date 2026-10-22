@@ -20,7 +20,13 @@ from langgraph.graph import END, StateGraph
 from pydantic import ValidationError
 
 from agent.fastpath import plan_button, plan_text
-from agent.policy import key_allowed, normalize_keys, on_media_site, sanitize_untrusted, url_allowed
+from agent.policy import (
+    key_allowed,
+    normalize_keys,
+    on_media_site,
+    sanitize_untrusted,
+    url_allowed,
+)
 from agent.prompts import (
     ROUTER_SYSTEM,
     router_repair_prompt,
@@ -51,6 +57,14 @@ VISION_ELIGIBLE = {"click_selector", "fullscreen", "close_ad", "vision_click"}
 BROWSER_MEDIA = {"play", "pause", "play_pause", "next", "prev"}
 OS_FALLBACK_KEYS: dict[str, MediaKey] = {"play_pause": "play_pause", "next": "next", "prev": "prev"}
 FAIL_MESSAGE = "Sorry, that did not work. Try again."
+LEAVE_PAGE_MESSAGE = "I stayed on this page. Say 'search' or 'YouTube' if you want me to leave it."
+# Failures that retrying cannot fix: end the command now with the step's own message.
+TERMINAL_REASONS = {"off_site", "item_not_found"}
+_ASKED_TO_SEARCH = re.compile(r"\b(?:you ?tube|music|search|look up)\b", re.I)
+
+
+def _is_web_page(url: str) -> bool:
+    return url.startswith(("http://", "https://"))
 
 
 @dataclass
@@ -77,6 +91,10 @@ def extract_json(text: str) -> str:
 
 def success_message(plan: IntentPlan) -> str:
     if plan.intent is Intent.MEDIA_PLAY:
+        if any(s.op == "click_item" for s in plan.steps):
+            return "Opened it"
+        if any(s.op == "navigate" and s.args.get("play") is False for s in plan.steps):
+            return f"Showing results for {plan.slots.get('query', 'your search')}"
         return f"Playing {plan.slots.get('query', 'your request')}"
     return {
         Intent.VOLUME: "Volume updated",
@@ -129,8 +147,15 @@ def build_graph(deps: AgentDeps) -> Any:
         # The tab title is page-controlled text: quote it as bounded, markup-free untrusted data
         # and never include the URL.
         title = sanitize_untrusted(snap.title)
+        try:
+            items = await deps.browser.list_items(30)
+        except Exception:  # the page is a convenience for routing, never a reason to fail
+            items = []
+        listing = " | ".join(f"{c.index}: {sanitize_untrusted(c.text, 50)}" for c in items)
         context = (
+            f"site={'media' if on_media_site(snap.url) else 'other'} "  # never the hostname
             f"<untrusted_page_title>{title}</untrusted_page_title> "
+            f"<untrusted_page_items>{listing}</untrusted_page_items> "
             f"playing={snap.is_playing} fullscreen={snap.is_fullscreen}"
         )
         user = router_user_prompt(state.utterance, context)
@@ -181,13 +206,21 @@ def build_graph(deps: AgentDeps) -> Any:
             }
         return {"plan": plan, "status": "executing"}
 
-    async def run_step(step: ActionStep) -> ActionResult:
+    async def run_step(step: ActionStep, utterance: str = "") -> ActionResult:
         a = step.args
         op = step.op
         if op == "navigate":
             if "query" in a:
+                url = (await deps.browser.snapshot()).url
+                if (
+                    _is_web_page(url)
+                    and not on_media_site(url)
+                    and not _ASKED_TO_SEARCH.search(utterance)
+                ):
+                    # Playing "episode 5" must never yank the TV off the site it is showing.
+                    return ActionResult(False, "dom", LEAVE_PAGE_MESSAGE, "off_site")
                 return await deps.browser.search_and_play(
-                    str(a["query"]), str(a.get("source", "youtube"))
+                    str(a["query"]), str(a.get("source", "youtube")), play=bool(a.get("play", True))
                 )
             url = str(a.get("url", ""))
             if not url_allowed(url):  # LLM output is untrusted: only https media sites
@@ -233,6 +266,20 @@ def build_graph(deps: AgentDeps) -> Any:
                 float(a["minutes"]), str(a.get("label", "timer")), str(a.get("action", "notify"))
             )
             return ActionResult(True, "os")
+        if op == "click_item":
+            # Index/episode/text pick from the list the browser itself reported: the model never
+            # supplies a selector, so this is allowed on any web page (not only media sites).
+            if not _is_web_page((await deps.browser.snapshot()).url):
+                return ActionResult(False, "dom", "no web page to click on", "off_site")
+            picks: dict[str, Any] = {}
+            for key in ("index", "episode", "result"):
+                if key in a:
+                    picks[key] = int(a[key])
+            if "text" in a:
+                picks["text"] = str(a["text"])
+            if not picks:
+                return ActionResult(False, "dom", "nothing to pick", "unsupported")
+            return await deps.browser.click_item(**picks)
         if op == "vision_click":
             if not on_media_site((await deps.browser.snapshot()).url):
                 return ActionResult(
@@ -271,7 +318,7 @@ def build_graph(deps: AgentDeps) -> Any:
             step = steps[cursor]
             started = time.perf_counter()
             with tele.span("executor.step", attributes={"cj.op": step.op}) as step_span:
-                res = await run_step(step)
+                res = await run_step(step, state.utterance)
                 step_span.set_attribute("cj.tier", res.tier)
                 if not res.ok:
                     step_span.set_attribute("cj.fallback_reason", res.fallback_reason)
@@ -289,6 +336,14 @@ def build_graph(deps: AgentDeps) -> Any:
                 cursor += 1
                 tier_used = res.tier
                 continue
+            if res.fallback_reason in TERMINAL_REASONS:
+                # Retrying cannot help (and recovery would reload the page): tell the user why.
+                return {
+                    "cursor": cursor,
+                    "outcomes": outcomes,
+                    "status": "failed",
+                    "final_message": res.error or FAIL_MESSAGE,
+                }
             if step.op in VISION_ELIGIBLE and res.fallback_reason != "blocked":
                 return {
                     "cursor": cursor,
@@ -389,6 +444,8 @@ def build_graph(deps: AgentDeps) -> Any:
     async def post_action_verifier(state: AgentState, span: Span) -> dict[str, Any]:
         assert state.plan is not None
         plan = state.plan
+        if state.status == "failed":  # the executor already ended the command with a message
+            return {}
         if state.cursor < len(plan.steps):
             result = VerifyResult(passed=False, predicate="execution_incomplete")
         else:

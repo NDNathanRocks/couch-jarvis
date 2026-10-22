@@ -50,9 +50,71 @@ def _seek(delta: int) -> IntentPlan:
     return _plan(Intent.MEDIA_CONTROL, [ActionStep(op="seek", args={"delta_s": delta})])
 
 
+_ORDINALS = {
+    "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5,
+    "sixth": 6, "seventh": 7, "eighth": 8, "ninth": 9, "tenth": 10,
+}  # fmt: skip
+_ORD = rf"(\d{{1,3}})(?:st|nd|rd|th)|({'|'.join(_ORDINALS)})"
+_PICK_VERB = r"(?:(?:play|watch|put on|open|start|click|select|choose|pick)(?: on)? )?"
+
+
+def _ordinal(m: re.Match[str], first_group: int) -> int:
+    digits, word = m.group(first_group), m.group(first_group + 1)
+    return int(digits) if digits else _ORDINALS[word]
+
+
+def _pick_plan(**args: int) -> IntentPlan:
+    return _plan(Intent.MEDIA_PLAY, [ActionStep(op="click_item", args=dict(args))])
+
+
+def _search_plan(query: str, music: bool) -> IntentPlan:
+    source = "ytmusic" if music else "youtube"
+    return _plan(
+        Intent.MEDIA_PLAY,
+        [ActionStep(op="navigate", args={"query": query, "source": source, "play": False})],
+        {"query": query},
+    )
+
+
+def _plan_page_actions(t: str) -> IntentPlan | None:
+    """Search-only and "pick the Nth thing on this page": never leaves the current site."""
+    m = re.fullmatch(r"(?:search|look up)(?: for)? (.+?) on (youtube music|yt music|youtube)", t)
+    if m:
+        return _search_plan(m.group(1), "music" in m.group(2) or m.group(2) == "yt music")
+    m = re.fullmatch(r"search (youtube music|yt music|youtube) for (.+)", t)
+    if m:
+        return _search_plan(m.group(2), "music" in m.group(1) or m.group(1) == "yt music")
+    m = re.fullmatch(r"(?:search(?: for)?|look up) (.+)", t)
+    if m:
+        return _search_plan(m.group(1), False)
+
+    ep = rf"(?:episode|ep\.?)(?: number)? ?{_NUM}"
+    m = re.fullmatch(rf"{_PICK_VERB}(?:the )?{ep}(?: please)?", t)
+    if m:
+        return _pick_plan(episode=int(m.group(1)))
+    m = re.fullmatch(rf"{_PICK_VERB}(?:the )?(?:{_ORD}) episode(?: please)?", t)
+    if m:
+        return _pick_plan(episode=_ordinal(m, 1))
+    m = re.fullmatch(
+        rf"{_PICK_VERB}(?:the )?(?:{_ORD})(?: one| result| video| link| item| song| track)?"
+        r"(?: please)?",
+        t,
+    )
+    if m and (m.group(1) or m.group(2)):
+        return _pick_plan(result=_ordinal(m, 1))
+    m = re.fullmatch(rf"{_PICK_VERB}(?:number|no\.?|#) ?{_NUM}(?: please)?", t)
+    if m:
+        return _pick_plan(result=int(m.group(1)))
+    return None
+
+
 def plan_text(utterance: str) -> IntentPlan | None:
     """Return a plan for a recognized command, else None (caller falls back to the LLM)."""
     t = normalize(utterance)
+
+    page = _plan_page_actions(t)
+    if page is not None:
+        return page
 
     if re.fullmatch(rf"(?:pause|stop|hold on|hold up){_MEDIA_NOUN}", t):
         return _media("pause", "paused")

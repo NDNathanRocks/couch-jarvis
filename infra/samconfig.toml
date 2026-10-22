@@ -2,6 +2,7 @@ version = 0.1
 
 [default.global.parameters]
 stack_name = "couch-jarvis"
+region = "us-east-2"
 
 [default.build.parameters]
 cached = true
@@ -11,6 +12,7 @@ parallel = true
 lint = true
 
 [default.deploy.parameters]
+region = "us-east-2"
 capabilities = "CAPABILITY_IAM"
 confirm_changeset = true
 resolve_s3 = true

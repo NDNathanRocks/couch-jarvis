@@ -9,3 +9,6 @@ node_modules/
 dist/
 .aws-sam/
 *.log
+
+.playwright-mcp/
+tests/e2e/.shots/

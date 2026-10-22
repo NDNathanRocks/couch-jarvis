@@ -31,6 +31,7 @@ StepOp = Literal[
     "fullscreen",
     "close_ad",
     "vision_click",
+    "click_item",
     "wait_for",
     "timer_start",
     # additions to the approved plan so every QuickAction maps to one explicit step

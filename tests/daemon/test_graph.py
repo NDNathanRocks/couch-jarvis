@@ -131,7 +131,7 @@ async def test_executor_failure_retries_then_succeeds(env: AgentEnv) -> None:
     real = env.browser.search_and_play
     attempts = [0]
 
-    async def flaky(query: str, source: str) -> ActionResult:
+    async def flaky(query: str, source: str, *, play: bool = True) -> ActionResult:
         attempts[0] += 1
         if attempts[0] == 1:  # e.g. Edge was mid-relaunch on the first try
             return ActionResult(False, "dom", "no result", "selector_timeout")
@@ -182,7 +182,7 @@ async def test_llm_outage_is_reported(env: AgentEnv) -> None:
 
 
 async def test_hard_timeout_ceiling(env: AgentEnv) -> None:
-    async def hang(query: str, source: str) -> ActionResult:
+    async def hang(query: str, source: str, *, play: bool = True) -> ActionResult:
         await asyncio.sleep(10)
         return ActionResult(True, "dom")
 

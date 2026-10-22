@@ -11,6 +11,7 @@ from executors.base import (
     MediaKey,
     Screenshot,
 )
+from executors.page_items import ITEM_NOT_FOUND, Candidate, pick_item
 
 
 def blank_png(width: int = 1920, height: int = 1080) -> bytes:
@@ -28,6 +29,8 @@ class FakeBrowser:
         self.alive = True
         self.snap = BrowserSnapshot(url="https://www.youtube.com/", title="YouTube")
         self.calls: list[str] = []
+        self.items: list[str] = []  # clickable things "on the page", in DOM order
+        self.wakes = 0  # times the player controls were woken (mouse wiggle)
         # failure scripting
         self.dom_fail_reason: str | None = None  # applies to click/fullscreen/close_ad dom tier
         self.js_ok = False
@@ -47,10 +50,15 @@ class FakeBrowser:
         self.snap = self.snap.model_copy(update={"url": url})
         return ActionResult(True, "dom")
 
-    async def search_and_play(self, query: str, source: str) -> ActionResult:
-        self._log(f"search_and_play:{source}:{query}")
+    async def search_and_play(self, query: str, source: str, *, play: bool = True) -> ActionResult:
+        self._log(f"search_and_play:{source}:{query}" if play else f"search:{source}:{query}")
         if not self.search_ok:
             return ActionResult(False, "dom", "no result", "selector_timeout")
+        if not play:
+            self.snap = self.snap.model_copy(
+                update={"title": query, "source": "ytmusic" if source == "ytmusic" else "youtube"}
+            )
+            return ActionResult(True, "dom")
         self.snap = self.snap.model_copy(
             update={
                 "title": query,
@@ -59,6 +67,33 @@ class FakeBrowser:
             }
         )
         return ActionResult(True, "dom")
+
+    async def list_items(self, limit: int = 40) -> list[Candidate]:
+        return [Candidate(i, t) for i, t in enumerate(self.items[:limit])]
+
+    async def click_item(
+        self,
+        *,
+        index: int | None = None,
+        text: str | None = None,
+        episode: int | None = None,
+        result: int | None = None,
+    ) -> ActionResult:
+        picked = {"index": index, "text": text, "episode": episode, "result": result}
+        key, value = next((k, v) for k, v in picked.items() if v is not None)
+        self._log(f"click_item:{key}={value}")
+        if (
+            self.items
+            and pick_item(
+                await self.list_items(), index=index, text=text, episode=episode, result=result
+            )
+            is None
+        ):
+            return ActionResult(False, "dom", ITEM_NOT_FOUND, "item_not_found")
+        return ActionResult(True, "dom")
+
+    async def wake_controls(self) -> None:
+        self.wakes += 1
 
     async def click_selector(self, selector: str, timeout_ms: int) -> ActionResult:
         self._log(f"click_selector:{selector}")
