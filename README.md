@@ -277,4 +277,4 @@ Verified in automated tests: contracts, command queue, STT fallback chain, agent
 recovery), page-aware commands, DPI mapping, SSE/WebSocket API, Lambda relay (against moto), reconnect logic, LAN
 pairing, HUD rendering, the PWA (reducers, gestures, connection state machine, UI flows, a real-browser e2e suite) and
 the CDP executor against a real Edge. Exercised by hand against real services: a deployed AWS stack, Vercel, real Edge on a
-streaming site, local Ollama models. Not yet exercised: the packaged installer on a clean PC.
+streaming site, local Ollama models. The packaged installer was installed, launched and uninstalled on the development PC; it has not yet been tried on a clean machine.

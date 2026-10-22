@@ -127,9 +127,7 @@ It builds the phone app, writes the defaults, freezes the daemon with PyInstalle
 Speech and vision models are **not** bundled: they download on first use, which keeps the installer a reasonable size.
 Playwright's browsers are **not** bundled either; the app drives the Edge already on the PC.
 
-Test a build on a clean PC (or a fresh Windows user account) before sharing it. The build was checked by running the frozen app
-headless on the development PC (serves the phone app, connects to the relay, creates its settings, refuses a second copy),
-but a full install on a machine without the Python environment has not been done yet.
+Before sharing a build, test it on a PC (or Windows user account) that has no Python, Node or Visual C++ runtime installed. So far it has been verified on the development PC: a silent install into a temp folder, launching the installed app (serves the phone app, connects to the relay, creates its settings, refuses a second copy), and a clean uninstall that leaves your settings alone. A truly clean machine has not been tried yet.
 
 ### What every install shares (read this before handing it out)
 
