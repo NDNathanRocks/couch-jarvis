@@ -24,13 +24,12 @@ faster_whisper = pytest.importorskip("faster_whisper")
 av = pytest.importorskip("av")
 
 
-def hold_to_talk(page: Page, hold_ms: int) -> None:
-    box = page.get_by_role("button", name="Hold to talk").bounding_box()
-    assert box is not None
-    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
-    page.mouse.down()
-    page.wait_for_timeout(hold_ms)
-    page.mouse.up()
+def tap_to_talk(page: Page, talk_ms: int) -> None:
+    """Tap the mic on, speak for talk_ms, then tap "Tap to send": the default way to talk."""
+    page.get_by_role("button", name="Tap to talk").click()
+    page.get_by_role("group", name="Listening").wait_for(timeout=10_000)
+    page.wait_for_timeout(talk_ms)
+    page.get_by_role("button", name="Send recording").click()
 
 
 def test_a_real_browser_recording_survives_the_wire_and_decodes(phone, stub: StubServer) -> None:  # type: ignore[no-untyped-def]
@@ -42,10 +41,10 @@ def test_a_real_browser_recording_survives_the_wire_and_decodes(phone, stub: Stu
     )
     page.goto(stub.url)
     page.wait_for_function(
-        "() => { const b = document.querySelector(\"button[aria-label='Hold to talk']\"); return b && !b.disabled; }",
+        "() => { const b = document.querySelector(\"button[aria-label='Tap to talk']\"); return b && !b.disabled; }",
         timeout=15_000,
     )
-    hold_to_talk(page, 2500)
+    tap_to_talk(page, 2500)
     deadline = time.time() + 15
     while time.time() < deadline and not any(m["type"] == "audio.end" for m in stub.messages):
         time.sleep(0.2)

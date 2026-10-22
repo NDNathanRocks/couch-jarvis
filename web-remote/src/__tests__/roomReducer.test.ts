@@ -192,3 +192,26 @@ describe("back-pressure and lost answers", () => {
     expect(v.pendingAt).toEqual({});
   });
 });
+
+describe("suggestions from the PC", () => {
+  const result = (command_id: string) =>
+    msg("cmd.result", {
+      command_id,
+      ok: false,
+      message: "I couldn't find a search bar on this page.",
+      suggest: { label: "Open a new tab and search YouTube", text: "search for x on youtube in a new tab" },
+    } as never);
+
+  it("is attached to the toast of the phone that asked", () => {
+    const v = run({ ...initialView, pending: { c1: "Sending..." } }, result("c1"));
+    expect(v.toasts.at(-1)?.suggest).toEqual({
+      label: "Open a new tab and search YouTube",
+      text: "search for x on youtube in a new tab",
+    });
+  });
+
+  it("is not offered to a friend's phone", () => {
+    const v = run(initialView, result("someone-elses"));
+    expect(v.toasts.at(-1)?.suggest).toBeUndefined();
+  });
+});

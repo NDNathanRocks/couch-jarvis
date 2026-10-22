@@ -8,6 +8,7 @@ import { DECK, QuickDeck } from "../components/QuickDeck";
 import { TimerList, remainingLabel } from "../components/TimerList";
 import { TOAST_MS, Toasts } from "../components/Toasts";
 import { initialView, roomReducer, type RoomView } from "../state/roomReducer";
+import type { Voice } from "../hooks/useVoice";
 import { incoming } from "./helpers";
 
 const online = (patch: Partial<RoomView> = {}): RoomView => ({
@@ -201,11 +202,22 @@ describe("Toasts", () => {
   });
 });
 
-describe("TextCommand", () => {
-  it("stays editable while offline; only Send is disabled, and the draft is kept", async () => {
-    const { TextCommand } = await import("../components/TextCommand");
+describe("CommandBar", () => {
+  const voice = (over: Partial<Voice> = {}): Voice => ({
+    supported: true,
+    active: false,
+    elapsedMs: 0,
+    toggle: vi.fn(),
+    cancel: vi.fn(),
+    holdStart: vi.fn(),
+    holdEnd: vi.fn(),
+    ...over,
+  });
+
+  it("stays editable while offline; only sending is blocked, and the draft is kept", async () => {
+    const { CommandBar } = await import("../components/CommandBar");
     const onSend = vi.fn(() => true);
-    render(<TextCommand disabled onSend={onSend} />);
+    render(<CommandBar disabled voice={voice()} micMode="tap" onSend={onSend} />);
     const input = screen.getByLabelText("Type a command");
     expect(input).toBeEnabled();
     fireEvent.change(input, { target: { value: "play lofi" } });
@@ -213,5 +225,76 @@ describe("TextCommand", () => {
     expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
     fireEvent.submit(input.closest("form") as HTMLFormElement); // enter key while offline still routes to onSend
     expect(onSend).toHaveBeenCalledWith("play lofi");
+  });
+
+  it("shows the mic when there is nothing typed, and tapping it toggles recording", async () => {
+    const { CommandBar } = await import("../components/CommandBar");
+    const v = voice();
+    render(<CommandBar disabled={false} voice={v} micMode="tap" onSend={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Tap to talk" }));
+    expect(v.toggle).toHaveBeenCalledTimes(1);
+  });
+
+  it("while listening it is a compact panel with a timer, Cancel and Tap to send", async () => {
+    const { CommandBar } = await import("../components/CommandBar");
+    const v = voice({ active: true, elapsedMs: 4200 });
+    render(<CommandBar disabled={false} voice={v} micMode="tap" onSend={vi.fn()} />);
+    const panel = screen.getByRole("group", { name: "Listening" });
+    expect(panel).toHaveTextContent("0:04");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send recording" }));
+    expect(v.cancel).toHaveBeenCalledTimes(1);
+    expect(v.toggle).toHaveBeenCalledTimes(1);
+  });
+
+  it("hold mode keeps the old press-and-release behaviour", async () => {
+    const { CommandBar } = await import("../components/CommandBar");
+    const v = voice();
+    render(<CommandBar disabled={false} voice={v} micMode="hold" onSend={vi.fn()} />);
+    const mic = screen.getByRole("button", { name: "Hold to talk" });
+    fireEvent.pointerDown(mic);
+    fireEvent.pointerUp(mic);
+    expect(v.holdStart).toHaveBeenCalledTimes(1);
+    expect(v.holdEnd).toHaveBeenCalledTimes(1);
+    expect(v.toggle).not.toHaveBeenCalled();
+  });
+
+  it("is inert when voice is unsupported (plain http) but typing works", async () => {
+    const { CommandBar } = await import("../components/CommandBar");
+    render(<CommandBar disabled={false} voice={voice({ supported: false })} micMode="tap" onSend={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Tap to talk" })).toBeDisabled();
+    expect(screen.getByLabelText("Type a command")).toBeEnabled();
+  });
+});
+
+describe("suggestion toast", () => {
+  it("offers a one-tap follow-up that sends the suggested command", async () => {
+    const { SUGGEST_TOAST_MS } = await import("../components/Toasts");
+    const onSuggest = vi.fn();
+    const onDismiss = vi.fn();
+    const toast = {
+      id: "s1",
+      kind: "error" as const,
+      text: "I couldn't find a search bar on this page.",
+      mine: true,
+      suggest: { label: "Open a new tab and search YouTube", text: "search for big bang theory on youtube in a new tab" },
+    };
+    render(<Toasts toasts={[toast]} onDismiss={onDismiss} onSuggest={onSuggest} />);
+    expect(screen.getByText(/couldn't find a search bar/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open a new tab and search YouTube" }));
+    expect(onSuggest).toHaveBeenCalledWith("search for big bang theory on youtube in a new tab");
+    expect(onDismiss).toHaveBeenCalledWith("s1");
+    expect(SUGGEST_TOAST_MS).toBeGreaterThan(TOAST_MS);
+  });
+
+  it("Not now just dismisses it", () => {
+    const onSuggest = vi.fn();
+    const onDismiss = vi.fn();
+    const toast = { id: "s2", kind: "error" as const, text: "No bar", mine: true, suggest: { label: "Do it", text: "x" } };
+    render(<Toasts toasts={[toast]} onDismiss={onDismiss} onSuggest={onSuggest} />);
+    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+    expect(onDismiss).toHaveBeenCalledWith("s2");
+    expect(onSuggest).not.toHaveBeenCalled();
   });
 });

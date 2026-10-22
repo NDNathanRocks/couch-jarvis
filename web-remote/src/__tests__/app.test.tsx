@@ -127,7 +127,7 @@ describe("returning phone", () => {
     render(<App />);
     await waitFor(() => expect(FakeSocket.instances.length).toBe(1));
     expect(await screen.findByRole("button", { name: "Play / Pause" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Hold to talk" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Tap to talk" })).toBeDisabled();
   });
 });
 

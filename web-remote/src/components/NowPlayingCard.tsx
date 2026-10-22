@@ -16,9 +16,9 @@ const SOURCES: Record<NowPlaying["source"] & string, string> = {
 export function NowPlayingCard({ playing, pending }: { playing: NowPlaying | null; pending: string | null }) {
   if (!playing) {
     return (
-      <section className="rounded-2xl bg-zinc-900 p-4 text-center text-zinc-400 ring-1 ring-zinc-800">
+      <section className="rounded-2xl bg-surface p-4 text-center text-muted ring-1 ring-line">
         <p className="text-sm">Nothing playing</p>
-        {pending && <p className="mt-1 text-xs text-sky-300">{pending}</p>}
+        {pending && <p className="mt-1 text-xs text-accent">{pending}</p>}
       </section>
     );
   }
@@ -40,7 +40,7 @@ function PlayingBody({ playing, pending }: { playing: NowPlaying; pending: strin
   const now = Math.min(duration || Infinity, (playing.position_s ?? 0) + elapsed);
   const pct = duration > 0 ? Math.min(100, (now / duration) * 100) : 0;
   return (
-    <section className="flex gap-3 rounded-2xl bg-zinc-900 p-3 ring-1 ring-zinc-800" aria-label="Now playing">
+    <section className="flex gap-3 rounded-2xl bg-surface p-3 ring-1 ring-line" aria-label="Now playing">
       {playing.thumbnail_url ? (
         <img src={playing.thumbnail_url} alt="" className="h-16 w-16 flex-none rounded-lg object-cover" referrerPolicy="no-referrer" />
       ) : (
@@ -54,12 +54,12 @@ function PlayingBody({ playing, pending }: { playing: NowPlaying; pending: strin
           {SOURCES[playing.source ?? "other"]} · {playing.is_playing ? "Playing" : "Paused"}
         </p>
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-800" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
-          <div className="h-full bg-sky-500 transition-[width] duration-1000 ease-linear" style={{ width: `${pct}%` }} />
+          <div className="h-full bg-accent transition-[width] duration-1000 ease-linear" style={{ width: `${pct}%` }} />
         </div>
         <p className="mt-1 text-[11px] tabular-nums text-zinc-500">
           {formatClock(now)} / {duration > 0 ? formatClock(duration) : "--:--"}
         </p>
-        {pending && <p className="mt-1 text-xs text-sky-300">{pending}</p>}
+        {pending && <p className="mt-1 text-xs text-accent">{pending}</p>}
       </div>
     </section>
   );

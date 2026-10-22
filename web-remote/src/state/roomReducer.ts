@@ -37,6 +37,8 @@ export interface Toast {
   kind: "ok" | "error" | "info";
   text: string;
   mine: boolean;
+  /** A one-tap follow-up the PC offers ("open a new tab and search?"): sent as a text command. */
+  suggest?: { label: string; text: string };
 }
 
 export interface RoomView {
@@ -269,7 +271,7 @@ function reduceMessage(view: RoomView, msg: Incoming): RoomView {
       return mine ? withLog(next, { id: msg.id, at: msgTime(msg), level: "error", text, detail: `rejected: ${msg.payload.reason ?? "unknown"}` }) : next;
     }
     case "cmd.result": {
-      const { command_id, ok, message, heard, detail, tier_used, latency_ms } = msg.payload;
+      const { command_id, ok, message, heard, detail, tier_used, latency_ms, suggest } = msg.payload;
       const mine = command_id in view.pending;
       const pending = omit(view.pending, command_id);
       const pendingAt = omit(view.pendingAt, command_id);
@@ -277,7 +279,14 @@ function reduceMessage(view: RoomView, msg: Incoming): RoomView {
         ...view,
         pending,
         pendingAt,
-        toasts: pushToast(view.toasts, { id: msg.id, kind: ok ? "ok" : "error", text: message, mine }),
+        toasts: pushToast(view.toasts, {
+          id: msg.id,
+          kind: ok ? "ok" : "error",
+          text: message,
+          mine,
+          // only the phone that asked is offered the follow-up, not its friends
+          ...(mine && suggest ? { suggest: { label: suggest.label, text: suggest.text } } : {}),
+        }),
       };
       if (!mine) return next;
       const lines = [

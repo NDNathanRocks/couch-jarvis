@@ -106,7 +106,7 @@ def test_daemon_restart_reconnects_without_reload_and_controls_gate_correctly(
     wait_badge(page, "Reconnecting", timeout=20_000)
     play = page.get_by_role("button", name="Play / Pause")
     expect(play).to_be_disabled()
-    expect(page.get_by_role("button", name="Hold to talk")).to_be_disabled()
+    expect(page.get_by_role("button", name="Tap to talk")).to_be_disabled()
     # the rest of the UI is alive while offline: typing works, forget-this-phone is reachable
     page.get_by_label("Type a command").fill("still responsive")
     daemon.start()
@@ -338,14 +338,14 @@ def test_text_zoom_and_long_content_do_not_break_the_layout(
     page.screenshot(path=str(SHOTS / "phone_zoomed.png"), full_page=True)
 
 
-def test_hold_to_talk_degrades_gracefully_without_a_secure_context(
+def test_voice_degrades_gracefully_without_a_secure_context(
     phone: PhoneFactory, daemon: Daemon
 ) -> None:
     """On the LAN (plain http://192.168.x.x) browsers hide the microphone API entirely."""
     page = phone()
     page.add_init_script("Object.defineProperty(navigator, 'mediaDevices', {value: undefined})")
     pair(page, daemon)
-    assert page.get_by_role("button", name="Hold to talk").is_disabled()
+    assert page.get_by_role("button", name="Tap to talk").is_disabled()
     expect(page.get_by_text("secure (https)")).to_be_visible()
     page.get_by_label("Type a command").fill("pause")  # the text path still works
     page.get_by_role("button", name="Send").click()
