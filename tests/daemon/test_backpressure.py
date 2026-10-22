@@ -16,7 +16,6 @@ from contracts import (
     AudioEnd,
     CmdButton,
     CmdResultPayload,
-    ErrorMsg,
     Ping,
     envelope,
 )
@@ -293,14 +292,15 @@ async def test_audio_buffers_are_namespaced_by_sender(
 ) -> None:
     svc, _ = voice
     await svc.handle_envelope(begin("shared-id"), "alice")
-    # Bob guesses Alice command id: he can neither add to nor finish her recording...
+    # Bob guesses Alice command id: his parts land in HIS buffer, never in hers...
     for msg in (chunk("shared-id"), end("shared-id")):
-        (err,) = await svc.handle_envelope(msg, "bob")
-        assert isinstance(err, ErrorMsg) and err.payload.code == "unknown_audio"
-    # ...and his own begin with the same id does not overwrite hers
-    await svc.handle_envelope(begin("shared-id"), "bob")
-    assert ("alice", "shared-id") in svc._audio and ("bob", "shared-id") in svc._audio  # noqa: SLF001
+        assert await svc.handle_envelope(msg, "bob") == []
+    alice = svc._audio[("alice", "shared-id")]  # noqa: SLF001
+    assert alice.chunks == {} and alice.expected is None  # untouched: he cannot finish her clip
+    assert svc._audio[("bob", "shared-id")].chunks.keys() == {0}  # noqa: SLF001
+    # ...and her own parts still complete her own recording
     assert await svc.handle_envelope(chunk("shared-id"), "alice") == []
+    assert svc._audio[("alice", "shared-id")].chunks.keys() == {0}  # noqa: SLF001
 
 
 async def test_audio_buffers_are_capped_per_device_and_overall(

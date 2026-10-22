@@ -59,7 +59,10 @@ OS_FALLBACK_KEYS: dict[str, MediaKey] = {"play_pause": "play_pause", "next": "ne
 FAIL_MESSAGE = "Sorry, that did not work. Try again."
 LEAVE_PAGE_MESSAGE = "I stayed on this page. Say 'search' or 'YouTube' if you want me to leave it."
 # Failures that retrying cannot fix: end the command now with the step's own message.
-TERMINAL_REASONS = {"off_site", "item_not_found"}
+TERMINAL_REASONS = {"off_site", "item_not_found", "no_history"}
+BROWSER_NAV_ACTIONS = frozenset(
+    {"back", "forward", "reload", "new_tab", "next_tab", "prev_tab", "scroll_up", "scroll_down"}
+)
 _ASKED_TO_SEARCH = re.compile(r"\b(?:you ?tube|music|search|look up)\b", re.I)
 
 
@@ -96,13 +99,38 @@ def success_message(plan: IntentPlan) -> str:
         if any(s.op == "navigate" and s.args.get("play") is False for s in plan.steps):
             return f"Showing results for {plan.slots.get('query', 'your search')}"
         return f"Playing {plan.slots.get('query', 'your request')}"
+    if plan.intent is Intent.TAB:
+        nav = next((s.args.get("action") for s in plan.steps if s.op == "browser_nav"), None)
+        return {
+            "new_tab": "New tab",
+            "back": "Went back",
+            "forward": "Went forward",
+            "reload": "Reloaded",
+            "next_tab": "Next tab",
+            "prev_tab": "Previous tab",
+        }.get(str(nav), "Tab closed" if nav is None else "Done")
     return {
         Intent.VOLUME: "Volume updated",
         Intent.FULLSCREEN: "Fullscreen",
         Intent.TIMER: "Timer set",
-        Intent.TAB: "Tab closed",
         Intent.SYSTEM: "Done",
     }.get(plan.intent, "Done")
+
+
+def failure_detail(state: AgentState) -> str:
+    """One short line for the phone's log: what we understood and which step failed why."""
+    parts: list[str] = []
+    if state.plan is not None:
+        steps = ",".join(s.op for s in state.plan.steps) or "none"
+        parts.append(f"{state.plan.intent.value} via {state.plan.source} [{steps}]")
+    else:
+        parts.append("no plan")
+    for o in state.outcomes:
+        if not o.ok:
+            parts.append(f"step{o.step_index}/{o.tier}: {o.error or 'failed'}")
+    if state.verify is not None and not state.verify.passed:
+        parts.append(f"verify {state.verify.predicate} failed")
+    return "; ".join(parts)[:400]
 
 
 def _overall_tier(outcomes: list[StepOutcome]) -> str:
@@ -236,6 +264,13 @@ def build_graph(deps: AgentDeps) -> Any:
             return await deps.fullscreener.dom_js_tiers(op)
         if op == "close_tab":
             return await deps.browser.close_tab()
+        if op == "browser_nav":
+            action = str(a.get("action", ""))
+            if action not in BROWSER_NAV_ACTIONS:
+                return ActionResult(
+                    False, "dom", f"unknown browser action: {action}", "unsupported"
+                )
+            return await deps.browser.browser_action(action)
         if op == "sleep_display":
             return await deps.os_ctl.sleep_display()
         if op == "show_qr":
@@ -593,4 +628,5 @@ class AgentRunner:
                 message=final.final_message or FAIL_MESSAGE,
                 tier_used=final.tier_used if ok else _overall_tier(final.outcomes),  # type: ignore[arg-type]
                 latency_ms=(time.perf_counter() - started) * 1000,
+                detail="" if ok else failure_detail(final),
             )

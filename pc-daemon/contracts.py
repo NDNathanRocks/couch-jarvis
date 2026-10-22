@@ -30,7 +30,25 @@ QuickAction = Literal[
     "sleep_display",
     "show_qr",
     "panic",
+    "back",
+    "forward",
+    "reload",
+    "new_tab",
+    "next_tab",
+    "prev_tab",
+    "scroll_up",
+    "scroll_down",
 ]
+
+PointerAction = Literal[
+    "click", "right_click", "middle_click", "double_click", "drag_start", "drag_end"
+]
+Modifier = Literal["ctrl", "alt", "shift"]
+# One printable key or a named key. Dangerous ones (F4, Win, ...) are simply not expressible.
+REMOTE_KEY_PATTERN = (
+    r"^(?:[a-z0-9=\-]|enter|backspace|delete|tab|esc|space|left|right|up|down|home|end"
+    r"|pageup|pagedown|f5|f6|f11)$"
+)
 
 
 class _Model(BaseModel):
@@ -77,6 +95,7 @@ class RoomState(_Model):
     queue_depth: int = 0
     driver: str | None = None
     devices: list[DevicePresence] = Field(default_factory=list)
+    remote_input: bool = True  # touchpad/keyboard allowed (CJ_REMOTE_INPUT on the PC)
     rev: int = 0
 
 
@@ -109,6 +128,24 @@ class CmdTextPayload(_Model):
     command_id: str
     idempotency_key: str
     text: str = Field(min_length=1, max_length=500)
+
+
+class InputPointerPayload(_Model):
+    """Relative touchpad movement. scroll is in wheel notches, positive = down."""
+
+    dx: int = Field(default=0, ge=-400, le=400)
+    dy: int = Field(default=0, ge=-400, le=400)
+    scroll: int = Field(default=0, ge=-30, le=30)
+    action: PointerAction | None = None
+
+
+class InputKeyPayload(_Model):
+    key: str = Field(pattern=REMOTE_KEY_PATTERN)
+    mods: list[Modifier] = Field(default_factory=list, max_length=3)
+
+
+class InputTextPayload(_Model):
+    text: str = Field(min_length=1, max_length=200)
 
 
 class AudioBeginPayload(_Model):
@@ -151,6 +188,8 @@ class CmdResultPayload(_Model):
     message: str
     tier_used: Literal["dom", "js", "vision", "os", "none"] = "none"
     latency_ms: float = 0.0
+    heard: str = Field(default="", max_length=500)  # the words we acted on (voice / typed)
+    detail: str = Field(default="", max_length=400)  # why it failed, for the phone's log
 
 
 class PresencePayload(_Model):
@@ -213,6 +252,21 @@ class CmdButton(_EnvelopeBase):
 class CmdText(_EnvelopeBase):
     type: Literal["cmd.text"] = "cmd.text"
     payload: CmdTextPayload
+
+
+class InputPointer(_EnvelopeBase):
+    type: Literal["input.pointer"] = "input.pointer"
+    payload: InputPointerPayload
+
+
+class InputKey(_EnvelopeBase):
+    type: Literal["input.key"] = "input.key"
+    payload: InputKeyPayload
+
+
+class InputText(_EnvelopeBase):
+    type: Literal["input.text"] = "input.text"
+    payload: InputTextPayload
 
 
 class AudioBegin(_EnvelopeBase):
@@ -300,6 +354,9 @@ Message = Annotated[
     | PairDenied
     | CmdButton
     | CmdText
+    | InputPointer
+    | InputKey
+    | InputText
     | AudioBegin
     | AudioChunk
     | AudioEnd
@@ -326,6 +383,9 @@ PHONE_TO_SERVER_TYPES = frozenset(
         "pair.request",
         "cmd.button",
         "cmd.text",
+        "input.pointer",
+        "input.key",
+        "input.text",
         "audio.begin",
         "audio.chunk",
         "audio.end",

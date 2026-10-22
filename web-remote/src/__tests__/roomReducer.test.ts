@@ -137,7 +137,7 @@ describe("commands, progress and toasts", () => {
   });
 
   it("reset returns to the initial view", () => {
-    expect(run(run(initialView, snapshot(3)), { type: "reset" })).toBe(initialView);
+    expect(run(run(initialView, snapshot(3)), { type: "reset" })).toStrictEqual(initialView);
   });
 
   it("progress text is friendly and includes what was heard", () => {

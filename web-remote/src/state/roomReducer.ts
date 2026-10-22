@@ -17,7 +17,19 @@ export interface RoomSnapshot {
   queue_depth: number;
   driver: string | null;
   devices: DevicePresence[];
+  /** The PC allows the touchpad/keyboard (CJ_REMOTE_INPUT). */
+  remote_input: boolean;
   rev: number;
+}
+
+/** One line of the on-phone debug log. `at` is ms since the epoch (0 = unknown). */
+export interface LogEntry {
+  id: string;
+  at: number;
+  level: "ok" | "error" | "info";
+  text: string;
+  /** Extra lines: what the PC heard, which step failed and why. */
+  detail?: string;
 }
 
 export interface Toast {
@@ -44,10 +56,13 @@ export interface RoomView {
   needsSync: boolean;
   /** Recent ids of messages this phone sent, to recognise errors that answer them. */
   sent: string[];
+  /** Newest last. Bounded; shown by the Log button so problems can be debugged from the couch. */
+  log: LogEntry[];
 }
 
 export type RoomAction =
-  | { type: "connection"; connection: Connection }
+  | { type: "connection"; connection: Connection; at?: number }
+  | { type: "clear_log" }
   | { type: "sent"; messageId: string; commandId?: string; label?: string; at?: number }
   | { type: "expire"; now: number; maxAgeMs: number }
   | { type: "msg"; msg: Incoming }
@@ -58,6 +73,7 @@ export type RoomAction =
 
 const MAX_TOASTS = 4;
 const MAX_SENT = 40;
+const MAX_LOG = 80;
 
 export const emptyRoom: RoomSnapshot = {
   pc_online: false,
@@ -69,6 +85,7 @@ export const emptyRoom: RoomSnapshot = {
   queue_depth: 0,
   driver: null,
   devices: [],
+  remote_input: true,
   rev: 0,
 };
 
@@ -83,6 +100,25 @@ export const initialView: RoomView = {
   toasts: [],
   needsSync: false,
   sent: [],
+  log: [],
+};
+
+/** Message time in ms (the sender stamps seconds; 0 when missing). */
+function msgTime(msg: { ts: number }): number {
+  return msg.ts > 0 ? Math.round(msg.ts * 1000) : 0;
+}
+
+function withLog(view: RoomView, entry: LogEntry): RoomView {
+  return { ...view, log: [...view.log, entry].slice(-MAX_LOG) };
+}
+
+const CONNECTION_TEXT: Record<Connection, string> = {
+  idle: "Not paired",
+  connecting: "Connecting to the relay...",
+  online: "Connected",
+  offline: "Connection lost - retrying",
+  unreachable: "Cannot reach the relay (retrying slowly)",
+  rejected: "Pairing was refused",
 };
 
 function isPlain(value: unknown): value is Record<string, unknown> {
@@ -130,9 +166,19 @@ export function progressText(node: string, status: string, detail: string): stri
 export function roomReducer(view: RoomView, action: RoomAction): RoomView {
   switch (action.type) {
     case "reset":
-      return initialView;
-    case "connection":
-      return { ...view, connection: action.connection };
+      return { ...initialView, log: view.log }; // keep the log: it explains how we got here
+    case "clear_log":
+      return { ...view, log: [] };
+    case "connection": {
+      if (action.connection === view.connection) return view;
+      const next = { ...view, connection: action.connection };
+      return withLog(next, {
+        id: `conn-${action.at ?? 0}-${action.connection}`,
+        at: action.at ?? 0,
+        level: action.connection === "online" ? "ok" : "info",
+        text: CONNECTION_TEXT[action.connection],
+      });
+    }
     case "toast":
       return { ...view, toasts: pushToast(view.toasts, action.toast) };
     case "dismiss":
@@ -163,17 +209,26 @@ export function roomReducer(view: RoomView, action: RoomAction): RoomView {
         pending = omit(pending, id);
         pendingAt = omit(pendingAt, id);
       }
-      return {
-        ...view,
-        pending,
-        pendingAt,
-        toasts: pushToast(view.toasts, {
+      return withLog(
+        {
+          ...view,
+          pending,
+          pendingAt,
+          toasts: pushToast(view.toasts, {
+            id: `expired-${action.now}`,
+            kind: "error",
+            text: "No answer from the PC - check the TV and try again",
+            mine: true,
+          }),
+        },
+        {
           id: `expired-${action.now}`,
-          kind: "error",
-          text: "No answer from the PC - check the TV and try again",
-          mine: true,
-        }),
-      };
+          at: action.now,
+          level: "error",
+          text: "No answer from the PC",
+          detail: "The command was sent but no result came back. The PC may be asleep, the daemon stopped, or the relay dropped it.",
+        },
+      );
     }
     case "msg":
       return reduceMessage(view, action.msg);
@@ -210,25 +265,37 @@ function reduceMessage(view: RoomView, msg: Incoming): RoomView {
           : msg.payload.reason === "queue_full"
             ? "The TV is busy. Try again in a few seconds."
             : "Command rejected";
-      return { ...view, pending, pendingAt, toasts: pushToast(view.toasts, { id: msg.id, kind: "error", text, mine }) };
+      const next = { ...view, pending, pendingAt, toasts: pushToast(view.toasts, { id: msg.id, kind: "error", text, mine }) };
+      return mine ? withLog(next, { id: msg.id, at: msgTime(msg), level: "error", text, detail: `rejected: ${msg.payload.reason ?? "unknown"}` }) : next;
     }
     case "cmd.result": {
-      const { command_id, ok, message } = msg.payload;
+      const { command_id, ok, message, heard, detail, tier_used, latency_ms } = msg.payload;
       const mine = command_id in view.pending;
       const pending = omit(view.pending, command_id);
       const pendingAt = omit(view.pendingAt, command_id);
-      return {
+      const next = {
         ...view,
         pending,
         pendingAt,
         toasts: pushToast(view.toasts, { id: msg.id, kind: ok ? "ok" : "error", text: message, mine }),
       };
+      if (!mine) return next;
+      const lines = [
+        heard ? `heard: "${heard}"` : "",
+        detail ?? "",
+        `${tier_used ?? "none"} tier, ${Math.round(latency_ms ?? 0)} ms`,
+      ].filter(Boolean);
+      return withLog(next, { id: msg.id, at: msgTime(msg), level: ok ? "ok" : "error", text: message, detail: lines.join("\n") });
     }
     case "error": {
       // Errors broadcast by the PC for a friend's message carry that message's id: ignore those.
       if (msg.reply_to !== null && !view.sent.includes(msg.reply_to)) return view;
+      if (msg.payload.code === "rate_limited") return view; // touchpad bursts: noise, not news
       const text = msg.payload.code === "pc_offline" ? "The PC is offline" : msg.payload.message;
-      return { ...view, toasts: pushToast(view.toasts, { id: msg.id, kind: "error", text, mine: true }) };
+      return withLog(
+        { ...view, toasts: pushToast(view.toasts, { id: msg.id, kind: "error", text, mine: true }) },
+        { id: msg.id, at: msgTime(msg), level: "error", text, detail: `code: ${msg.payload.code}` },
+      );
     }
     case "pair.denied":
       return {

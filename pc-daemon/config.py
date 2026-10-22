@@ -66,6 +66,10 @@ class Settings(BaseSettings):
     ollama_vlm_model: str = "qwen2.5vl:7b"
     gemini_api_key: SecretStr | None = None
 
+    # Let paired phones drive the cursor/keyboard (touchpad). Pair only people you would trust
+    # at your keyboard; set false to keep phones to media/browser commands.
+    remote_input: bool = True
+
     # Storage / misc
     telemetry_dir: Path = _local_app_dir() / "telemetry"
     room_file: Path = _roaming_app_dir() / "room.json"

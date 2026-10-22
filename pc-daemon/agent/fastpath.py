@@ -76,6 +76,34 @@ def _search_plan(query: str, music: bool) -> IntentPlan:
     )
 
 
+def _browser(action: str) -> IntentPlan:
+    return _plan(Intent.TAB, [ActionStep(op="browser_nav", args={"action": action})])
+
+
+def _plan_browser(t: str) -> IntentPlan | None:
+    """Tabs, history, reload and scrolling: "new tab" must never close one."""
+    if re.fullmatch(r"(?:open |make |start |create |give me )?(?:a )?new tab(?: please)?", t):
+        return _browser("new_tab")
+    if re.fullmatch(
+        r"(?:go back|back a page|navigate back|(?:go (?:back )?to )?(?:the )?previous page"
+        r"|go back to (?:the )?(?:previous|last) page)",
+        t,
+    ):
+        return _browser("back")
+    if re.fullmatch(r"(?:go forward|forward a page|navigate forward|next page)", t):
+        return _browser("forward")
+    if re.fullmatch(r"(?:reload|refresh)(?: the| this)?(?: page| tab)?", t):
+        return _browser("reload")
+    if re.fullmatch(r"(?:next|switch to the next|go to the next) tab", t):
+        return _browser("next_tab")
+    if re.fullmatch(r"(?:previous|prev|last|switch to the previous|go to the previous) tab", t):
+        return _browser("prev_tab")
+    m = re.fullmatch(r"scroll (up|down)(?: a (?:bit|little)| some| more| a lot)?", t)
+    if m:
+        return _browser(f"scroll_{m.group(1)}")
+    return None
+
+
 def _plan_page_actions(t: str) -> IntentPlan | None:
     """Search-only and "pick the Nth thing on this page": never leaves the current site."""
     m = re.fullmatch(r"(?:search|look up)(?: for)? (.+?) on (youtube music|yt music|youtube)", t)
@@ -112,7 +140,7 @@ def plan_text(utterance: str) -> IntentPlan | None:
     """Return a plan for a recognized command, else None (caller falls back to the LLM)."""
     t = normalize(utterance)
 
-    page = _plan_page_actions(t)
+    page = _plan_browser(t) or _plan_page_actions(t)
     if page is not None:
         return page
 
@@ -122,7 +150,7 @@ def plan_text(utterance: str) -> IntentPlan | None:
         return _media("play", "video_playing")
     if re.fullmatch(rf"(?:next|skip|skip to next|play next){_MEDIA_NOUN}", t):
         return _media("next")
-    if re.fullmatch(rf"(?:previous|prev|go back|last|play previous){_MEDIA_NOUN}", t):
+    if re.fullmatch(rf"(?:previous|prev|last|play previous){_MEDIA_NOUN}", t):
         return _media("prev")
 
     m = re.fullmatch(rf"(?:set |turn |change )?(?:the )?volume (?:to|at) {_NUM}(?: percent|%)?", t)
@@ -214,5 +242,13 @@ def plan_button(
         "sleep_display": _plan(Intent.SYSTEM, [ActionStep(op="sleep_display")]),
         "show_qr": _plan(Intent.SYSTEM, [ActionStep(op="show_qr")]),
         "panic": _media("pause", "paused"),
+        "back": _browser("back"),
+        "forward": _browser("forward"),
+        "reload": _browser("reload"),
+        "new_tab": _browser("new_tab"),
+        "next_tab": _browser("next_tab"),
+        "prev_tab": _browser("prev_tab"),
+        "scroll_up": _browser("scroll_up"),
+        "scroll_down": _browser("scroll_down"),
     }
     return table[action]

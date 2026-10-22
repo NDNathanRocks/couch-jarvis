@@ -530,7 +530,15 @@
             "seek_back_10",
             "sleep_display",
             "show_qr",
-            "panic"
+            "panic",
+            "back",
+            "forward",
+            "reload",
+            "new_tab",
+            "next_tab",
+            "prev_tab",
+            "scroll_up",
+            "scroll_down"
           ],
           "title": "Action",
           "type": "string"
@@ -634,6 +642,18 @@
       "properties": {
         "command_id": {
           "title": "Command Id",
+          "type": "string"
+        },
+        "detail": {
+          "default": "",
+          "maxLength": 400,
+          "title": "Detail",
+          "type": "string"
+        },
+        "heard": {
+          "default": "",
+          "maxLength": 500,
+          "title": "Heard",
           "type": "string"
         },
         "latency_ms": {
@@ -942,6 +962,270 @@
         "message"
       ],
       "title": "ErrorPayload",
+      "type": "object"
+    },
+    "InputKey": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/InputKeyPayload"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "input.key",
+          "default": "input.key",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "InputKey",
+      "type": "object"
+    },
+    "InputKeyPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "pattern": "^(?:[a-z0-9=\\-]|enter|backspace|delete|tab|esc|space|left|right|up|down|home|end|pageup|pagedown|f5|f6|f11)$",
+          "title": "Key",
+          "type": "string"
+        },
+        "mods": {
+          "items": {
+            "enum": [
+              "ctrl",
+              "alt",
+              "shift"
+            ],
+            "type": "string"
+          },
+          "maxItems": 3,
+          "title": "Mods",
+          "type": "array"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "title": "InputKeyPayload",
+      "type": "object"
+    },
+    "InputPointer": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/InputPointerPayload"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "input.pointer",
+          "default": "input.pointer",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "InputPointer",
+      "type": "object"
+    },
+    "InputPointerPayload": {
+      "additionalProperties": false,
+      "description": "Relative touchpad movement. scroll is in wheel notches, positive = down.",
+      "properties": {
+        "action": {
+          "anyOf": [
+            {
+              "enum": [
+                "click",
+                "right_click",
+                "middle_click",
+                "double_click",
+                "drag_start",
+                "drag_end"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Action"
+        },
+        "dx": {
+          "default": 0,
+          "maximum": 400,
+          "minimum": -400,
+          "title": "Dx",
+          "type": "integer"
+        },
+        "dy": {
+          "default": 0,
+          "maximum": 400,
+          "minimum": -400,
+          "title": "Dy",
+          "type": "integer"
+        },
+        "scroll": {
+          "default": 0,
+          "maximum": 30,
+          "minimum": -30,
+          "title": "Scroll",
+          "type": "integer"
+        }
+      },
+      "title": "InputPointerPayload",
+      "type": "object"
+    },
+    "InputText": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/InputTextPayload"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "input.text",
+          "default": "input.text",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from",
+        "payload"
+      ],
+      "title": "InputText",
+      "type": "object"
+    },
+    "InputTextPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "InputTextPayload",
       "type": "object"
     },
     "NowPlaying": {
@@ -1557,6 +1841,11 @@
           "title": "Queue Depth",
           "type": "integer"
         },
+        "remote_input": {
+          "default": true,
+          "title": "Remote Input",
+          "type": "boolean"
+        },
         "rev": {
           "default": 0,
           "title": "Rev",
@@ -1795,6 +2084,9 @@
       "cmd.text": "#/$defs/CmdText",
       "device.revoke": "#/$defs/DeviceRevoke",
       "error": "#/$defs/ErrorMsg",
+      "input.key": "#/$defs/InputKey",
+      "input.pointer": "#/$defs/InputPointer",
+      "input.text": "#/$defs/InputText",
       "pair.denied": "#/$defs/PairDenied",
       "pair.granted": "#/$defs/PairGranted",
       "pair.request": "#/$defs/PairRequest",
@@ -1823,6 +2115,15 @@
     },
     {
       "$ref": "#/$defs/CmdText"
+    },
+    {
+      "$ref": "#/$defs/InputPointer"
+    },
+    {
+      "$ref": "#/$defs/InputKey"
+    },
+    {
+      "$ref": "#/$defs/InputText"
     },
     {
       "$ref": "#/$defs/AudioBegin"

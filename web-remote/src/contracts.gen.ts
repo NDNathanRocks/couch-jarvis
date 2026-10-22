@@ -8,6 +8,9 @@ export type Message =
   | PairDenied
   | CmdButton
   | CmdText
+  | InputPointer
+  | InputKey
+  | InputText
   | AudioBegin
   | AudioChunk
   | AudioEnd
@@ -66,7 +69,15 @@ export type Action =
   | "seek_back_10"
   | "sleep_display"
   | "show_qr"
-  | "panic";
+  | "panic"
+  | "back"
+  | "forward"
+  | "reload"
+  | "new_tab"
+  | "next_tab"
+  | "prev_tab"
+  | "scroll_up"
+  | "scroll_down";
 export type CommandId = string;
 export type IdempotencyKey = string;
 export type ReplyTo3 = string | null;
@@ -86,71 +97,108 @@ export type Type4 = "cmd.text";
 export type V4 = 1;
 export type From5 = string;
 export type Id5 = string;
+export type Action1 = ("click" | "right_click" | "middle_click" | "double_click" | "drag_start" | "drag_end") | null;
+export type Dx = number;
+export type Dy = number;
+export type Scroll = number;
+export type ReplyTo5 = string | null;
+export type RoomId5 = string;
+export type Ts5 = number;
+export type Type5 = "input.pointer";
+export type V5 = 1;
+export type From6 = string;
+export type Id6 = string;
+export type Key = string;
+/**
+ * @maxItems 3
+ */
+export type Mods =
+  | []
+  | ["ctrl" | "alt" | "shift"]
+  | ["ctrl" | "alt" | "shift", "ctrl" | "alt" | "shift"]
+  | ["ctrl" | "alt" | "shift", "ctrl" | "alt" | "shift", "ctrl" | "alt" | "shift"];
+export type ReplyTo6 = string | null;
+export type RoomId6 = string;
+export type Ts6 = number;
+export type Type6 = "input.key";
+export type V6 = 1;
+export type From7 = string;
+export type Id7 = string;
+export type Text1 = string;
+export type ReplyTo7 = string | null;
+export type RoomId7 = string;
+export type Ts7 = number;
+export type Type7 = "input.text";
+export type V7 = 1;
+export type From8 = string;
+export type Id8 = string;
 export type CommandId2 = string;
 export type IdempotencyKey2 = string;
 export type Mime = string;
 export type SampleRate = number | null;
-export type ReplyTo5 = string | null;
-export type RoomId5 = string;
-export type Ts5 = number;
-export type Type5 = "audio.begin";
-export type V5 = 1;
-export type From6 = string;
-export type Id6 = string;
+export type ReplyTo8 = string | null;
+export type RoomId8 = string;
+export type Ts8 = number;
+export type Type8 = "audio.begin";
+export type V8 = 1;
+export type From9 = string;
+export type Id9 = string;
 export type B64 = string;
 export type CommandId3 = string;
 export type Seq = number;
-export type ReplyTo6 = string | null;
-export type RoomId6 = string;
-export type Ts6 = number;
-export type Type6 = "audio.chunk";
-export type V6 = 1;
-export type From7 = string;
-export type Id7 = string;
+export type ReplyTo9 = string | null;
+export type RoomId9 = string;
+export type Ts9 = number;
+export type Type9 = "audio.chunk";
+export type V9 = 1;
+export type From10 = string;
+export type Id10 = string;
 export type CommandId4 = string;
 export type DurationMs = number;
 export type TotalChunks = number;
-export type ReplyTo7 = string | null;
-export type RoomId7 = string;
-export type Ts7 = number;
-export type Type7 = "audio.end";
-export type V7 = 1;
-export type From8 = string;
-export type Id8 = string;
+export type ReplyTo10 = string | null;
+export type RoomId10 = string;
+export type Ts10 = number;
+export type Type10 = "audio.end";
+export type V10 = 1;
+export type From11 = string;
+export type Id11 = string;
 export type CommandId5 = string;
 export type Position = number | null;
 export type Reason1 = ("rate_limited" | "queue_full") | null;
 export type Status = "accepted" | "queued" | "duplicate" | "rejected";
-export type ReplyTo8 = string | null;
-export type RoomId8 = string;
-export type Ts8 = number;
-export type Type8 = "cmd.ack";
-export type V8 = 1;
-export type From9 = string;
-export type Id9 = string;
+export type ReplyTo11 = string | null;
+export type RoomId11 = string;
+export type Ts11 = number;
+export type Type11 = "cmd.ack";
+export type V11 = 1;
+export type From12 = string;
+export type Id12 = string;
 export type CommandId6 = string;
 export type Detail = string;
 export type Node = string;
 export type Status1 = string;
-export type ReplyTo9 = string | null;
-export type RoomId9 = string;
-export type Ts9 = number;
-export type Type9 = "agent.progress";
-export type V9 = 1;
-export type From10 = string;
-export type Id10 = string;
+export type ReplyTo12 = string | null;
+export type RoomId12 = string;
+export type Ts12 = number;
+export type Type12 = "agent.progress";
+export type V12 = 1;
+export type From13 = string;
+export type Id13 = string;
 export type CommandId7 = string;
+export type Detail1 = string;
+export type Heard = string;
 export type LatencyMs = number;
 export type Message1 = string;
 export type Ok = boolean;
 export type TierUsed = "dom" | "js" | "vision" | "os" | "none";
-export type ReplyTo10 = string | null;
-export type RoomId10 = string;
-export type Ts10 = number;
-export type Type10 = "cmd.result";
-export type V10 = 1;
-export type From11 = string;
-export type Id11 = string;
+export type ReplyTo13 = string | null;
+export type RoomId13 = string;
+export type Ts13 = number;
+export type Type13 = "cmd.result";
+export type V13 = 1;
+export type From14 = string;
+export type Id14 = string;
 export type DeviceId1 = string;
 export type LastSeen = number;
 export type Name = string;
@@ -167,86 +215,87 @@ export type ThumbnailUrl = string | null;
 export type Title = string;
 export type PcOnline = boolean;
 export type QueueDepth = number;
+export type RemoteInput = boolean;
 export type Rev = number;
-export type Action1 = string;
+export type Action2 = string;
 export type EndsAt = number;
 export type Label = string;
 export type TimerId = string;
 export type Timers = TimerInfo[];
 export type Volume = number;
-export type ReplyTo11 = string | null;
-export type RoomId11 = string;
-export type Ts11 = number;
-export type Type11 = "state.snapshot";
-export type V11 = 1;
-export type From12 = string;
-export type Id12 = string;
-export type ReplyTo12 = string | null;
-export type RoomId12 = string;
-export type Ts12 = number;
-export type Type12 = "state.patch";
-export type V12 = 1;
-export type From13 = string;
-export type Id13 = string;
-export type ReplyTo13 = string | null;
-export type RoomId13 = string;
-export type Ts13 = number;
-export type Type13 = "state.sync";
-export type V13 = 1;
-export type From14 = string;
-export type Id14 = string;
+export type ReplyTo14 = string | null;
+export type RoomId14 = string;
+export type Ts14 = number;
+export type Type14 = "state.snapshot";
+export type V14 = 1;
+export type From15 = string;
+export type Id15 = string;
+export type ReplyTo15 = string | null;
+export type RoomId15 = string;
+export type Ts15 = number;
+export type Type15 = "state.patch";
+export type V15 = 1;
+export type From16 = string;
+export type Id16 = string;
+export type ReplyTo16 = string | null;
+export type RoomId16 = string;
+export type Ts16 = number;
+export type Type16 = "state.sync";
+export type V16 = 1;
+export type From17 = string;
+export type Id17 = string;
 export type Devices1 = DevicePresence[];
 export type PcOnline1 = boolean;
 /**
  * @maxItems 100
  */
 export type Revoked = string[];
-export type ReplyTo14 = string | null;
-export type RoomId14 = string;
-export type Ts14 = number;
-export type Type14 = "presence";
-export type V14 = 1;
-export type From15 = string;
-export type Id15 = string;
-export type Key = string;
-export type KeyId = string;
-export type ReplyTo15 = string | null;
-export type RoomId15 = string;
-export type Ts15 = number;
-export type Type15 = "room.key";
-export type V15 = 1;
-export type From16 = string;
-export type Id16 = string;
-export type DeviceId2 = string;
-export type ReplyTo16 = string | null;
-export type RoomId16 = string;
-export type Ts16 = number;
-export type Type16 = "device.revoke";
-export type V16 = 1;
-export type From17 = string;
-export type Id17 = string;
 export type ReplyTo17 = string | null;
 export type RoomId17 = string;
 export type Ts17 = number;
-export type Type17 = "ping";
+export type Type17 = "presence";
 export type V17 = 1;
 export type From18 = string;
 export type Id18 = string;
+export type Key1 = string;
+export type KeyId = string;
 export type ReplyTo18 = string | null;
 export type RoomId18 = string;
 export type Ts18 = number;
-export type Type18 = "pong";
+export type Type18 = "room.key";
 export type V18 = 1;
 export type From19 = string;
 export type Id19 = string;
-export type Code = string;
-export type Message2 = string;
-export type Retryable = boolean;
+export type DeviceId2 = string;
 export type ReplyTo19 = string | null;
 export type RoomId19 = string;
 export type Ts19 = number;
-export type Type19 = "error";
+export type Type19 = "device.revoke";
 export type V19 = 1;
+export type From20 = string;
+export type Id20 = string;
+export type ReplyTo20 = string | null;
+export type RoomId20 = string;
+export type Ts20 = number;
+export type Type20 = "ping";
+export type V20 = 1;
+export type From21 = string;
+export type Id21 = string;
+export type ReplyTo21 = string | null;
+export type RoomId21 = string;
+export type Ts21 = number;
+export type Type21 = "pong";
+export type V21 = 1;
+export type From22 = string;
+export type Id22 = string;
+export type Code = string;
+export type Message2 = string;
+export type Retryable = boolean;
+export type ReplyTo22 = string | null;
+export type RoomId22 = string;
+export type Ts22 = number;
+export type Type22 = "error";
+export type V22 = 1;
 
 export interface PairRequest {
   from: From;
@@ -324,15 +373,61 @@ export interface CmdTextPayload {
   idempotency_key: IdempotencyKey1;
   text: Text;
 }
-export interface AudioBegin {
+export interface InputPointer {
   from: From5;
   id: Id5;
-  payload: AudioBeginPayload;
+  payload: InputPointerPayload;
   reply_to?: ReplyTo5;
   room_id: RoomId5;
   ts: Ts5;
   type?: Type5;
   v?: V5;
+}
+/**
+ * Relative touchpad movement. scroll is in wheel notches, positive = down.
+ */
+export interface InputPointerPayload {
+  action?: Action1;
+  dx?: Dx;
+  dy?: Dy;
+  scroll?: Scroll;
+}
+export interface InputKey {
+  from: From6;
+  id: Id6;
+  payload: InputKeyPayload;
+  reply_to?: ReplyTo6;
+  room_id: RoomId6;
+  ts: Ts6;
+  type?: Type6;
+  v?: V6;
+}
+export interface InputKeyPayload {
+  key: Key;
+  mods?: Mods;
+}
+export interface InputText {
+  from: From7;
+  id: Id7;
+  payload: InputTextPayload;
+  reply_to?: ReplyTo7;
+  room_id: RoomId7;
+  ts: Ts7;
+  type?: Type7;
+  v?: V7;
+}
+export interface InputTextPayload {
+  text: Text1;
+}
+export interface AudioBegin {
+  from: From8;
+  id: Id8;
+  payload: AudioBeginPayload;
+  reply_to?: ReplyTo8;
+  room_id: RoomId8;
+  ts: Ts8;
+  type?: Type8;
+  v?: V8;
 }
 export interface AudioBeginPayload {
   command_id: CommandId2;
@@ -341,14 +436,14 @@ export interface AudioBeginPayload {
   sample_rate?: SampleRate;
 }
 export interface AudioChunk {
-  from: From6;
-  id: Id6;
+  from: From9;
+  id: Id9;
   payload: AudioChunkPayload;
-  reply_to?: ReplyTo6;
-  room_id: RoomId6;
-  ts: Ts6;
-  type?: Type6;
-  v?: V6;
+  reply_to?: ReplyTo9;
+  room_id: RoomId9;
+  ts: Ts9;
+  type?: Type9;
+  v?: V9;
 }
 export interface AudioChunkPayload {
   b64: B64;
@@ -356,14 +451,14 @@ export interface AudioChunkPayload {
   seq: Seq;
 }
 export interface AudioEnd {
-  from: From7;
-  id: Id7;
+  from: From10;
+  id: Id10;
   payload: AudioEndPayload;
-  reply_to?: ReplyTo7;
-  room_id: RoomId7;
-  ts: Ts7;
-  type?: Type7;
-  v?: V7;
+  reply_to?: ReplyTo10;
+  room_id: RoomId10;
+  ts: Ts10;
+  type?: Type10;
+  v?: V10;
 }
 export interface AudioEndPayload {
   command_id: CommandId4;
@@ -371,14 +466,14 @@ export interface AudioEndPayload {
   total_chunks: TotalChunks;
 }
 export interface CmdAck {
-  from: From8;
-  id: Id8;
+  from: From11;
+  id: Id11;
   payload: CmdAckPayload;
-  reply_to?: ReplyTo8;
-  room_id: RoomId8;
-  ts: Ts8;
-  type?: Type8;
-  v?: V8;
+  reply_to?: ReplyTo11;
+  room_id: RoomId11;
+  ts: Ts11;
+  type?: Type11;
+  v?: V11;
 }
 export interface CmdAckPayload {
   command_id: CommandId5;
@@ -387,14 +482,14 @@ export interface CmdAckPayload {
   status: Status;
 }
 export interface AgentProgress {
-  from: From9;
-  id: Id9;
+  from: From12;
+  id: Id12;
   payload: AgentProgressPayload;
-  reply_to?: ReplyTo9;
-  room_id: RoomId9;
-  ts: Ts9;
-  type?: Type9;
-  v?: V9;
+  reply_to?: ReplyTo12;
+  room_id: RoomId12;
+  ts: Ts12;
+  type?: Type12;
+  v?: V12;
 }
 export interface AgentProgressPayload {
   command_id: CommandId6;
@@ -403,31 +498,33 @@ export interface AgentProgressPayload {
   status: Status1;
 }
 export interface CmdResult {
-  from: From10;
-  id: Id10;
+  from: From13;
+  id: Id13;
   payload: CmdResultPayload;
-  reply_to?: ReplyTo10;
-  room_id: RoomId10;
-  ts: Ts10;
-  type?: Type10;
-  v?: V10;
+  reply_to?: ReplyTo13;
+  room_id: RoomId13;
+  ts: Ts13;
+  type?: Type13;
+  v?: V13;
 }
 export interface CmdResultPayload {
   command_id: CommandId7;
+  detail?: Detail1;
+  heard?: Heard;
   latency_ms?: LatencyMs;
   message: Message1;
   ok: Ok;
   tier_used?: TierUsed;
 }
 export interface StateSnapshot {
-  from: From11;
-  id: Id11;
+  from: From14;
+  id: Id14;
   payload: RoomState;
-  reply_to?: ReplyTo11;
-  room_id: RoomId11;
-  ts: Ts11;
-  type?: Type11;
-  v?: V11;
+  reply_to?: ReplyTo14;
+  room_id: RoomId14;
+  ts: Ts14;
+  type?: Type14;
+  v?: V14;
 }
 export interface RoomState {
   devices?: Devices;
@@ -437,6 +534,7 @@ export interface RoomState {
   now_playing?: NowPlaying | null;
   pc_online?: PcOnline;
   queue_depth?: QueueDepth;
+  remote_input?: RemoteInput;
   rev?: Rev;
   timers?: Timers;
   volume?: Volume;
@@ -456,7 +554,7 @@ export interface NowPlaying {
   title: Title;
 }
 export interface TimerInfo {
-  action?: Action1;
+  action?: Action2;
   ends_at: EndsAt;
   label: Label;
   timer_id: TimerId;
@@ -465,38 +563,38 @@ export interface TimerInfo {
  * JSON-merge-patch (RFC 7386) of RoomState; rev must be included.
  */
 export interface StatePatch {
-  from: From12;
-  id: Id12;
+  from: From15;
+  id: Id15;
   payload: Payload;
-  reply_to?: ReplyTo12;
-  room_id: RoomId12;
-  ts: Ts12;
-  type?: Type12;
-  v?: V12;
+  reply_to?: ReplyTo15;
+  room_id: RoomId15;
+  ts: Ts15;
+  type?: Type15;
+  v?: V15;
 }
 export interface Payload {
   [k: string]: unknown;
 }
 export interface StateSync {
-  from: From13;
-  id: Id13;
+  from: From16;
+  id: Id16;
   payload?: Empty;
-  reply_to?: ReplyTo13;
-  room_id: RoomId13;
-  ts: Ts13;
-  type?: Type13;
-  v?: V13;
+  reply_to?: ReplyTo16;
+  room_id: RoomId16;
+  ts: Ts16;
+  type?: Type16;
+  v?: V16;
 }
 export interface Empty {}
 export interface Presence {
-  from: From14;
-  id: Id14;
+  from: From17;
+  id: Id17;
   payload: PresencePayload;
-  reply_to?: ReplyTo14;
-  room_id: RoomId14;
-  ts: Ts14;
-  type?: Type14;
-  v?: V14;
+  reply_to?: ReplyTo17;
+  room_id: RoomId17;
+  ts: Ts17;
+  type?: Type17;
+  v?: V17;
 }
 export interface PresencePayload {
   devices: Devices1;
@@ -504,67 +602,67 @@ export interface PresencePayload {
   revoked?: Revoked;
 }
 export interface RoomKey {
-  from: From15;
-  id: Id15;
-  payload: RoomKeyPayload;
-  reply_to?: ReplyTo15;
-  room_id: RoomId15;
-  ts: Ts15;
-  type?: Type15;
-  v?: V15;
-}
-/**
- * Per-room HS256 key the relay hands to the PC so it can verify device tokens offline.
- */
-export interface RoomKeyPayload {
-  key: Key;
-  key_id: KeyId;
-}
-/**
- * PC -> relay: cut a phone off (live connections are closed, future tokens refused).
- */
-export interface DeviceRevoke {
-  from: From16;
-  id: Id16;
-  payload: DeviceRevokePayload;
-  reply_to?: ReplyTo16;
-  room_id: RoomId16;
-  ts: Ts16;
-  type?: Type16;
-  v?: V16;
-}
-export interface DeviceRevokePayload {
-  device_id: DeviceId2;
-}
-export interface Ping {
-  from: From17;
-  id: Id17;
-  payload?: Empty;
-  reply_to?: ReplyTo17;
-  room_id: RoomId17;
-  ts: Ts17;
-  type?: Type17;
-  v?: V17;
-}
-export interface Pong {
   from: From18;
   id: Id18;
-  payload?: Empty;
+  payload: RoomKeyPayload;
   reply_to?: ReplyTo18;
   room_id: RoomId18;
   ts: Ts18;
   type?: Type18;
   v?: V18;
 }
-export interface ErrorMsg {
+/**
+ * Per-room HS256 key the relay hands to the PC so it can verify device tokens offline.
+ */
+export interface RoomKeyPayload {
+  key: Key1;
+  key_id: KeyId;
+}
+/**
+ * PC -> relay: cut a phone off (live connections are closed, future tokens refused).
+ */
+export interface DeviceRevoke {
   from: From19;
   id: Id19;
-  payload: ErrorPayload;
+  payload: DeviceRevokePayload;
   reply_to?: ReplyTo19;
   room_id: RoomId19;
   ts: Ts19;
   type?: Type19;
   v?: V19;
+}
+export interface DeviceRevokePayload {
+  device_id: DeviceId2;
+}
+export interface Ping {
+  from: From20;
+  id: Id20;
+  payload?: Empty;
+  reply_to?: ReplyTo20;
+  room_id: RoomId20;
+  ts: Ts20;
+  type?: Type20;
+  v?: V20;
+}
+export interface Pong {
+  from: From21;
+  id: Id21;
+  payload?: Empty;
+  reply_to?: ReplyTo21;
+  room_id: RoomId21;
+  ts: Ts21;
+  type?: Type21;
+  v?: V21;
+}
+export interface ErrorMsg {
+  from: From22;
+  id: Id22;
+  payload: ErrorPayload;
+  reply_to?: ReplyTo22;
+  room_id: RoomId22;
+  ts: Ts22;
+  type?: Type22;
+  v?: V22;
 }
 export interface ErrorPayload {
   code: Code;

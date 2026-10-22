@@ -11,7 +11,7 @@ mss>=9.0,<11
 pyautogui>=0.9.54,<1
 pycaw>=20240210; sys_platform == "win32"
 comtypes>=1.4; sys_platform == "win32"
-pillow>=10,<13
+pillow>=13,<14
 PyJWT>=2.9,<3
 faster-whisper>=1.0,<2
 # faster-whisper 1.2 calls av.open(metadata_errors=...), which PyAV 19 removed: voice decoding

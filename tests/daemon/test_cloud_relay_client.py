@@ -253,13 +253,13 @@ async def test_service_errors_carry_the_original_message_id(rig: Rig, relay: Fak
     stray_chunk.update(
         type="audio.chunk",
         id="orig-id-1",
-        payload={"command_id": "never-started", "seq": 0, "b64": "AAAA"},
+        payload={"command_id": "never-started", "seq": 0, "b64": "!!not base64!!"},
     )
     for ws in relay.connections:
         await ws.send(json.dumps(stray_chunk))
     await until(lambda: "error" in relay.types())
     err = next(m for m in relay.received if m["type"] == "error")
-    assert err["reply_to"] == "orig-id-1" and err["payload"]["code"] == "unknown_audio"
+    assert err["reply_to"] == "orig-id-1" and err["payload"]["code"] == "bad_audio"
     assert isinstance(parse_message(json.dumps(err)), ErrorMsg)
 
 

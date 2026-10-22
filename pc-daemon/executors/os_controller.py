@@ -35,6 +35,78 @@ WM_SYSCOMMAND = 0x0112
 SC_MONITORPOWER = 0xF170
 MONITOR_OFF = 2
 
+MOUSEEVENTF_MOVE = 0x0001
+MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP = 0x0002, 0x0004
+MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP = 0x0008, 0x0010
+MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP = 0x0020, 0x0040
+MOUSEEVENTF_WHEEL = 0x0800
+WHEEL_DELTA = 120
+MOUSE_ACTIONS: dict[str, tuple[int, ...]] = {
+    "click": (MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP),
+    "double_click": (MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP) * 2,
+    "right_click": (MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP),
+    "middle_click": (MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP),
+    "drag_start": (MOUSEEVENTF_LEFTDOWN,),
+    "drag_end": (MOUSEEVENTF_LEFTUP,),
+}
+
+INPUT_KEYBOARD = 1
+KEYEVENTF_UNICODE = 0x0004
+VK_RETURN = 0x0D
+
+
+class _KeyboardInput(ctypes.Structure):
+    _fields_ = (
+        ("wVk", ctypes.c_ushort),
+        ("wScan", ctypes.c_ushort),
+        ("dwFlags", ctypes.c_ulong),
+        ("time", ctypes.c_ulong),
+        ("dwExtraInfo", ctypes.c_void_p),
+    )
+
+
+class _MouseInput(ctypes.Structure):  # only here so the INPUT union has its real (largest) size
+    _fields_ = (
+        ("dx", ctypes.c_long),
+        ("dy", ctypes.c_long),
+        ("mouseData", ctypes.c_ulong),
+        ("dwFlags", ctypes.c_ulong),
+        ("time", ctypes.c_ulong),
+        ("dwExtraInfo", ctypes.c_void_p),
+    )
+
+
+class _InputUnion(ctypes.Union):
+    _fields_ = (("ki", _KeyboardInput), ("mi", _MouseInput))
+
+
+class _Input(ctypes.Structure):
+    _fields_ = (("type", ctypes.c_ulong), ("u", _InputUnion))
+
+
+def _send_key_events(events: list[tuple[int, int, int]]) -> None:
+    """events are (vk, scan, flags); sent in one SendInput call so they stay in order."""
+    inputs = (_Input * len(events))()
+    for slot, (vk, scan, flags) in zip(inputs, events, strict=True):
+        slot.type = INPUT_KEYBOARD
+        slot.u.ki = _KeyboardInput(vk, scan, flags, 0, None)
+    ctypes.windll.user32.SendInput(len(events), inputs, ctypes.sizeof(_Input))
+
+
+def _send_unicode(ch: str) -> None:
+    """Type one character regardless of keyboard layout (surrogate pairs for emoji)."""
+    units = ch.encode("utf-16-le")
+    codes = [int.from_bytes(units[i : i + 2], "little") for i in range(0, len(units), 2)]
+    events: list[tuple[int, int, int]] = []
+    for code in codes:
+        events.append((0, code, KEYEVENTF_UNICODE))
+        events.append((0, code, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP))
+    _send_key_events(events)
+
+
+def _send_vk(vk: int) -> None:
+    _send_key_events([(vk, 0, 0), (vk, 0, KEYEVENTF_KEYUP)])
+
 
 class WindowsOS:
     def __init__(self) -> None:
@@ -107,6 +179,59 @@ class WindowsOS:
             return ActionResult(True, "os")
 
         return await self._run(press)
+
+    # ---- phone touchpad / keyboard (policy is enforced by the caller: remote_input.py)
+
+    async def move_rel(self, dx: int, dy: int) -> ActionResult:
+        def move() -> ActionResult:
+            ctypes.windll.user32.mouse_event(MOUSEEVENTF_MOVE, int(dx), int(dy), 0, 0)
+            return ActionResult(True, "os")
+
+        return await self._run(move)
+
+    async def scroll(self, notches: int) -> ActionResult:
+        def wheel() -> ActionResult:
+            # Windows: positive delta = wheel away from you (up); the phone says positive = down
+            ctypes.windll.user32.mouse_event(
+                MOUSEEVENTF_WHEEL, 0, 0, -int(notches) * WHEEL_DELTA, 0
+            )
+            return ActionResult(True, "os")
+
+        return await self._run(wheel)
+
+    async def mouse_action(self, action: str) -> ActionResult:
+        flags = MOUSE_ACTIONS.get(action)
+        if flags is None:
+            return ActionResult(False, "os", f"unknown mouse action: {action}")
+
+        def act() -> ActionResult:
+            user32 = ctypes.windll.user32
+            for flag in flags:
+                user32.mouse_event(flag, 0, 0, 0, 0)
+            return ActionResult(True, "os")
+
+        return await self._run(act)
+
+    async def press_key(self, key: str, mods: tuple[str, ...]) -> ActionResult:
+        def press() -> ActionResult:
+            import pyautogui
+
+            pyautogui.FAILSAFE = False
+            pyautogui.hotkey(*mods, key)
+            return ActionResult(True, "os")
+
+        return await self._run(press)
+
+    async def type_text(self, text: str) -> ActionResult:
+        def type_() -> ActionResult:
+            for ch in text:
+                if ch == "\n":
+                    _send_vk(VK_RETURN)
+                else:
+                    _send_unicode(ch)
+            return ActionResult(True, "os")
+
+        return await self._run(type_)
 
     async def sleep_display(self) -> ActionResult:
         def off() -> ActionResult:

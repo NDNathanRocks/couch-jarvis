@@ -31,6 +31,8 @@ Ops and their args:
 - timer_start: {"minutes": number, "label": string, "action": "pause"|"sleep_display"|"notify"}
 - vision_click: {"target": "<what to click, described visually>"}
 - click_selector: {"selector": "<css>", "description": "<what it is>"}
+- browser_nav: {"action": "back"|"forward"|"reload"|"new_tab"|"next_tab"|"prev_tab"|"scroll_up"|
+  "scroll_down"}   ("new tab" OPENS a tab with new_tab: close_tab only when asked to close)
 - wait_for: {"ms": int}
 
 Predicates for "expect" (or null): "video_playing", "paused", "is_fullscreen", "no_ad",

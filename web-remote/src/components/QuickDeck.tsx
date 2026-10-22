@@ -21,6 +21,18 @@ export const DECK: readonly DeckButton[] = [
   { action: "sleep_display", label: "Screen off", icon: "🌙" },
 ];
 
+/** Browser controls: the buttons for "go back", "new tab" and friends. */
+export const BROWSER_DECK: readonly DeckButton[] = [
+  { action: "back", label: "Back page", icon: "◀" },
+  { action: "forward", label: "Forward page", icon: "▶" },
+  { action: "reload", label: "Reload", icon: "⟳" },
+  { action: "new_tab", label: "New tab", icon: "＋" },
+  { action: "prev_tab", label: "Tab left", icon: "⇤" },
+  { action: "next_tab", label: "Tab right", icon: "⇥" },
+  { action: "scroll_up", label: "Scroll up", icon: "⬆" },
+  { action: "scroll_down", label: "Scroll down", icon: "⬇" },
+];
+
 interface Props {
   onPress: (action: QuickAction) => void;
   disabled: boolean;
@@ -49,6 +61,23 @@ export function QuickDeck({ onPress, disabled }: Props) {
             className="flex min-h-[4.5rem] flex-col items-center justify-center gap-1 rounded-2xl bg-zinc-800 px-1 py-2 text-zinc-100 ring-1 ring-zinc-700 active:scale-95 active:bg-zinc-700 disabled:opacity-40"
           >
             <span className="text-2xl" aria-hidden>
+              {b.icon}
+            </span>
+            <span className="text-[11px] leading-tight text-zinc-300">{b.label}</span>
+          </button>
+        ))}
+      </div>
+      <div role="group" aria-label="Browser" className="grid grid-cols-4 gap-2">
+        {BROWSER_DECK.map((b) => (
+          <button
+            key={b.action}
+            type="button"
+            disabled={disabled}
+            onClick={() => onPress(b.action)}
+            aria-label={b.label}
+            className="flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-2xl bg-zinc-800 px-1 py-2 text-zinc-100 ring-1 ring-zinc-700 active:scale-95 active:bg-zinc-700 disabled:opacity-40"
+          >
+            <span className="text-xl" aria-hidden>
               {b.icon}
             </span>
             <span className="text-[11px] leading-tight text-zinc-300">{b.label}</span>

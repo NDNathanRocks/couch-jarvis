@@ -42,6 +42,9 @@ export interface OutgoingPayloads {
   "pair.request": C.PairRequestPayload;
   "cmd.button": C.CmdButtonPayload;
   "cmd.text": C.CmdTextPayload;
+  "input.pointer": C.InputPointerPayload;
+  "input.key": C.InputKeyPayload;
+  "input.text": C.InputTextPayload;
   "audio.begin": C.AudioBeginPayload;
   "audio.chunk": C.AudioChunkPayload;
   "audio.end": C.AudioEndPayload;
@@ -68,12 +71,18 @@ export const OUTGOING_TYPES = [
   "pair.request",
   "cmd.button",
   "cmd.text",
+  "input.pointer",
+  "input.key",
+  "input.text",
   "audio.begin",
   "audio.chunk",
   "audio.end",
   "state.sync",
   "ping",
 ] as const satisfies readonly OutgoingType[];
+
+export type PointerAction = NonNullable<C.InputPointerPayload["action"]>;
+export type Modifier = NonNullable<C.InputKeyPayload["mods"]>[number];
 
 export function uuid(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {

@@ -5,7 +5,7 @@ import {
   type PairParams,
   type SocketLike,
 } from "../connection/roomConnection";
-import { uuid, type QuickAction } from "../protocol";
+import { uuid, type Modifier, type PointerAction, type QuickAction } from "../protocol";
 import { initialView, roomReducer, type RoomView } from "../state/roomReducer";
 import type { Recording } from "../utils/audioRecorder";
 import type { Endpoint } from "../utils/config";
@@ -28,9 +28,13 @@ export interface RoomActions {
   sendButton(action: QuickAction): boolean;
   sendText(text: string): boolean;
   sendAudio(recording: Recording): boolean;
+  sendPointer(p: { dx?: number; dy?: number; scroll?: number; action?: PointerAction }): boolean;
+  sendKey(key: string, mods?: Modifier[]): boolean;
+  sendTyped(text: string): boolean;
   unpair(): Promise<void>;
   dismiss(toastId: string): void;
   notify(text: string): void;
+  clearLog(): void;
 }
 
 export function useRoomSocket(options: RoomSocketOptions): { view: RoomView; actions: RoomActions } {
@@ -88,11 +92,15 @@ export function useRoomSocket(options: RoomSocketOptions): { view: RoomView; act
       sendButton: (a) => connection.current?.sendButton(a) ?? false,
       sendText: (t) => connection.current?.sendText(t) ?? false,
       sendAudio: (r) => connection.current?.sendAudio(r) ?? false,
+      sendPointer: (p) => connection.current?.sendPointer(p) ?? false,
+      sendKey: (k, m) => connection.current?.sendKey(k, m) ?? false,
+      sendTyped: (t) => connection.current?.sendTyped(t) ?? false,
       unpair: async () => {
         await connection.current?.unpair();
       },
       dismiss: (id) => dispatch({ type: "dismiss", id }),
       notify: (text) => dispatch({ type: "toast", toast: { id: uuid(), kind: "info", text, mine: true } }),
+      clearLog: () => dispatch({ type: "clear_log" }),
     }),
     [],
   );

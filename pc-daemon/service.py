@@ -37,6 +37,9 @@ from contracts import (
     DeviceRevoke,
     ErrorMsg,
     ErrorPayload,
+    InputKey,
+    InputPointer,
+    InputText,
     Message,
     NowPlaying,
     Pong,
@@ -48,6 +51,7 @@ from contracts import (
 )
 from event_bus import EventBus
 from executors.base import Browser, OSController
+from remote_input import key_combo_allowed, sanitize_typed_text
 from stt_engine import STTEngine, STTError
 from telemetry import Telemetry
 from timers import TimerService
@@ -59,6 +63,7 @@ MAX_AUDIO_PER_DEVICE = 2
 MAX_AUDIO_TOTAL = 8
 MAX_CONCURRENT_STT = 2
 AUDIO_TTL_S = 30.0
+AUDIO_GRACE_S = 4.0  # how long a recording may still be missing parts after audio.end arrived
 
 
 class RoomStateStore:
@@ -124,10 +129,18 @@ class TokenBucket:
 
 @dataclass
 class _AudioBuffer:
+    """One phone's recording. The cloud relay handles every message in its own Lambda call, so
+    begin / chunks / end can arrive in any order: the buffer fills from whichever comes first
+    and the recording is processed once all three parts are present."""
+
     device_id: str
-    idempotency_key: str
-    mime: str
     started: float
+    idempotency_key: str = ""
+    mime: str = ""
+    begun: bool = False  # audio.begin seen
+    expected: int | None = None  # total_chunks from audio.end, once seen
+    duration_ms: int = 0
+    deadline: asyncio.TimerHandle | None = None  # fires if parts are still missing after end
     chunks: dict[int, bytes] = field(default_factory=dict)
     size: int = 0
 
@@ -146,6 +159,7 @@ class CommandService:
         stt: STTEngine | None = None,
         mode: Literal["cloud", "lan"] = "cloud",
         state_poll_s: float = 10.0,
+        remote_input: bool = True,
     ) -> None:
         self.room_id = room_id
         self.bus = bus
@@ -161,6 +175,10 @@ class CommandService:
         self.queue = CommandQueue(self._run_command, on_result=self._on_result)
         self._audio: dict[tuple[str, str], _AudioBuffer] = {}  # (device_id, command_id)
         self._limiter = TokenBucket(rate=4.0, burst=12.0)
+        self._input_limiter = TokenBucket(rate=60.0, burst=150.0)  # touchpad is chatty by design
+        self._input_lock = asyncio.Lock()
+        self.remote_input_enabled = remote_input
+        self.state.update(remote_input=remote_input)
         self._stt_slots = asyncio.Semaphore(MAX_CONCURRENT_STT)
         self._devices: dict[str, DevicePresence] = {}
         self._cloud_devices: list[DevicePresence] = []
@@ -181,6 +199,8 @@ class CommandService:
             self._poller.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._poller
+        for key in list(self._audio):
+            self._drop_audio(key)
         for task in list(self._bg):
             task.cancel()
         await asyncio.gather(*self._bg, return_exceptions=True)
@@ -281,12 +301,44 @@ class CommandService:
                     text=typed.text,
                 )
             )
+        elif isinstance(msg, InputPointer | InputKey | InputText):
+            return await self._handle_input(msg, device_id)
         elif isinstance(msg, AudioBegin):
             return self._audio_begin(msg, device_id)
         elif isinstance(msg, AudioChunk):
             return self._audio_chunk(msg, device_id)
         elif isinstance(msg, AudioEnd):
             return self._audio_end(msg, device_id)
+        return []
+
+    async def _handle_input(
+        self, msg: InputPointer | InputKey | InputText, device_id: str
+    ) -> list[Message]:
+        """Touchpad / keyboard: applied immediately (never queued behind the agent)."""
+        if not self.remote_input_enabled:
+            return [self._error("input_disabled", "Remote input is turned off on this PC")]
+        if not self._input_limiter.allow(device_id):
+            return [self._error("rate_limited", "Slow down", retryable=True)]
+        os_ctl = self._os
+        async with self._input_lock:  # keep one phone's gesture in order, never interleaved
+            if isinstance(msg, InputPointer):
+                move = msg.payload
+                if move.dx or move.dy:
+                    await os_ctl.move_rel(move.dx, move.dy)
+                if move.scroll:
+                    await os_ctl.scroll(move.scroll)
+                if move.action:
+                    await os_ctl.mouse_action(move.action)
+            elif isinstance(msg, InputKey):
+                chord = msg.payload
+                if not key_combo_allowed(chord.key, chord.mods):
+                    name = "+".join([*chord.mods, chord.key])
+                    return [self._error("key_not_allowed", f"{name} is blocked")]
+                await os_ctl.press_key(chord.key, tuple(chord.mods))
+            else:
+                text = sanitize_typed_text(msg.payload.text)
+                if text:
+                    await os_ctl.type_text(text)
         return []
 
     def submit(self, req: CommandRequest) -> SubmitAck:
@@ -328,61 +380,90 @@ class CommandService:
     def _gc_audio(self) -> None:
         now = time.monotonic()
         for key in [k for k, b in self._audio.items() if now - b.started > AUDIO_TTL_S]:
-            del self._audio[key]
+            self._drop_audio(key)
+
+    def _drop_audio(self, key: tuple[str, str]) -> _AudioBuffer | None:
+        buf = self._audio.pop(key, None)
+        if buf is not None and buf.deadline is not None:
+            buf.deadline.cancel()
+        return buf
+
+    def _audio_slot(self, device_id: str, command_id: str) -> _AudioBuffer:
+        """The sender's buffer for this recording, created by whichever part arrives first.
+
+        Buffers are namespaced by sender so one phone can never touch another phone recording,
+        and capped so a flood of audio parts cannot exhaust memory (oldest are dropped first).
+        """
+        key = (device_id, command_id)
+        buf = self._audio.get(key)
+        if buf is None:
+            self._gc_audio()
+            mine = [k for k in self._audio if k[0] == device_id]
+            while len(mine) >= MAX_AUDIO_PER_DEVICE:
+                self._drop_audio(mine.pop(0))
+            while len(self._audio) >= MAX_AUDIO_TOTAL:
+                self._drop_audio(next(iter(self._audio)))
+            buf = self._audio[key] = _AudioBuffer(device_id, time.monotonic())
+        return buf
+
+    def _audio_progress(self, key: tuple[str, str]) -> None:
+        """Process the recording once begin, every chunk and end are in; else wait (bounded)."""
+        buf = self._audio.get(key)
+        if buf is None or buf.expected is None:
+            return  # audio.end not seen yet: nothing to decide
+        if buf.begun and sorted(buf.chunks) == list(range(buf.expected)):
+            self._drop_audio(key)
+            audio = b"".join(buf.chunks[i] for i in range(buf.expected))
+            task = asyncio.create_task(
+                self._transcribe_and_submit(key[1], buf, audio, buf.duration_ms)
+            )
+            self._bg.add(task)
+            task.add_done_callback(self._bg.discard)
+        elif buf.deadline is None:  # late parts get a grace period before we give up
+            buf.deadline = asyncio.get_running_loop().call_later(
+                AUDIO_GRACE_S, self._audio_expired, key
+            )
+
+    def _audio_expired(self, key: tuple[str, str]) -> None:
+        if self._drop_audio(key) is not None:
+            self._publish_result(key[1], False, "Recording was incomplete, try again")
 
     def _audio_begin(self, msg: AudioBegin, device_id: str) -> list[Message]:
-        self._gc_audio()
         p = msg.payload
         if self._stt is None:
             return [self._error("stt_unavailable", "Voice is not available on this PC")]
-        # Buffers are namespaced by sender so one phone can never touch another phone recording,
-        # and capped so a flood of audio.begin cannot exhaust memory (oldest are dropped first).
-        mine = [k for k in self._audio if k[0] == device_id]
-        while len(mine) >= MAX_AUDIO_PER_DEVICE:
-            del self._audio[mine.pop(0)]
-        while len(self._audio) >= MAX_AUDIO_TOTAL:
-            del self._audio[next(iter(self._audio))]
-        self._audio[(device_id, p.command_id)] = _AudioBuffer(
-            device_id, p.idempotency_key, p.mime, time.monotonic()
-        )
+        buf = self._audio_slot(device_id, p.command_id)
+        buf.idempotency_key, buf.mime, buf.begun = p.idempotency_key, p.mime, True
         self.bus.publish(
             envelope(
                 CmdAck, self.room_id, CmdAckPayload(command_id=p.command_id, status="accepted")
             )
         )
+        self._audio_progress((device_id, p.command_id))
         return []
 
     def _audio_chunk(self, msg: AudioChunk, device_id: str) -> list[Message]:
         p = msg.payload
-        buf = self._audio.get((device_id, p.command_id))
-        if buf is None:
-            return [self._error("unknown_audio", "No audio stream in progress")]
+        key = (device_id, p.command_id)
         try:
             data = base64.b64decode(p.b64, validate=True)
         except (binascii.Error, ValueError):
-            self._audio.pop((device_id, p.command_id), None)
+            self._drop_audio(key)
             return [self._error("bad_audio", "Audio chunk was not valid base64")]
+        buf = self._audio_slot(device_id, p.command_id)
         buf.size += len(data)
         if buf.size > MAX_AUDIO_BYTES:
-            self._audio.pop((device_id, p.command_id), None)
+            self._drop_audio(key)
             return [self._error("too_large", "Recording too long")]
         buf.chunks[p.seq] = data
+        self._audio_progress(key)
         return []
 
     def _audio_end(self, msg: AudioEnd, device_id: str) -> list[Message]:
         p = msg.payload
-        buf = self._audio.pop((device_id, p.command_id), None)
-        if buf is None:
-            return [self._error("unknown_audio", "No audio stream in progress")]
-        if sorted(buf.chunks) != list(range(p.total_chunks)):
-            self._publish_result(p.command_id, False, "Recording was incomplete, try again")
-            return []
-        audio = b"".join(buf.chunks[i] for i in range(p.total_chunks))
-        task = asyncio.create_task(
-            self._transcribe_and_submit(p.command_id, buf, audio, p.duration_ms)
-        )
-        self._bg.add(task)
-        task.add_done_callback(self._bg.discard)
+        buf = self._audio_slot(device_id, p.command_id)
+        buf.expected, buf.duration_ms = p.total_chunks, p.duration_ms
+        self._audio_progress((device_id, p.command_id))
         return []
 
     async def _transcribe_and_submit(
@@ -423,7 +504,10 @@ class CommandService:
 
     async def _run_command(self, req: CommandRequest) -> CmdResultPayload:
         self._sync_queue_state()
-        return await self._runner.run(req)
+        result = await self._runner.run(req)
+        if req.kind in ("voice", "text") and req.text:
+            result = result.model_copy(update={"heard": req.text[:500]})  # shown in the phone log
+        return result
 
     async def _on_result(self, req: CommandRequest, result: CmdResultPayload) -> None:
         self.bus.publish(envelope(CmdResult, self.room_id, result))

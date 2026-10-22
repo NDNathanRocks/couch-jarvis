@@ -139,26 +139,60 @@ async def test_voice_flow_reassembles_chunks_and_transcribes(
     assert next(e for e in events(svc) if e["type"] == "cmd.result")["payload"]["ok"] is True
 
 
-async def test_incomplete_audio_is_rejected_cleanly(svc: CommandService) -> None:
+async def test_incomplete_audio_is_rejected_cleanly(
+    svc: CommandService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("service.AUDIO_GRACE_S", 0.05)
     base = {"command_id": "v1"}
     await svc.handle_envelope(
         msg(AudioBegin, {**base, "idempotency_key": "kv", "mime": "audio/webm"}), "d1"
     )
     await svc.handle_envelope(msg(AudioChunk, {**base, "seq": 0, "b64": "AAAA"}), "d1")
     await svc.handle_envelope(msg(AudioEnd, {**base, "total_chunks": 3, "duration_ms": 10}), "d1")
+    await settle(svc, "cmd.result")  # only after the grace period for late chunks
     result = next(e for e in events(svc) if e["type"] == "cmd.result")
     assert result["payload"]["ok"] is False and "incomplete" in result["payload"]["message"]
 
 
+@pytest.mark.parametrize(
+    "order",
+    [
+        ["end", 0, 1, "begin"],  # the relay runs each message in its own Lambda: any order
+        ["end", "begin", 1, 0],
+        [0, "begin", "end", 1],
+        [1, 0, "end", "begin"],
+        ["begin", 0, 1, "end"],
+    ],
+)
+async def test_voice_survives_any_arrival_order(
+    svc: CommandService, env: AgentEnv, order: list
+) -> None:
+    svc._stt = STTEngine(FakeStt("volume to 35"), None)
+    pieces = [b"OPUS" * 500, b"DATA" * 500]
+    base = {"command_id": "v1"}
+    steps = {
+        "begin": msg(AudioBegin, {**base, "idempotency_key": "kv", "mime": "audio/webm"}),
+        "end": msg(AudioEnd, {**base, "total_chunks": 2, "duration_ms": 1500}),
+        0: msg(AudioChunk, {**base, "seq": 0, "b64": base64.b64encode(pieces[0]).decode()}),
+        1: msg(AudioChunk, {**base, "seq": 1, "b64": base64.b64encode(pieces[1]).decode()}),
+    }
+    for step in order:
+        assert await svc.handle_envelope(steps[step], "d1") == []  # no error for early arrivals
+    await settle(svc, "cmd.result")
+    assert env.os.volume == 35
+    assert next(e for e in events(svc) if e["type"] == "cmd.result")["payload"]["ok"] is True
+
+
 async def test_audio_cannot_be_hijacked_by_another_device(svc: CommandService) -> None:
+    svc._stt = STTEngine(FakeStt("volume to 35"), None)
     base = {"command_id": "v1"}
     await svc.handle_envelope(
         msg(AudioBegin, {**base, "idempotency_key": "kv", "mime": "audio/webm"}), "d1"
     )
-    reply = await svc.handle_envelope(
-        msg(AudioChunk, {**base, "seq": 0, "b64": "AAAA"}, "d2"), "d2"
-    )
-    assert isinstance(reply[0], ErrorMsg) and reply[0].payload.code == "unknown_audio"
+    await svc.handle_envelope(msg(AudioChunk, {**base, "seq": 0, "b64": "AAAA"}, "d2"), "d2")
+    # d2's bytes live in d2's own buffer; d1's recording never sees them
+    assert svc._audio[("d1", "v1")].chunks == {}
+    assert svc._audio[("d2", "v1")].chunks == {0: b"\x00\x00\x00"}
 
 
 async def test_oversized_and_corrupt_audio_are_refused(svc: CommandService) -> None:

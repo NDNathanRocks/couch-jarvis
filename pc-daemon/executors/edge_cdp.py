@@ -315,9 +315,7 @@ class EdgeCDP:
             page = web[0]  # the oldest tab is the one the TV was already showing
         else:
             page = pages[-1] if pages else await context.new_page()
-        self._page_ref = page
-        # Ad scripts open popups when the player is clicked: close them, never follow them.
-        page.on("popup", lambda popup: asyncio.ensure_future(_close_quietly(popup)))
+        self._adopt(page)  # ad scripts open popups when the player is clicked: close them
         return page
 
     @contextlib.asynccontextmanager
@@ -494,6 +492,52 @@ class EdgeCDP:
             return ActionResult(True, "dom")
 
         return await self._guard(run)
+
+    async def browser_action(self, action: str) -> ActionResult:
+        """Back / forward / reload, tab switching, and scrolling for the current tab."""
+
+        async def run(page: Any) -> ActionResult:
+            if action in ("back", "forward"):
+                async with self._hold_origin(page) as hijacked:
+                    go = page.go_back if action == "back" else page.go_forward
+                    moved = await go(wait_until="domcontentloaded", timeout=8000)
+                if moved is None and not hijacked:
+                    return ActionResult(
+                        False, "dom", f"There is no page to go {action} to.", "no_history"
+                    )
+                return ActionResult(True, "dom")
+            if action == "reload":
+                await page.reload(wait_until="domcontentloaded", timeout=15000)
+                return ActionResult(True, "dom")
+            if action in ("scroll_up", "scroll_down"):
+                box = await page.evaluate(JS_PLAYER_BOX)  # a viewport-sized box when no player
+                await page.mouse.move(box["x"] + box["w"] / 2, box["y"] + box["h"] / 2)
+                await page.mouse.wheel(0, 600 if action == "scroll_down" else -600)
+                return ActionResult(True, "dom")
+            if action == "new_tab":
+                fresh = await page.context.new_page()
+                with contextlib.suppress(Exception):
+                    await fresh.goto("edge://newtab/", timeout=8000)
+                await fresh.bring_to_front()
+                self._adopt(fresh)
+                return ActionResult(True, "dom")
+            if action in ("next_tab", "prev_tab"):
+                tabs = [p for p in page.context.pages if not p.is_closed()]
+                if len(tabs) < 2:
+                    return ActionResult(True, "dom")  # nothing to switch to
+                step = 1 if action == "next_tab" else -1
+                target = tabs[(tabs.index(page) + step) % len(tabs)]
+                await target.bring_to_front()
+                self._adopt(target)
+                return ActionResult(True, "dom")
+            return ActionResult(False, "dom", f"unknown browser action: {action}", "unsupported")
+
+        return await self._guard(run)
+
+    def _adopt(self, page: Any) -> None:
+        """Make this the tab we control from now on (and keep closing its ad popups)."""
+        self._page_ref = page
+        page.on("popup", lambda popup: asyncio.ensure_future(_close_quietly(popup)))
 
     async def close_ad_dom(self) -> ActionResult:
         async def run(page: Any) -> ActionResult:

@@ -25,6 +25,9 @@ PHONE_TYPES = frozenset(
         "pair.request",
         "cmd.button",
         "cmd.text",
+        "input.pointer",
+        "input.key",
+        "input.text",
         "audio.begin",
         "audio.chunk",
         "audio.end",
@@ -34,7 +37,22 @@ PHONE_TYPES = frozenset(
     }
 )
 # Commands that are forwarded to the PC (the phone must be authenticated)
-COMMAND_TYPES = frozenset({"cmd.button", "cmd.text", "audio.begin", "audio.chunk", "audio.end"})
+COMMAND_TYPES = frozenset(
+    {
+        "cmd.button",
+        "cmd.text",
+        "input.pointer",
+        "input.key",
+        "input.text",
+        "audio.begin",
+        "audio.chunk",
+        "audio.end",
+    }
+)
+# High-rate message types: the connection is closed on revoke, so skip the per-message DB check
+HIGH_RATE_TYPES = frozenset(
+    {"audio.chunk", "audio.end", "input.pointer", "input.key", "input.text"}
+)
 # Commands carrying an idempotency key that the relay de-duplicates
 IDEMPOTENT_TYPES = frozenset({"cmd.button", "cmd.text", "audio.begin"})
 # PC -> every phone in the room

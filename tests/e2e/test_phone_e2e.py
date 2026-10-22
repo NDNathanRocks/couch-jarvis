@@ -218,8 +218,15 @@ def test_a_command_the_pc_never_answers_times_out(phone: PhoneFactory, stub: Stu
     page.get_by_label("Type a command").fill("play something")
     page.get_by_role("button", name="Send").click()
     expect(page.get_by_text("Sending...")).to_be_visible()
-    page.clock.run_for(52_000)  # just past the 45 s limit; toasts auto-dismiss 4 s later
-    expect(page.get_by_text("No answer from the PC")).to_be_visible(timeout=5_000)
+    # The expiry check polls every 5 s and the toast auto-dismisses after 4 s, so the exact tick
+    # depends on when the command was sent. Step the fake clock a second at a time past the 45 s
+    # limit and stop as soon as the toast shows, instead of assuming where the tick lands.
+    toast = page.get_by_text("No answer from the PC")
+    for _ in range(70):
+        page.clock.run_for(1_000)
+        if toast.count():
+            break
+    expect(toast).to_be_visible(timeout=5_000)
     expect(page.get_by_text("Sending...")).to_have_count(0)
 
 

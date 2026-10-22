@@ -265,8 +265,10 @@ async def test_a_legit_audio_sized_frame_still_fits(live: Live) -> None:
     async with websockets.connect(live.ws) as ws:
         await asyncio.wait_for(ws.recv(), 3)
         await ws.send(json.dumps(msg))
-        err = json.loads(await asyncio.wait_for(ws.recv(), 3))
-        assert err["payload"]["code"] in ("unknown_audio", "stt_unavailable")  # parsed, not cut off
+        ping = {**msg, "type": "ping", "id": "p", "payload": {}}
+        await ws.send(json.dumps(ping))  # the connection survived the big frame and still answers
+        reply = json.loads(await asyncio.wait_for(ws.recv(), 3))
+        assert reply["type"] == "pong"
 
 
 async def test_http_command_cannot_impersonate_another_device(live: Live) -> None:

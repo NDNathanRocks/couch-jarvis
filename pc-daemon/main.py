@@ -140,6 +140,7 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
         timers=timers,
         stt=stt,
         mode="lan" if dry_run else "cloud",
+        remote_input=settings.remote_input,
     )
     service_ref.append(service)
     return Runtime(service, telemetry, watchdog, room_id, room_store, bus, deps)

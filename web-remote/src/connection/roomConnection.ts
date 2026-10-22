@@ -2,8 +2,10 @@ import {
   makeEnvelope,
   parseIncoming,
   uuid,
+  type Modifier,
   type OutgoingPayloads,
   type OutgoingType,
+  type PointerAction,
   type QuickAction,
 } from "../protocol";
 import type { RoomAction } from "../state/roomReducer";
@@ -87,7 +89,7 @@ export class RoomConnection {
     else if (saved) this.mode = { kind: "token", pairing: saved };
     else {
       this.mode = { kind: "none" };
-      this.opts.dispatch({ type: "connection", connection: "idle" });
+      this.opts.dispatch({ type: "connection", connection: "idle", at: this.now() });
       return;
     }
     this.connect();
@@ -117,7 +119,7 @@ export class RoomConnection {
       this.mode.kind === "token"
         ? endpoint.tokenUrl({ roomId: this.mode.pairing.roomId, token: this.mode.pairing.deviceToken, name: deviceName })
         : endpoint.pairUrl({ roomId: this.mode.roomId, name: deviceName });
-    this.opts.dispatch({ type: "connection", connection: "connecting" });
+    this.opts.dispatch({ type: "connection", connection: "connecting", at: this.now() });
     let sock: SocketLike;
     try {
       sock = this.opts.createSocket(url);
@@ -133,7 +135,7 @@ export class RoomConnection {
       if (!live()) return;
       this.opened = true;
       this.lastMessageAt = this.now();
-      this.opts.dispatch({ type: "connection", connection: "online" });
+      this.opts.dispatch({ type: "connection", connection: "online", at: this.now() });
       if (this.mode.kind === "pair") {
         this.send("pair.request", { room_secret: this.mode.secret, device_name: this.opts.deviceName });
       } else {
@@ -194,7 +196,7 @@ export class RoomConnection {
       this.handshakeFailures++;
     }
     const unreachable = this.handshakeFailures >= TOKEN_FAILURES_BEFORE_REPAIR_HINT;
-    this.opts.dispatch({ type: "connection", connection: unreachable ? "unreachable" : "offline" });
+    this.opts.dispatch({ type: "connection", connection: unreachable ? "unreachable" : "offline", at: this.now() });
     this.scheduleReconnect(unreachable ? SLOW_RETRY_MS : undefined);
   }
 
@@ -299,6 +301,37 @@ export class RoomConnection {
     const id = this.send("cmd.text", { command_id: commandId, idempotency_key: uuid(), text: trimmed });
     if (!id) return this.notConnected();
     this.opts.dispatch({ type: "sent", messageId: id, commandId, label: "Sending...", at: this.now() });
+    return true;
+  }
+
+  /** Touchpad movement/clicks. Fire-and-forget: never tracked, never toasts. */
+  sendPointer(p: { dx?: number; dy?: number; scroll?: number; action?: PointerAction }): boolean {
+    const payload: OutgoingPayloads["input.pointer"] = {};
+    if (p.dx) payload.dx = Math.max(-400, Math.min(400, Math.round(p.dx)));
+    if (p.dy) payload.dy = Math.max(-400, Math.min(400, Math.round(p.dy)));
+    if (p.scroll) payload.scroll = Math.max(-30, Math.min(30, Math.round(p.scroll)));
+    if (p.action) payload.action = p.action;
+    if (Object.keys(payload).length === 0) return true;
+    return this.send("input.pointer", payload) !== null;
+  }
+
+  /** A key or chord (alt+left ...). Tracked so a refusal from the PC reaches this phone. */
+  sendKey(key: string, mods: Modifier[] = []): boolean {
+    // the generated schema type is a tuple union (0-3 items); the contract caps it at three
+    const limited = mods.slice(0, 3) as NonNullable<OutgoingPayloads["input.key"]["mods"]>;
+    const id = this.send("input.key", { key, mods: limited });
+    if (!id) return this.notConnected();
+    this.opts.dispatch({ type: "sent", messageId: id });
+    return true;
+  }
+
+  /** Literal typed text from the phone keyboard. */
+  sendTyped(text: string): boolean {
+    const clipped = text.slice(0, 200);
+    if (!clipped) return false;
+    const id = this.send("input.text", { text: clipped });
+    if (!id) return this.notConnected();
+    this.opts.dispatch({ type: "sent", messageId: id });
     return true;
   }
 

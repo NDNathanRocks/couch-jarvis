@@ -115,6 +115,10 @@ class FakeBrowser:
         self._log(f"seek:{delta_s}")
         return ActionResult(True, "dom")
 
+    async def browser_action(self, action: str) -> ActionResult:
+        self._log(f"browser_nav:{action}")
+        return ActionResult(True, "dom")
+
     async def close_tab(self) -> ActionResult:
         self._log("close_tab")
         self.snap = self.snap.model_copy(update={"tab_count": max(0, self.snap.tab_count - 1)})
@@ -187,6 +191,9 @@ class FakeOS:
         self.muted = False
         self.clicks: list[tuple[int, int]] = []
         self.keys: list[str] = []
+        self.pointer_log: list[tuple[object, ...]] = []
+        self.pressed: list[tuple[str, tuple[str, ...]]] = []
+        self.typed: list[str] = []
         self.display_slept = False
         self.awake = False
 
@@ -215,6 +222,26 @@ class FakeOS:
 
     async def key_combo(self, *keys: str) -> ActionResult:
         self.keys.append("+".join(keys))
+        return ActionResult(True, "os")
+
+    async def move_rel(self, dx: int, dy: int) -> ActionResult:
+        self.pointer_log.append(("move", dx, dy))
+        return ActionResult(True, "os")
+
+    async def scroll(self, notches: int) -> ActionResult:
+        self.pointer_log.append(("scroll", notches))
+        return ActionResult(True, "os")
+
+    async def mouse_action(self, action: str) -> ActionResult:
+        self.pointer_log.append(("action", action))
+        return ActionResult(True, "os")
+
+    async def press_key(self, key: str, mods: tuple[str, ...]) -> ActionResult:
+        self.pressed.append((key, mods))
+        return ActionResult(True, "os")
+
+    async def type_text(self, text: str) -> ActionResult:
+        self.typed.append(text)
         return ActionResult(True, "os")
 
     async def sleep_display(self) -> ActionResult:
