@@ -538,7 +538,8 @@
             "next_tab",
             "prev_tab",
             "scroll_up",
-            "scroll_down"
+            "scroll_down",
+            "subtitles"
           ],
           "title": "Action",
           "type": "string"
@@ -668,6 +669,17 @@
         "ok": {
           "title": "Ok",
           "type": "boolean"
+        },
+        "suggest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Suggestion"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "tier_used": {
           "default": "none",
@@ -2040,6 +2052,29 @@
         "from"
       ],
       "title": "StateSync",
+      "type": "object"
+    },
+    "Suggestion": {
+      "additionalProperties": false,
+      "description": "A one-tap follow-up offered with a failed result: the phone sends ``text`` as a command.",
+      "properties": {
+        "label": {
+          "maxLength": 60,
+          "title": "Label",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "text"
+      ],
+      "title": "Suggestion",
       "type": "object"
     },
     "TimerInfo": {

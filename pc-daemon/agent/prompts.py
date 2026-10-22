@@ -33,6 +33,9 @@ Ops and their args:
 - click_selector: {"selector": "<css>", "description": "<what it is>"}
 - browser_nav: {"action": "back"|"forward"|"reload"|"new_tab"|"next_tab"|"prev_tab"|"scroll_up"|
   "scroll_down"}   ("new tab" OPENS a tab with new_tab: close_tab only when asked to close)
+- subtitles: {"state": "on"|"off"|"toggle", "lang": "<2-letter code>"?}  (omit lang for the default)
+- page_search: {"query": "<text>"} types into the search bar of the CURRENT page (use this for
+  "search X" unless the user names YouTube; it stays on the site)
 - wait_for: {"ms": int}
 
 Predicates for "expect" (or null): "video_playing", "paused", "is_fullscreen", "no_ad",

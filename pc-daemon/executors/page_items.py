@@ -11,6 +11,8 @@ import re
 from dataclasses import dataclass
 
 ITEM_NOT_FOUND = "I could not find that on this page."
+NO_SEARCH_BAR = "I couldn't find a search bar on this page."
+NO_SUBTITLES = "I couldn't find subtitles on this player."
 REDIRECT_BLOCKED = "That site tried to open another website, so I blocked it."
 
 

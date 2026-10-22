@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from agent.graph import AgentDeps, AgentRunner
 from executors.fakes import FakeBrowser, FakeOS, FakeScreen
+from executors.subtitles import SubtitleController
 from executors.video_fullscreener import VideoFullscreener
 from executors.vision_grounding import VisionGrounder
 from llm.fake import ScriptedLLM
@@ -38,4 +39,5 @@ def make_env() -> AgentEnv:
     grounder = VisionGrounder(vlm, screen, tele)
     fullscreener = VideoFullscreener(browser, grounder, os_ctl, tele, settle_s=0)
     deps = AgentDeps(router, browser, os_ctl, fullscreener, grounder, tele, verify_delays_s=(0.0,))
+    deps.subtitles = SubtitleController(browser, grounder, os_ctl, settle_s=0)
     return AgentEnv(browser, os_ctl, screen, router, vlm, tele, deps, fullscreener, grounder)

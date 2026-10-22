@@ -128,10 +128,20 @@ def run_supervisor(argv: list[str]) -> int:
         delay = next_delay(delay, ran)
 
 
+def open_settings(target: Path, defaults: Path) -> int:
+    """Open the user's settings file in their editor (creating it first), then exit."""
+    ensure_user_config(target, defaults)
+    if sys.platform == "win32":
+        os.startfile(target)  # noqa: S606 - the user's own settings file
+    return 0
+
+
 def main() -> int:
     args = sys.argv[1:]
     if args[:1] == ["--worker"]:
         return run_worker(args[1:])
+    if args[:1] == ["--open-settings"]:
+        return open_settings(user_config_file(), resource_root() / "installer" / "defaults.env")
     return run_supervisor(args)
 
 

@@ -38,6 +38,7 @@ QuickAction = Literal[
     "prev_tab",
     "scroll_up",
     "scroll_down",
+    "subtitles",
 ]
 
 PointerAction = Literal[
@@ -182,6 +183,13 @@ class AgentProgressPayload(_Model):
     detail: str = ""
 
 
+class Suggestion(_Model):
+    """A one-tap follow-up offered with a failed result: the phone sends ``text`` as a command."""
+
+    label: str = Field(max_length=60)
+    text: str = Field(min_length=1, max_length=500)
+
+
 class CmdResultPayload(_Model):
     command_id: str
     ok: bool
@@ -190,6 +198,7 @@ class CmdResultPayload(_Model):
     latency_ms: float = 0.0
     heard: str = Field(default="", max_length=500)  # the words we acted on (voice / typed)
     detail: str = Field(default="", max_length=400)  # why it failed, for the phone's log
+    suggest: Suggestion | None = None  # "no search bar here: open a new tab and search?"
 
 
 class PresencePayload(_Model):

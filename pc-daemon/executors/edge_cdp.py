@@ -9,13 +9,21 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import re
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 from urllib.parse import quote_plus, urlparse
 
 from agent.policy import url_allowed
 from executors.base import ActionResult, BrowserSnapshot, MediaCommand, Tier
-from executors.page_items import ITEM_NOT_FOUND, REDIRECT_BLOCKED, Candidate, pick_item
+from executors.page_items import (
+    ITEM_NOT_FOUND,
+    NO_SEARCH_BAR,
+    REDIRECT_BLOCKED,
+    Candidate,
+    pick_item,
+)
+from executors.subtitles import language_names
 
 log = logging.getLogger(__name__)
 
@@ -182,6 +190,85 @@ JS_PLAY_TARGET = """(el) => {
   return controls.find(c => good.test(tag(c))) || controls[0] || el;
 }"""
 
+# Tier 1: HTML5 text tracks (sites that attach <track> elements to the <video>).
+JS_TEXT_TRACKS = """({state, names}) => {
+  const v = document.querySelector('video');
+  if (!v || !v.textTracks) return null;
+  const tracks = [...v.textTracks].filter(t => t.kind === 'subtitles' || t.kind === 'captions');
+  if (!tracks.length) return null;
+  const showing = tracks.some(t => t.mode === 'showing');
+  if (state === 'off' || (state === 'toggle' && showing)) {
+    tracks.forEach(t => { t.mode = 'disabled'; });
+    return {state: 'off'};
+  }
+  const hit = tracks.find(t => {
+    const lang = (t.language || '').toLowerCase(), label = (t.label || '').toLowerCase();
+    return names.some(n => lang === n || lang.startsWith(n + '-') || label.startsWith(n));
+  });
+  if (!hit) return {state: 'no_match', available: tracks.map(t => t.language || t.label)};
+  tracks.forEach(t => { t.mode = (t === hit) ? 'showing' : 'disabled'; });
+  return {state: 'on', language: hit.language};
+}"""
+
+# Controls (any player) whose own label says subtitles/captions; menu entries that are not it.
+SUBTITLE_CONTROLS = ", ".join(
+    [
+        "[aria-label*='ubtitle' i]",
+        "[aria-label*='aption' i]",
+        "[title*='ubtitle' i]",
+        "[title*='aption' i]",
+        ".vjs-subs-caps-button",
+        ".jw-icon-cc",
+        "[data-plyr='captions']",
+        "button[class*='subtitle' i]",
+        "button[class*='caption' i]",
+        "[data-testid*='ubtitle' i]",
+    ]
+)
+NOT_THE_SUBTITLE_CONTROL = re.compile(r"upload|download|style|size|colou?r|font|delay|sync", re.I)
+OFF_NAMES = ["off", "none", "disable", "no subtitles", "turn off"]
+
+# The entry for a language (or "Off") in the menu a subtitles control just opened.
+JS_MENU_ENTRY = """(names) => {
+  const all = [...document.querySelectorAll(
+    "button,[role=menuitem],[role=menuitemradio],[role=option],[role=radio],li,a")];
+  const shown = all.filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+  const label = e => ((e.innerText || e.getAttribute('aria-label') || '').trim().toLowerCase().split('\\n')[0]);
+  for (const n of names) {
+    const hit = shown.find(e => {
+      const t = label(e);
+      return t && t.length <= 40 && (n.length <= 3 ? t === n : t.startsWith(n));
+    });
+    if (hit) return hit;
+  }
+  return null;
+}"""
+
+# Page search: any visible, editable search field; icons that reveal one.
+SEARCH_INPUTS = ", ".join(
+    [
+        "input[type='search']",
+        "[role='searchbox']",
+        "input[name='q']",
+        "input[name='search_query']",
+        "input[name*='search' i]",
+        "input[id*='search' i]",
+        "input[placeholder*='search' i]",
+        "input[aria-label*='search' i]",
+        "textarea[placeholder*='search' i]",
+        "textarea[aria-label*='search' i]",
+    ]
+)
+SEARCH_OPENERS = ", ".join(
+    [
+        "button[aria-label*='search' i]",
+        "[role='button'][aria-label*='search' i]",
+        "a[aria-label*='search' i]",
+        "button[class*='search' i]",
+        "button[title*='search' i]",
+    ]
+)
+
 JS_VIDEO_STATE = """() => {
   const v = document.querySelector('video');
   return v ? {is_playing: !v.paused && !v.ended, position_s: v.currentTime,
@@ -213,6 +300,15 @@ def blocks_navigation(start_url: str, target_url: str) -> bool:
     if target.scheme not in ("http", "https"):
         return False  # about:blank, data: and blob: frames are not a site change
     return (target.hostname or "").lower() != (urlparse(start_url).hostname or "").lower()
+
+
+async def _click_itself(target: Any) -> None:
+    """Click a locator/element; if something covers it (a pause screen, an ad layer) click the
+    element itself. A forced click at its coordinates would land on whatever is on top."""
+    try:
+        await target.click(timeout=2500)
+    except Exception:
+        await target.evaluate("e => e.click()")
 
 
 async def _safe_count(locator: Any, *, timeout_s: float = 2.0) -> int:
@@ -288,9 +384,6 @@ class EdgeCDP:
                         await self._ensure_edge()  # watchdog relaunches Edge if it is gone
                     await asyncio.sleep(0.5 * 2**attempt)
             raise ConnectionError(f"cannot reach Edge CDP at {self._cdp_url}") from last
-
-    async def is_alive(self) -> bool:
-        return self._browser is not None and bool(self._browser.is_connected())
 
     async def close(self) -> None:
         if self._pw is not None:
@@ -436,6 +529,139 @@ class EdgeCDP:
             return ActionResult(True, "dom")
 
         return await self._guard(click)
+
+    async def _visible_in_frames(self, page: Any, selector: str, *, limit: int = 8) -> Any:
+        """The first visible, enabled match for selector in any frame (main frame first)."""
+        for frame in page.frames:
+            matches = frame.locator(selector)
+            for i in range(min(await _safe_count(matches), limit)):
+                el = matches.nth(i)
+                try:
+                    if await asyncio.wait_for(el.is_visible(), 1.5) and await el.is_enabled():
+                        return el
+                except Exception:
+                    continue
+        return None
+
+    async def page_search(self, query: str) -> ActionResult:
+        """Type the query into the page's own search bar and submit it."""
+
+        async def go(page: Any) -> ActionResult:
+            box = await self._visible_in_frames(page, SEARCH_INPUTS)
+            if box is None:  # a magnifier icon that reveals the field
+                opener = await self._visible_in_frames(page, SEARCH_OPENERS)
+                if opener is not None:
+                    async with self._hold_origin(page):
+                        await opener.click(timeout=2500)
+                    await asyncio.sleep(0.5)
+                    box = await self._visible_in_frames(page, SEARCH_INPUTS)
+            if box is None:
+                return ActionResult(False, "dom", NO_SEARCH_BAR, "no_search_bar")
+            async with self._hold_origin(page) as hijacked:
+                with contextlib.suppress(Exception):  # covered by a modal? fill() focuses anyway
+                    await box.click(timeout=1500)
+                await box.fill(query, timeout=3000)
+                await box.press("Enter", timeout=3000)
+                await asyncio.sleep(0.8)
+            if hijacked:
+                return ActionResult(False, "dom", REDIRECT_BLOCKED, "off_site")
+            return ActionResult(True, "dom")
+
+        return await self._guard(go)
+
+    async def set_subtitles(self, state: str, lang: str) -> ActionResult:
+        """Turn subtitles on/off in the wanted language: text tracks, YouTube, then any control
+        labelled subtitles/captions (the common case: a custom player in an iframe)."""
+        names = [n.lower() for n in language_names(lang)]
+
+        async def run(page: Any) -> ActionResult:
+            tracks = await _first_in_frames(page, JS_TEXT_TRACKS, {"state": state, "names": names})
+            if isinstance(tracks, dict) and tracks.get("state") in ("on", "off"):
+                return ActionResult(True, "js", observed=tracks)
+            if await self._youtube_subtitles(page, state, names):
+                return ActionResult(True, "dom")
+            await self.wake_controls()  # many players remove their control bar while idle
+            for attempt in range(2):
+                if await self._generic_subtitles(page, state, names):
+                    return ActionResult(True, "dom")
+                if attempt == 0:
+                    await asyncio.sleep(0.4)
+                    await self.wake_controls()
+            return ActionResult(False, "dom", "no subtitles control found", "no_subtitle_control")
+
+        return await self._guard(run)
+
+    async def _youtube_subtitles(self, page: Any, state: str, names: list[str]) -> bool:
+        button = page.locator(".ytp-subtitles-button").first
+        if not await _safe_count(button):
+            return False
+        try:
+            if not await button.is_visible():  # YouTube hides it on videos without captions
+                return False
+            was_on = (await button.get_attribute("aria-pressed")) == "true"
+            want = {"on": True, "off": False}.get(state, not was_on)
+            if was_on != want:
+                async with self._hold_origin(page):
+                    await button.click(timeout=2500)
+            if want and names[0] != "english":  # English is what YouTube picks for most viewers
+                await self._pick_in_menu(page, ".ytp-settings-button", "subtitles", names)
+            return True
+        except Exception:
+            return False
+
+    async def _pick_in_menu(self, page: Any, opener: str, section: str, names: list[str]) -> None:
+        """Best effort: settings gear -> the section ("Subtitles/CC") -> the language entry."""
+        await page.locator(opener).first.click(timeout=2000)
+        await page.locator(".ytp-menuitem", has_text=re.compile(section, re.I)).first.click(
+            timeout=2000
+        )
+        entry = page.locator(
+            ".ytp-menuitem", has_text=re.compile(rf"^\s*{re.escape(names[0])}", re.I)
+        )
+        await entry.first.click(timeout=2000)
+
+    async def _generic_subtitles(self, page: Any, state: str, names: list[str]) -> bool:
+        control, frame = None, None
+        for candidate in page.frames:
+            matches = candidate.locator(SUBTITLE_CONTROLS)
+            for i in range(min(await _safe_count(matches), 8)):
+                el = matches.nth(i)
+                try:
+                    label = await asyncio.wait_for(
+                        el.evaluate(
+                            "e => (e.getAttribute('aria-label') || e.title || e.innerText || '').trim()"
+                        ),
+                        1.5,
+                    )
+                    if NOT_THE_SUBTITLE_CONTROL.search(label) or not await el.is_visible():
+                        continue
+                except Exception:
+                    continue
+                control, frame = el, candidate
+                break
+            if control is not None:
+                break
+        if control is None or frame is None:
+            return False
+        signature = "e => [e.className, e.getAttribute('aria-pressed'), e.getAttribute('data-state')].join('|')"
+        pressed = await control.get_attribute("aria-pressed")
+        before = await control.evaluate(signature)
+        want_off = state == "off" or (state == "toggle" and pressed == "true")
+        wanted = OFF_NAMES if want_off else names
+        # The menu may already be open (left that way): then clicking the control would close it.
+        entry = (await frame.evaluate_handle(JS_MENU_ENTRY, wanted)).as_element()
+        if entry is None:
+            async with self._hold_origin(page):
+                await _click_itself(control)
+            await asyncio.sleep(0.5)
+            entry = (await frame.evaluate_handle(JS_MENU_ENTRY, wanted)).as_element()
+        if entry is not None:  # the control opened a menu: choose the language (or "Off")
+            async with self._hold_origin(page):
+                await _click_itself(entry)
+            return True
+        # No menu: only a plain toggle button can have done it, and then the button changes
+        # (class or aria state). A control that did nothing is a failure, not a success.
+        return bool(await control.evaluate(signature) != before)
 
     async def wake_controls(self) -> None:
         """Move the pointer over the player: most players hide their control bar until it moves."""

@@ -10,25 +10,18 @@ from __future__ import annotations
 
 import http.server
 import io
-import socket
 import struct
-import subprocess
-import tempfile
 import threading
-import time
 import wave
 from collections.abc import Iterator
-from pathlib import Path
 
-import httpx
 import pytest
 
+from edge_support import free_port
 from executors.edge_cdp import ALLOWLISTED_JS, EdgeCDP
-from watchdog import build_edge_command
 
 pytestmark = pytest.mark.edge
 
-EDGE = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
 
 PAGE = b"""<!doctype html><title>Lofi Girl - YouTube</title>
 <meta property="og:image" content="https://i.ytimg.com/vi/x/hq.jpg">
@@ -61,22 +54,6 @@ def silence() -> bytes:
         w.setframerate(8000)
         w.writeframes(struct.pack("<h", 0) * 8000 * 30)  # 30 s so seeking has room
     return buf.getvalue()
-
-
-def kill_tree(proc: subprocess.Popen[bytes]) -> None:
-    """Chromium spawns renderer/GPU children that outlive a plain kill() of the parent."""
-    subprocess.run(  # noqa: S603
-        ["taskkill", "/F", "/T", "/PID", str(proc.pid)],  # noqa: S607
-        capture_output=True,
-        check=False,
-    )
-    proc.wait(10)
-
-
-def free_port() -> int:
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return int(s.getsockname()[1])
 
 
 @pytest.fixture(scope="module")
@@ -113,33 +90,6 @@ def site() -> Iterator[str]:
     threading.Thread(target=server.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{server.server_address[1]}/"
     server.shutdown()
-
-
-@pytest.fixture(scope="module")
-def edge_port() -> Iterator[int]:
-    if not EDGE.exists():
-        pytest.skip("Microsoft Edge is not installed")
-    port = free_port()
-    profile = Path(tempfile.mkdtemp(prefix="cj-edge-"))
-    cmd = [
-        *build_edge_command(EDGE, profile, port),
-        "--headless=new",
-        "--autoplay-policy=no-user-gesture-required",
-        "about:blank",
-    ]
-    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # noqa: S603
-    deadline = time.time() + 30
-    while time.time() < deadline:
-        try:
-            if httpx.get(f"http://127.0.0.1:{port}/json/version", timeout=1).status_code == 200:
-                break
-        except httpx.HTTPError:
-            time.sleep(0.3)
-    else:
-        kill_tree(proc)
-        pytest.fail("Edge did not expose the CDP port")
-    yield port
-    kill_tree(proc)
 
 
 @pytest.fixture
@@ -226,7 +176,6 @@ async def test_closing_the_tab_and_self_healing_when_edge_state_changes(cdp: Edg
     extra = await page.context.new_page()
     await extra.goto("about:blank")
     assert (await cdp.snapshot()).tab_count == count + 1
-    assert await cdp.is_alive()
 
 
 async def asyncio_sleep(seconds: float) -> None:

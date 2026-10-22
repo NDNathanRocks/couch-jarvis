@@ -55,10 +55,10 @@ def test_page_picks_never_leave_the_page_or_wait_on_the_llm(
 @pytest.mark.parametrize(
     ("utterance", "query", "source"),
     [
-        ("search for bruno mars", "bruno mars", "youtube"),
+        ("search for bruno mars on youtube", "bruno mars", "youtube"),
         ("search bruno mars on youtube", "bruno mars", "youtube"),
         ("search youtube for bruno mars", "bruno mars", "youtube"),
-        ("look up bruno mars", "bruno mars", "youtube"),
+        ("look up bruno mars on youtube", "bruno mars", "youtube"),
         ("search for uptown funk on youtube music", "uptown funk", "ytmusic"),
     ],
 )
@@ -170,7 +170,7 @@ async def test_llm_cannot_navigate_away_from_a_site_unless_asked(env: AgentEnv) 
 
 
 async def test_search_only_does_not_play(env: AgentEnv) -> None:
-    result = await env.runner().run(text("search for bruno mars"))
+    result = await env.runner().run(text("search for bruno mars on youtube"))
     assert result.ok, result.message
     assert env.browser.calls == ["search:youtube:bruno mars"]
     assert env.browser.snap.is_playing is None

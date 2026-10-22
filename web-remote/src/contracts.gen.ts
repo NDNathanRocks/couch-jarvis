@@ -77,7 +77,8 @@ export type Action =
   | "next_tab"
   | "prev_tab"
   | "scroll_up"
-  | "scroll_down";
+  | "scroll_down"
+  | "subtitles";
 export type CommandId = string;
 export type IdempotencyKey = string;
 export type ReplyTo3 = string | null;
@@ -191,6 +192,8 @@ export type Heard = string;
 export type LatencyMs = number;
 export type Message1 = string;
 export type Ok = boolean;
+export type Label = string;
+export type Text2 = string;
 export type TierUsed = "dom" | "js" | "vision" | "os" | "none";
 export type ReplyTo13 = string | null;
 export type RoomId13 = string;
@@ -219,7 +222,7 @@ export type RemoteInput = boolean;
 export type Rev = number;
 export type Action2 = string;
 export type EndsAt = number;
-export type Label = string;
+export type Label1 = string;
 export type TimerId = string;
 export type Timers = TimerInfo[];
 export type Volume = number;
@@ -514,7 +517,15 @@ export interface CmdResultPayload {
   latency_ms?: LatencyMs;
   message: Message1;
   ok: Ok;
+  suggest?: Suggestion | null;
   tier_used?: TierUsed;
+}
+/**
+ * A one-tap follow-up offered with a failed result: the phone sends ``text`` as a command.
+ */
+export interface Suggestion {
+  label: Label;
+  text: Text2;
 }
 export interface StateSnapshot {
   from: From14;
@@ -556,7 +567,7 @@ export interface NowPlaying {
 export interface TimerInfo {
   action?: Action2;
   ends_at: EndsAt;
-  label: Label;
+  label: Label1;
   timer_id: TimerId;
 }
 /**

@@ -33,6 +33,8 @@ StepOp = Literal[
     "vision_click",
     "click_item",
     "browser_nav",
+    "subtitles",
+    "page_search",
     "wait_for",
     "timer_start",
     # additions to the approved plan so every QuickAction maps to one explicit step
@@ -106,6 +108,7 @@ class AgentState(BaseModel):
         "routing", "executing", "vision", "verifying", "recovering", "done", "failed"
     ] = "routing"
     final_message: str | None = None
+    suggest: dict[str, str] | None = None  # {"label", "text"} offered with a failed result
     # execution bookkeeping (extends the approved schema)
     needs_vision: bool = False
     fallback_reason: str | None = None

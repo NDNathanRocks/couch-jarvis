@@ -26,7 +26,6 @@ class Priority(IntEnum):
     EMERGENCY = 0
     CONTROL = 10
     AGENT = 50
-    BACKGROUND = 90
 
 
 class CommandRequest(BaseModel):

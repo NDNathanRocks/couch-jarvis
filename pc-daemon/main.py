@@ -27,6 +27,7 @@ from contracts import TimerInfo, new_id
 from event_bus import EventBus
 from executors.base import Browser, OSController, Screen
 from executors.fakes import FakeBrowser, FakeOS, FakeScreen
+from executors.subtitles import SubtitleController
 from executors.video_fullscreener import VideoFullscreener
 from executors.vision_grounding import VisionGrounder
 from hud.qr import detect_lan_ip
@@ -108,6 +109,8 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
     grounder = VisionGrounder(vlm, screen, telemetry)
     fullscreener = VideoFullscreener(browser, grounder, os_ctl, telemetry)
     deps = AgentDeps(router, browser, os_ctl, fullscreener, grounder, telemetry)
+    deps.subtitles = SubtitleController(browser, grounder, os_ctl)
+    deps.subtitle_lang = settings.subtitle_lang.strip().lower() or "en"
     service_ref: list[CommandService] = []
 
     async def on_timer(info: TimerInfo) -> None:

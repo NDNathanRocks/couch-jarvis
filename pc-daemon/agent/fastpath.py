@@ -6,6 +6,7 @@ import re
 
 from agent.state import ActionStep, Intent, IntentPlan
 from contracts import QuickAction
+from executors.subtitles import SPOKEN_LANGUAGES
 
 _FILLER = re.compile(r"^(?:hey |ok |okay )?(?:jarvis[, ]+)?(?:please[, ]+)?")
 _TRAILING = re.compile(r"[\s.!?,]+$")
@@ -76,6 +77,35 @@ def _search_plan(query: str, music: bool) -> IntentPlan:
     )
 
 
+_SUBS = r"(?:subtitles?|closed captions?|captions?|cc)"
+_LANG = "|".join(sorted(SPOKEN_LANGUAGES, key=len, reverse=True))
+
+
+def _subtitles(state: str, lang: str | None = None) -> IntentPlan:
+    args: dict[str, str | int | float | bool] = {"state": state}
+    if lang:
+        args["lang"] = SPOKEN_LANGUAGES[lang]
+    return _plan(Intent.MEDIA_CONTROL, [ActionStep(op="subtitles", args=args)])
+
+
+def _plan_subtitles(t: str) -> IntentPlan | None:
+    """ "turn on subtitles", "subtitles off", "spanish subtitles", "captions in german"."""
+    end = r"(?: please)?"
+    if re.fullmatch(rf"(?:turn off|switch off|disable|hide|remove|stop)(?: the)? {_SUBS}{end}", t):
+        return _subtitles("off")
+    if re.fullmatch(rf"{_SUBS} off{end}", t):
+        return _subtitles("off")
+    on = r"(?:turn on|switch on|enable|show|display|put on|activate)"
+    m = re.fullmatch(rf"{on}(?: the)?(?: ({_LANG}))? {_SUBS}(?: in ({_LANG}))?{end}", t)
+    if m:
+        return _subtitles("on", m.group(1) or m.group(2))
+    m = re.fullmatch(rf"(?:the )?(?:({_LANG}) )?{_SUBS}(?: on)?(?: in ({_LANG}))?{end}", t)
+    if m:
+        lang = m.group(1) or m.group(2)
+        return _subtitles("on" if lang or t.endswith(" on") else "toggle", lang)
+    return None
+
+
 def _browser(action: str) -> IntentPlan:
     return _plan(Intent.TAB, [ActionStep(op="browser_nav", args={"action": action})])
 
@@ -106,15 +136,32 @@ def _plan_browser(t: str) -> IntentPlan | None:
 
 def _plan_page_actions(t: str) -> IntentPlan | None:
     """Search-only and "pick the Nth thing on this page": never leaves the current site."""
-    m = re.fullmatch(r"(?:search|look up)(?: for)? (.+?) on (youtube music|yt music|youtube)", t)
+    site = r"(youtube music|yt music|youtube)"
+    m = re.fullmatch(rf"(?:search|look up)(?: for)? (.+?) on {site} in a new tab", t)
+    if m:  # the follow-up offered when the page has no search bar
+        music = "music" in m.group(2) or m.group(2) == "yt music"
+        return _plan(
+            Intent.MEDIA_PLAY,
+            [
+                ActionStep(op="browser_nav", args={"action": "new_tab"}),
+                *_search_plan(m.group(1), music).steps,
+            ],
+            {"query": m.group(1)},
+        )
+    m = re.fullmatch(rf"(?:search|look up)(?: for)? (.+?) on {site}", t)
     if m:
         return _search_plan(m.group(1), "music" in m.group(2) or m.group(2) == "yt music")
-    m = re.fullmatch(r"search (youtube music|yt music|youtube) for (.+)", t)
+    m = re.fullmatch(rf"search {site} for (.+)", t)
     if m:
         return _search_plan(m.group(2), "music" in m.group(1) or m.group(1) == "yt music")
     m = re.fullmatch(r"(?:search(?: for)?|look up) (.+)", t)
-    if m:
-        return _search_plan(m.group(1), False)
+    if m:  # no site named: use the search bar of the page being shown
+        query = m.group(1).strip()
+        return _plan(
+            Intent.NAVIGATE,
+            [ActionStep(op="page_search", args={"query": query})],
+            {"query": query},
+        )
 
     ep = rf"(?:episode|ep\.?)(?: number)? ?{_NUM}"
     m = re.fullmatch(rf"{_PICK_VERB}(?:the )?{ep}(?: please)?", t)
@@ -140,7 +187,7 @@ def plan_text(utterance: str) -> IntentPlan | None:
     """Return a plan for a recognized command, else None (caller falls back to the LLM)."""
     t = normalize(utterance)
 
-    page = _plan_browser(t) or _plan_page_actions(t)
+    page = _plan_subtitles(t) or _plan_browser(t) or _plan_page_actions(t)
     if page is not None:
         return page
 
@@ -250,5 +297,6 @@ def plan_button(
         "prev_tab": _browser("prev_tab"),
         "scroll_up": _browser("scroll_up"),
         "scroll_down": _browser("scroll_down"),
+        "subtitles": _subtitles("toggle"),
     }
     return table[action]

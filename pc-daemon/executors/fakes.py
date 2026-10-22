@@ -11,7 +11,7 @@ from executors.base import (
     MediaKey,
     Screenshot,
 )
-from executors.page_items import ITEM_NOT_FOUND, Candidate, pick_item
+from executors.page_items import ITEM_NOT_FOUND, NO_SEARCH_BAR, Candidate, pick_item
 
 
 def blank_png(width: int = 1920, height: int = 1080) -> bytes:
@@ -26,24 +26,21 @@ class FakeBrowser:
     """Scriptable browser. Set *_ok flags / failure reasons to exercise each tier."""
 
     def __init__(self) -> None:
-        self.alive = True
         self.snap = BrowserSnapshot(url="https://www.youtube.com/", title="YouTube")
         self.calls: list[str] = []
         self.items: list[str] = []  # clickable things "on the page", in DOM order
         self.wakes = 0  # times the player controls were woken (mouse wiggle)
+        self.search_bar = True  # the page has a search bar
+        self.subtitle_dom_fail = False  # no usable subtitles control in the DOM
         # failure scripting
         self.dom_fail_reason: str | None = None  # applies to click/fullscreen/close_ad dom tier
         self.js_ok = False
         self.search_ok = True
         self.playing_after_search = True
-        self.fullscreen_after_vision = False
         self.fail_verify_times = 0  # number of play commands that do not take effect
 
     def _log(self, name: str) -> None:
         self.calls.append(name)
-
-    async def is_alive(self) -> bool:
-        return self.alive
 
     async def navigate(self, url: str) -> ActionResult:
         self._log(f"navigate:{url}")
@@ -94,6 +91,18 @@ class FakeBrowser:
 
     async def wake_controls(self) -> None:
         self.wakes += 1
+
+    async def set_subtitles(self, state: str, lang: str) -> ActionResult:
+        self._log(f"subtitles:{state}:{lang}")
+        if self.subtitle_dom_fail:
+            return ActionResult(False, "dom", "no subtitles control found", "no_subtitle_control")
+        return ActionResult(True, "dom")
+
+    async def page_search(self, query: str) -> ActionResult:
+        self._log(f"page_search:{query}")
+        if not self.search_bar:
+            return ActionResult(False, "dom", NO_SEARCH_BAR, "no_search_bar")
+        return ActionResult(True, "dom")
 
     async def click_selector(self, selector: str, timeout_ms: int) -> ActionResult:
         self._log(f"click_selector:{selector}")

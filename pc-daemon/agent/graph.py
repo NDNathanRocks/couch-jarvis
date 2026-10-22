@@ -41,8 +41,10 @@ from agent.state import (
     VerifyResult,
 )
 from command_queue import CommandRequest
-from contracts import CmdResultPayload
+from contracts import CmdResultPayload, Suggestion
 from executors.base import ActionResult, Browser, MediaKey, OSController
+from executors.page_items import NO_SEARCH_BAR, NO_SUBTITLES
+from executors.subtitles import SubtitleController, language_name
 from executors.video_fullscreener import VideoFullscreener
 from executors.vision_grounding import VisionGrounder
 from llm.base import LLMError, TextLLM
@@ -53,13 +55,13 @@ log = logging.getLogger(__name__)
 
 ProgressFn = Callable[[str, str, str, str], None]  # command_id, node, status, detail
 
-VISION_ELIGIBLE = {"click_selector", "fullscreen", "close_ad", "vision_click"}
+VISION_ELIGIBLE = {"click_selector", "fullscreen", "close_ad", "vision_click", "subtitles"}
 BROWSER_MEDIA = {"play", "pause", "play_pause", "next", "prev"}
 OS_FALLBACK_KEYS: dict[str, MediaKey] = {"play_pause": "play_pause", "next": "next", "prev": "prev"}
 FAIL_MESSAGE = "Sorry, that did not work. Try again."
 LEAVE_PAGE_MESSAGE = "I stayed on this page. Say 'search' or 'YouTube' if you want me to leave it."
 # Failures that retrying cannot fix: end the command now with the step's own message.
-TERMINAL_REASONS = {"off_site", "item_not_found", "no_history"}
+TERMINAL_REASONS = {"off_site", "item_not_found", "no_history", "no_search_bar"}
 BROWSER_NAV_ACTIONS = frozenset(
     {"back", "forward", "reload", "new_tab", "next_tab", "prev_tab", "scroll_up", "scroll_down"}
 )
@@ -79,6 +81,8 @@ class AgentDeps:
     grounder: VisionGrounder
     telemetry: Telemetry
     timers: TimerService | None = None
+    subtitles: SubtitleController | None = None
+    subtitle_lang: str = "en"  # default language for "turn on subtitles"
     show_qr: Callable[[], None] = lambda: None  # set by main when a HUD exists
     progress: ProgressFn = lambda *_: None
     verify_delays_s: tuple[float, ...] = (0.0, 0.4, 0.8)
@@ -93,6 +97,14 @@ def extract_json(text: str) -> str:
 
 
 def success_message(plan: IntentPlan) -> str:
+    for step in plan.steps:
+        if step.op == "subtitles":
+            if step.args.get("state") == "off":
+                return "Subtitles off"
+            lang = str(step.args.get("lang") or "")
+            return f"Subtitles on ({language_name(lang)})" if lang else "Subtitles on"
+        if step.op == "page_search":
+            return f"Searched for {step.args.get('query', 'that')}"
     if plan.intent is Intent.MEDIA_PLAY:
         if any(s.op == "click_item" for s in plan.steps):
             return "Opened it"
@@ -264,6 +276,29 @@ def build_graph(deps: AgentDeps) -> Any:
             return await deps.fullscreener.dom_js_tiers(op)
         if op == "close_tab":
             return await deps.browser.close_tab()
+        if op == "page_search":
+            query = str(a.get("query", "")).strip()
+            found = await deps.browser.page_search(query)
+            if not found.ok and found.fallback_reason == "no_search_bar":
+                # Ask, do not guess: offer a one-tap follow-up instead of opening tabs unasked.
+                offer = {
+                    "label": "Open a new tab and search YouTube",
+                    "text": f"search for {query} on youtube in a new tab",
+                }
+                return ActionResult(
+                    False,
+                    found.tier,
+                    found.error or NO_SEARCH_BAR,
+                    "no_search_bar",
+                    {"suggest": offer},
+                )
+            return found
+        if op == "subtitles":
+            want = str(a.get("state", "toggle"))
+            lang = str(a.get("lang") or deps.subtitle_lang)
+            if deps.subtitles is not None:
+                return await deps.subtitles.dom_tier(want, lang)
+            return await deps.browser.set_subtitles(want, lang)
         if op == "browser_nav":
             action = str(a.get("action", ""))
             if action not in BROWSER_NAV_ACTIONS:
@@ -378,6 +413,7 @@ def build_graph(deps: AgentDeps) -> Any:
                     "outcomes": outcomes,
                     "status": "failed",
                     "final_message": res.error or FAIL_MESSAGE,
+                    "suggest": res.observed.get("suggest"),
                 }
             if step.op in VISION_ELIGIBLE and res.fallback_reason != "blocked":
                 return {
@@ -409,6 +445,25 @@ def build_graph(deps: AgentDeps) -> Any:
         started = time.perf_counter()
         if step.op in ("fullscreen", "close_ad"):
             res = await deps.fullscreener.vision_tier(step.op)
+        elif step.op == "subtitles" and deps.subtitles is not None:
+            res = await deps.subtitles.vision_tier(
+                str(step.args.get("state", "toggle")),
+                str(step.args.get("lang") or deps.subtitle_lang),
+            )
+            if not res.ok:  # a missing control will not appear on a retry: say so now
+                missed = StepOutcome(
+                    step_index=state.cursor,
+                    tier="vision",
+                    ok=False,
+                    error=res.error,
+                    latency_ms=(time.perf_counter() - started) * 1000,
+                )
+                return {
+                    "outcomes": [*state.outcomes, missed],
+                    "needs_vision": False,
+                    "status": "failed",
+                    "final_message": NO_SUBTITLES,
+                }
         elif not on_media_site((await deps.browser.snapshot()).url):
             res = ActionResult(False, "vision", "clicks are only allowed on media sites", "blocked")
         else:
@@ -629,4 +684,5 @@ class AgentRunner:
                 tier_used=final.tier_used if ok else _overall_tier(final.outcomes),  # type: ignore[arg-type]
                 latency_ms=(time.perf_counter() - started) * 1000,
                 detail="" if ok else failure_detail(final),
+                suggest=Suggestion(**final.suggest) if final.suggest else None,
             )

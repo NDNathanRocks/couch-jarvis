@@ -81,6 +81,9 @@ class Settings(BaseSettings):
     ollama_vlm_model: str = "qwen2.5vl:7b"
     gemini_api_key: SecretStr | None = None
 
+    # Language "turn on subtitles" picks when you do not name one (ISO 639-1 code: en, es, fr...).
+    subtitle_lang: str = "en"
+
     # Let paired phones drive the cursor/keyboard (touchpad). Pair only people you would trust
     # at your keyboard; set false to keep phones to media/browser commands.
     remote_input: bool = True
