@@ -25,6 +25,9 @@ from contracts import (
     CmdButton,
     CmdText,
     ErrorMsg,
+    InputKey,
+    InputPointer,
+    InputText,
     Ping,
     Presence,
     RoomKey,
@@ -42,7 +45,20 @@ log = logging.getLogger(__name__)
 
 Status = Literal["up", "down", "rejected"]
 MAX_FRAME_BYTES = 30 * 1024  # API Gateway frame limit is 32 KB; keep headroom
-PHONE_MESSAGES = (CmdButton, CmdText, AudioBegin, AudioChunk, AudioEnd, StateSync)
+# Everything a phone may send that the service handles. A test checks this against
+# contracts.PHONE_TO_SERVER_TYPES: a type missing here is silently dropped (touchpad and
+# keyboard were, until that test existed).
+PHONE_MESSAGES = (
+    CmdButton,
+    CmdText,
+    InputPointer,
+    InputKey,
+    InputText,
+    AudioBegin,
+    AudioChunk,
+    AudioEnd,
+    StateSync,
+)
 
 
 def backoff_delay(

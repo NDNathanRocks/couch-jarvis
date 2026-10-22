@@ -410,3 +410,33 @@ async def test_owner_revocation_is_forwarded_to_the_relay(rig: Rig, relay: FakeR
     await until(lambda: "device.revoke" in relay.types())
     sent = next(m for m in relay.received if m["type"] == "device.revoke")
     assert sent["payload"] == {"device_id": "dev-gone"}
+
+
+# --------------------------------------------------------------------------- phone message types
+def test_cloud_client_forwards_every_phone_message_type_the_contract_defines() -> None:
+    """A type added to the contract but not to the cloud client is silently dropped (it was:
+    touchpad/keyboard worked on the LAN and in service tests but never over the relay)."""
+    from cloud_relay_client import PHONE_MESSAGES
+    from contracts import PHONE_TO_SERVER_TYPES
+
+    forwarded = {cls.model_fields["type"].default for cls in PHONE_MESSAGES}
+    handled_elsewhere = {"pair.request", "ping", "pong"}  # relay-level, never reach the service
+    assert forwarded == PHONE_TO_SERVER_TYPES - handled_elsewhere
+
+
+async def test_touchpad_keyboard_and_text_typing_reach_the_pc_over_the_relay(
+    rig: Rig, relay: FakeRelay
+) -> None:
+    from contracts import InputKey, InputPointer, InputText
+
+    await until(lambda: "state.snapshot" in relay.types())
+    room = rig.store.identity.room_id
+    os_ctl = rig.service._os  # noqa: SLF001
+    await relay.push(
+        envelope(InputPointer, room, {"dx": 7, "dy": -2, "action": "click"}, from_="dev-1")
+    )
+    await relay.push(envelope(InputKey, room, {"key": "left", "mods": ["alt"]}, from_="dev-1"))
+    await relay.push(envelope(InputText, room, {"text": "hello"}, from_="dev-1"))
+    await until(lambda: os_ctl.typed == ["hello"])  # type: ignore[attr-defined]
+    assert os_ctl.pointer_log == [("move", 7, -2), ("action", "click")]  # type: ignore[attr-defined]
+    assert os_ctl.pressed == [("left", ("alt",))]  # type: ignore[attr-defined]

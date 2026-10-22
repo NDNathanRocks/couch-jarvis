@@ -49,7 +49,10 @@ Tip: add the page to your phone's home screen (Share -> Add to Home Screen) so i
 
 **Voice (speech recognition).** The first voice command downloads the speech model, which takes a minute or two. Options:
 
-- *Have an NVIDIA GPU?* Nothing to do. It's used automatically.
+- *Have an NVIDIA GPU?* Speech runs on it only if NVIDIA's CUDA 12 libraries (cuBLAS and cuDNN) are present. The
+  installer does **not** bundle them (about 1 GB), so out of the box it quietly uses the **CPU** instead, which is slower but
+  works; the log says "GPU speech failed ... using the CPU". Running from source, `uv pip install -r requirements-gpu.txt`
+  adds them and the GPU is used automatically.
 - *No GPU, or the PC is slow?* In your settings file (below) set `CJ_STT_MODEL=small`, or get a free key from
   [console.groq.com](https://console.groq.com) and set `CJ_GROQ_API_KEY=gsk_...` to do voice in the cloud.
 

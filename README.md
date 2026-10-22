@@ -82,7 +82,7 @@ A red dot means the last thing was a problem. **Copy** puts it on the clipboard 
 - Edge is supervised: if it crashes it comes back with your signed-in TV profile.
 - The app restarts itself if it crashes, and starts with Windows if you choose that in the installer.
 - The cloud connection reconnects by itself with backoff; if the internet is down, the TV shows a local-network QR.
-- Voice runs on your GPU (`faster-whisper`), with an optional free cloud fallback (Groq).
+- Voice runs on your GPU when the CUDA libraries are installed (`faster-whisper`), otherwise on the CPU, with an optional free cloud fallback (Groq).
 
 ### What it won't do (yet)
 
@@ -160,7 +160,7 @@ Tap **Log** on the phone first: it usually names the cause.
 | "The PC is offline" | Is Couch Jarvis running on the PC? (Start menu -> Couch Jarvis.) Is the PC online? |
 | Phone stuck on "Connecting..." | Use Chrome first to rule out a browser quirk; see [INSTALL.md](docs/INSTALL.md#troubleshooting). Check the daemon log for `cloud relay: up` |
 | "Recording was incomplete" | Fixed in current versions (parts can arrive out of order); update the PC app **and** redeploy the relay |
-| Voice says "I could not hear that" | Check the Log's `heard:` line. Set `CJ_STT_DEVICE=cpu` or add `CJ_GROQ_API_KEY`. First use downloads the speech model |
+| Voice says "I could not hear that" / "I did not hear anything" | Check the Log's `heard:` line, then `%LOCALAPPDATA%\CouchJarvis\logs`. `cublas64_12.dll is not found` means the GPU libraries are missing: it now falls back to the CPU by itself, and `uv pip install -r requirements-gpu.txt` (from source) enables the GPU. First use downloads the speech model. Or add `CJ_GROQ_API_KEY` |
 | A command is misunderstood | The Log shows `heard:`. Free-form commands need Ollama or `CJ_GEMINI_API_KEY` |
 | Fullscreen does nothing | Tap it again (ad pages eat the first click); the Log shows which step failed |
 | "Commands do nothing in Edge" | Edge is started and supervised by the app on port 9222. Close other Edge windows that use the TV profile |

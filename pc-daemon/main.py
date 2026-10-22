@@ -55,6 +55,7 @@ class Runtime:
     room_store: RoomStore | None = None  # None in --dry-run (no identity on disk)
     bus: EventBus | None = None
     deps: AgentDeps | None = None
+    stt: STTEngine | None = None
 
 
 def build_llms(settings: Settings) -> tuple[TextLLM, VisionLLM]:
@@ -143,7 +144,7 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
         remote_input=settings.remote_input,
     )
     service_ref.append(service)
-    return Runtime(service, telemetry, watchdog, room_id, room_store, bus, deps)
+    return Runtime(service, telemetry, watchdog, room_id, room_store, bus, deps, stt)
 
 
 async def amain(args: argparse.Namespace) -> None:
@@ -202,6 +203,8 @@ async def amain(args: argparse.Namespace) -> None:
 
     await rt.service.start()
     background: list[asyncio.Task[None]] = []
+    if rt.stt is not None:  # load the speech model now, not during your first voice command
+        background.append(asyncio.create_task(rt.stt.warm_up(), name="stt-warm-up"))
     if args.hud and rt.room_store is not None:
         background.append(start_hud(rt, settings, host, port))
     if rt.watchdog is not None and not args.no_watchdog:

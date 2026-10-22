@@ -1,0 +1,5 @@
+# Optional: lets local speech-to-text run on an NVIDIA GPU (CUDA 12). Without these the app
+# falls back to the CPU (slower) or the Groq cloud key. About 1 GB of downloads.
+#   uv pip install -r requirements-gpu.txt
+nvidia-cublas-cu12
+nvidia-cudnn-cu12
