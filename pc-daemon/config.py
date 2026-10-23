@@ -88,6 +88,14 @@ class Settings(BaseSettings):
     # at your keyboard; set false to keep phones to media/browser commands.
     remote_input: bool = True
 
+    # Spoken replies ("Now playing X on YouTube Music"). Preferences are changed from the phone and
+    # saved per TV. ElevenLabs is optional (its free plan is ~10k credits a month); without a key
+    # the free Microsoft Edge neural voices speak, and Windows' own voices work offline.
+    elevenlabs_api_key: SecretStr | None = None
+    elevenlabs_monthly_chars: int = 9000  # stop before the free allowance runs out
+    voice_file: Path = _roaming_app_dir() / "voice.json"
+    voice_cache_dir: Path = _local_app_dir() / "voice-cache"
+
     # Storage / misc
     telemetry_dir: Path = _local_app_dir() / "telemetry"
     room_file: Path = _roaming_app_dir() / "room.json"

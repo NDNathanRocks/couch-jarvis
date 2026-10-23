@@ -42,6 +42,7 @@ StepOp = Literal[
     "close_tab",
     "sleep_display",
     "show_qr",
+    "voice_pref",
 ]
 
 Tier = Literal["dom", "js", "vision", "os"]

@@ -50,6 +50,8 @@ from executors.vision_grounding import VisionGrounder
 from llm.base import LLMError, TextLLM
 from telemetry import AttrValue, Span, Telemetry, new_trace_id
 from timers import TimerService
+from voice import VoiceService, pref_message
+from voice.replies import written_message
 
 log = logging.getLogger(__name__)
 
@@ -66,6 +68,24 @@ BROWSER_NAV_ACTIONS = frozenset(
     {"back", "forward", "reload", "new_tab", "next_tab", "prev_tab", "scroll_up", "scroll_down"}
 )
 _ASKED_TO_SEARCH = re.compile(r"\b(?:you ?tube|music|search|look up)\b", re.I)
+_ASKED_FOR_NEW_TAB = re.compile(r"\bnew (?:tab|window)\b", re.I)
+_OPENS_PAGES = frozenset({"navigate", "page_search"})
+
+
+def with_requested_new_tab(plan: IntentPlan, utterance: str) -> IntentPlan:
+    """ "Open a new tab and play X": a model that forgets the tab step would replace the page the
+    TV is showing, so the request itself decides, not the model."""
+    if (
+        not _ASKED_FOR_NEW_TAB.search(utterance)
+        or re.search(r"\bclose\b", utterance, re.I)
+        or len(plan.steps) >= 8
+        or not any(s.op in _OPENS_PAGES for s in plan.steps)
+        or any(s.op == "browser_nav" and s.args.get("action") == "new_tab" for s in plan.steps)
+    ):
+        return plan
+    first = next(i for i, s in enumerate(plan.steps) if s.op in _OPENS_PAGES)
+    tab = ActionStep(op="browser_nav", args={"action": "new_tab"})
+    return plan.model_copy(update={"steps": [*plan.steps[:first], tab, *plan.steps[first:]]})
 
 
 def _is_web_page(url: str) -> bool:
@@ -83,6 +103,7 @@ class AgentDeps:
     timers: TimerService | None = None
     subtitles: SubtitleController | None = None
     subtitle_lang: str = "en"  # default language for "turn on subtitles"
+    voice: VoiceService | None = None  # spoken replies; None = silent (tests, no speakers)
     show_qr: Callable[[], None] = lambda: None  # set by main when a HUD exists
     progress: ProgressFn = lambda *_: None
     verify_delays_s: tuple[float, ...] = (0.0, 0.4, 0.8)
@@ -97,6 +118,12 @@ def extract_json(text: str) -> str:
 
 
 def success_message(plan: IntentPlan) -> str:
+    for step in plan.steps:
+        if step.op == "voice_pref":
+            return pref_message(step.args)
+    several = written_message(plan)
+    if several is not None:
+        return several
     for step in plan.steps:
         if step.op == "subtitles":
             if step.args.get("state") == "off":
@@ -212,7 +239,8 @@ def build_graph(deps: AgentDeps) -> Any:
                 llm_span.set_attribute("gen_ai.usage.output_tokens", reply.output_tokens)
             try:
                 plan = IntentPlan.model_validate(json.loads(extract_json(reply.text)))
-                return plan.model_copy(update={"source": "llm"})
+                plan = plan.model_copy(update={"source": "llm"})
+                return with_requested_new_tab(plan, state.utterance)
             except (ValueError, ValidationError) as exc:
                 bad_reply, error = reply.text, str(exc)
                 span.set_attribute("cj.router_repairs", attempt + 1)
@@ -308,6 +336,12 @@ def build_graph(deps: AgentDeps) -> Any:
             return await deps.browser.browser_action(action)
         if op == "sleep_display":
             return await deps.os_ctl.sleep_display()
+        if op == "voice_pref":
+            if deps.voice is None:
+                return ActionResult(
+                    False, "os", "Spoken replies are not set up here", "unsupported"
+                )
+            return deps.voice.apply(a)
         if op == "show_qr":
             deps.show_qr()
             return ActionResult(True, "os")
@@ -635,6 +669,13 @@ class AgentRunner:
     def set_progress(self, progress: ProgressFn) -> None:
         self._deps.progress = progress
 
+    def _announce(
+        self, req: CommandRequest, plan: IntentPlan | None, ok: bool, message: str
+    ) -> None:
+        voice = self._deps.voice
+        if voice is not None:
+            voice.announce(kind=req.kind, plan=plan, ok=ok, message=message)
+
     def initial_state(self, req: CommandRequest) -> AgentState:
         plan = plan_button(req.action) if req.kind == "button" and req.action else None
         utterance = f"button:{req.action}" if plan else (req.text or "")
@@ -665,6 +706,7 @@ class AgentRunner:
                     raw = await self._graph.ainvoke(state, config={"recursion_limit": 40})
             except TimeoutError:
                 span.set_error("timeout")
+                self._announce(req, None, False, "That took too long.")
                 return CmdResultPayload(
                     command_id=req.command_id,
                     ok=False,
@@ -677,6 +719,7 @@ class AgentRunner:
             span.set_attribute("cj.ok", ok)
             if not ok:
                 span.set_error(final.final_message or "failed")
+            self._announce(req, final.plan, ok, final.final_message or FAIL_MESSAGE)
             return CmdResultPayload(
                 command_id=req.command_id,
                 ok=ok,

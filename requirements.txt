@@ -20,3 +20,4 @@ av>=14,<19
 PySide6>=6.7,<7
 qasync>=0.27,<1
 segno>=1.6,<2
+edge-tts>=7,<8  # free Microsoft neural voices for spoken replies

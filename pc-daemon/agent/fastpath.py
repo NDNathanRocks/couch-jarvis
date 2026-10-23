@@ -15,10 +15,22 @@ _MEDIA_NOUN = r"(?: the)?(?: video| music| song| track| it)?"
 _NUM = r"(\d{1,3})"
 
 
+# Speech recognition spells the same thing several ways.
+_SPOKEN_FIXES = (
+    (re.compile(r"\byou tube\b"), "youtube"),
+    (re.compile(r"\b(?:yt|y t) music\b"), "youtube music"),
+    (re.compile(r"\byoutube[.,] music\b"), "youtube music"),
+    (re.compile(r"\bnew tab[.,] and\b"), "new tab and"),
+)
+
+
 def normalize(utterance: str) -> str:
     text = utterance.strip().lower()
     text = _FILLER.sub("", text)
-    return _TRAILING.sub("", text).strip()
+    for pattern, fix in _SPOKEN_FIXES:
+        text = pattern.sub(fix, text)
+    text = _TRAILING.sub("", text).strip()
+    return re.sub(r"(?:,? please)+$", "", text).strip()
 
 
 def _plan(
@@ -183,11 +195,160 @@ def _plan_page_actions(t: str) -> IntentPlan | None:
     return None
 
 
+_SITES = {"youtube music": "ytmusic", "youtube": "youtube"}
+_SITE_URLS = {"youtube music": "https://music.youtube.com/", "youtube": "https://www.youtube.com/"}
+_NEW_TAB = ActionStep(op="browser_nav", args={"action": "new_tab"})
+
+
+def _plan_site(t: str) -> IntentPlan | None:
+    """ "play X on youtube music (in a new tab)" and "open youtube": the site is named, so
+    leaving the current page is exactly what was asked for."""
+    site = r"(youtube music|youtube)"
+    m = re.fullmatch(
+        rf"(?:play|put on|queue up|start)(?: some)? (.+?) (?:on|in|from|using|with) (?:the )?{site}"
+        r"(?: (?:app|website|site))?( in a new tab)?",
+        t,
+    )
+    if m:
+        query, name = m.group(1).strip(), m.group(2)
+        play = ActionStep(
+            op="navigate",
+            args={"query": query, "source": _SITES[name], "play": True},
+            expect="video_playing",
+        )
+        steps = [_NEW_TAB, play] if m.group(3) else [play]
+        return _plan(Intent.MEDIA_PLAY, steps, {"query": query, "site": name})
+    m = re.fullmatch(
+        rf"(?:open|go to|launch|take me to|bring up|start)(?: up)?(?: the)? {site}"
+        r"(?: (?:app|website|site|home ?page))?( in a new tab)?",
+        t,
+    )
+    if m:
+        name = m.group(1)
+        go = ActionStep(op="navigate", args={"url": _SITE_URLS[name]}, expect="navigated")
+        steps = [_NEW_TAB, go] if m.group(2) else [go]
+        return _plan(Intent.NAVIGATE, steps, {"site": name})
+    return None
+
+
+_VOICE_NAMES = {
+    "jarvis": "british_male", "british male": "british_male", "british": "british_male",
+    "butler": "british_male", "friday": "british_female", "british female": "british_female",
+    "chill": "us_male", "american male": "us_male", "us male": "us_male",
+    "aria": "us_female", "american female": "us_female", "us female": "us_female",
+}  # fmt: skip
+_STYLE_NAMES = {
+    "jarvis": "jarvis", "butler": "jarvis", "formal": "jarvis", "polite": "jarvis",
+    "friendly": "friendly", "casual": "friendly", "chatty": "friendly",
+    "brief": "brief", "short": "brief", "concise": "brief", "minimal": "brief",
+}  # fmt: skip
+
+
+def _voice(**args: str | int | float | bool) -> IntentPlan:
+    return _plan(Intent.SYSTEM, [ActionStep(op="voice_pref", args=args)])
+
+
+def _plan_voice(t: str) -> IntentPlan | None:
+    """Spoken-reply settings, so the phone's settings sheet and "stop talking" share one path."""
+    noun = r"(?:the )?(?:voice|spoken|talking|audio) (?:replies|reply|responses|feedback)"
+    m = re.fullmatch(rf"(?:(?:turn|switch|set) )?{noun} (on|off)", t) or re.fullmatch(
+        rf"(?:turn|switch) (on|off) {noun}", t
+    )
+    if m:
+        return _voice(enabled=m.group(1) == "on")
+    if re.fullmatch(r"stop talking|stop replying|stop speaking|no more talking", t):
+        return _voice(enabled=False)
+    if re.fullmatch(r"start talking|talk to me|speak to me|start replying", t):
+        return _voice(enabled=True)
+    if re.fullmatch(r"(?:also )?(?:speak|talk|reply) (?:for|on) (?:the )?buttons?(?: taps?)?", t):
+        return _voice(buttons=True)
+    if re.fullmatch(r"(?:don't|do not|stop) (?:speak|talk|reply) (?:for|on) (?:the )?buttons?", t):
+        return _voice(buttons=False)
+    if re.fullmatch(r"(?:test|try|check)(?: out)?(?: the| your)? voice|say something", t):
+        return _voice(test=True)
+    styles = "|".join(sorted(_STYLE_NAMES, key=len, reverse=True))
+    m = re.fullmatch(
+        rf"(?:(?:set|change|use) )?(?:the )?(?:voice |reply )?style(?: to)? ({styles})", t
+    )
+    m = m or re.fullmatch(rf"(?:be|sound|talk|reply)(?: a bit)?(?: more)? ({styles})", t)
+    if m:
+        return _voice(style=_STYLE_NAMES[m.group(1)])
+    names = "|".join(sorted(_VOICE_NAMES, key=len, reverse=True))
+    m = re.fullmatch(rf"(?:use|switch to|change to|set|try)(?: the)? ({names}) voice", t)
+    m = m or re.fullmatch(rf"(?:use|switch to|change to|set|try)(?: the)? ({names})", t)
+    m = m or re.fullmatch(
+        rf"(?:change|set|switch)(?: the| your)? voice(?: to)?(?: the)? ({names})", t
+    )
+    if m and (
+        m.group(1) in ("jarvis", "friday", "chill", "aria") or " " in m.group(1) or "voice" in t
+    ):
+        return _voice(voice=_VOICE_NAMES[m.group(1)])
+    return None
+
+
 def plan_text(utterance: str) -> IntentPlan | None:
-    """Return a plan for a recognized command, else None (caller falls back to the LLM)."""
+    """Return a plan for a recognized command, else None (caller falls back to the LLM).
+
+    A request made of several recognized commands ("open a new tab and play X on youtube music")
+    becomes ONE plan whose steps run in order."""
+    return _plan_single(utterance) or _plan_compound(utterance)
+
+
+_JOINERS = re.compile(r"\s*(?:,\s*(?:and\s+)?(?:then\s+)?|\band then\b|\bthen\b|\band\b)\s*")
+MAX_PARTS = 4
+
+
+def _plan_compound(utterance: str) -> IntentPlan | None:
+    """Split on "and" / "then" / commas where EVERY piece is a command we understand.
+
+    Splitting only when all pieces parse keeps "search tom and jerry" in one piece, and the
+    attempt that yields the most pieces wins ("mute, new tab and fullscreen")."""
+    t = normalize(utterance)
+    cuts = [m.span() for m in _JOINERS.finditer(t)]
+    if not cuts or len(cuts) > MAX_PARTS * 2:
+        return None
+    best: list[IntentPlan] = []
+    for mask in range(1, 2 ** len(cuts)):  # every way of choosing which joiners really split
+        chosen = [cuts[i] for i in range(len(cuts)) if mask >> i & 1]
+        if len(chosen) + 1 > MAX_PARTS or len(chosen) + 1 <= len(best):
+            continue
+        bounds = [0, *[x for span in chosen for x in span], len(t)]
+        pieces = [t[bounds[i] : bounds[i + 1]].strip() for i in range(0, len(bounds), 2)]
+        plans = [_plan_single(piece) if piece else None for piece in pieces]
+        if all(p is not None for p in plans):
+            best = [p for p in plans if p is not None]
+    if len(best) < 2:
+        return None
+    return merge_plans(best)
+
+
+def merge_plans(plans: list[IntentPlan]) -> IntentPlan | None:
+    """One plan out of several, steps in order. The last part decides the overall intent."""
+    steps: list[ActionStep] = []
+    slots: dict[str, str | int | float] = {}
+    for plan in plans:
+        for step in plan.steps:
+            if not (steps and steps[-1] == step and step.op == "browser_nav"):  # no double tabs
+                steps.append(step)
+        slots.update(plan.slots)
+    if len(steps) > 8:
+        return None
+    slots["parts"] = len(plans)
+    return IntentPlan(
+        intent=plans[-1].intent, confidence=1.0, slots=slots, steps=steps, source="fastpath"
+    )
+
+
+def _plan_single(utterance: str) -> IntentPlan | None:
     t = normalize(utterance)
 
-    page = _plan_subtitles(t) or _plan_browser(t) or _plan_page_actions(t)
+    page = (
+        _plan_voice(t)
+        or _plan_subtitles(t)
+        or _plan_browser(t)
+        or _plan_site(t)
+        or _plan_page_actions(t)
+    )
     if page is not None:
         return page
 

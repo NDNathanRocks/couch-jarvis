@@ -225,6 +225,11 @@ export type EndsAt = number;
 export type Label1 = string;
 export type TimerId = string;
 export type Timers = TimerInfo[];
+export type Buttons = boolean;
+export type Enabled = boolean;
+export type Engine = "elevenlabs" | "edge" | "windows" | "none";
+export type Style = "jarvis" | "friendly" | "brief";
+export type Voice = "british_male" | "british_female" | "us_male" | "us_female";
 export type Volume = number;
 export type ReplyTo14 = string | null;
 export type RoomId14 = string;
@@ -548,6 +553,7 @@ export interface RoomState {
   remote_input?: RemoteInput;
   rev?: Rev;
   timers?: Timers;
+  voice?: VoiceState;
   volume?: Volume;
 }
 export interface DevicePresence {
@@ -569,6 +575,16 @@ export interface TimerInfo {
   ends_at: EndsAt;
   label: Label1;
   timer_id: TimerId;
+}
+/**
+ * This TV's spoken-reply preferences (saved on the PC, so every phone sees the same).
+ */
+export interface VoiceState {
+  buttons?: Buttons;
+  enabled?: Enabled;
+  engine?: Engine;
+  style?: Style;
+  voice?: Voice;
 }
 /**
  * JSON-merge-patch (RFC 7386) of RoomState; rev must be included.

@@ -72,7 +72,6 @@ def test_search_only_shows_results_and_waits(utterance: str, query: str, source:
 
 def test_plain_play_still_goes_to_the_llm() -> None:
     assert plan_text("play bruno mars") is None
-    assert plan_text("play lofi hip hop on youtube") is None
 
 
 # ---------------------------------------------------------------- picking

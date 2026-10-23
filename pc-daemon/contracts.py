@@ -86,6 +86,20 @@ class DevicePresence(_Model):
     last_seen: float
 
 
+ReplyStyle = Literal["jarvis", "friendly", "brief"]
+ReplyVoice = Literal["british_male", "british_female", "us_male", "us_female"]
+
+
+class VoiceState(_Model):
+    """This TV's spoken-reply preferences (saved on the PC, so every phone sees the same)."""
+
+    enabled: bool = True
+    style: ReplyStyle = "jarvis"
+    voice: ReplyVoice = "british_male"
+    buttons: bool = False  # also speak after button taps (voice and typed commands always do)
+    engine: Literal["elevenlabs", "edge", "windows", "none"] = "none"  # what speaks right now
+
+
 class RoomState(_Model):
     pc_online: bool = False
     mode: Literal["cloud", "lan"] = "cloud"
@@ -97,6 +111,7 @@ class RoomState(_Model):
     driver: str | None = None
     devices: list[DevicePresence] = Field(default_factory=list)
     remote_input: bool = True  # touchpad/keyboard allowed (CJ_REMOTE_INPUT on the PC)
+    voice: VoiceState = Field(default_factory=VoiceState)
     rev: int = 0
 
 

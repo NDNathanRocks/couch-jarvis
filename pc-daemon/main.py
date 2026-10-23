@@ -14,6 +14,7 @@ import os
 import secrets
 import sys
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -23,7 +24,7 @@ from agent.graph import AgentDeps, AgentRunner
 from cloud_relay_client import CloudRelayClient
 from command_queue import CommandRequest
 from config import Settings, get_settings, init_dpi_awareness, resource_root
-from contracts import TimerInfo, new_id
+from contracts import TimerInfo, VoiceState, new_id
 from event_bus import EventBus
 from executors.base import Browser, OSController, Screen
 from executors.fakes import FakeBrowser, FakeOS, FakeScreen
@@ -41,6 +42,7 @@ from service import CommandService
 from stt_engine import STTEngine, build_stt_engine
 from telemetry import Telemetry
 from timers import TimerService
+from voice import VoicePrefsStore, VoiceService
 from watchdog import EdgeWatchdog, make_edge_launcher, make_http_probe
 
 log = logging.getLogger("couch-jarvis")
@@ -71,6 +73,35 @@ def build_llms(settings: Settings) -> tuple[TextLLM, VisionLLM]:
     if settings.gemini_api_key is not None:  # free-tier cloud VLM when local VRAM is tight
         return text, GeminiClient(settings.gemini_api_key.get_secret_value())
     return text, vlm
+
+
+def build_voice(settings: Settings, *, on_change: Callable[[VoiceState], None]) -> VoiceService:
+    """Spoken replies: ElevenLabs if a key is set, else free Edge neural voices, else Windows."""
+    from voice.player import MciPlayer
+    from voice.tts import (
+        EdgeProvider,
+        ElevenLabsProvider,
+        TtsEngine,
+        TtsProvider,
+        UsageLedger,
+        WindowsProvider,
+    )
+
+    providers: list[TtsProvider] = []
+    if settings.elevenlabs_api_key is not None:
+        ledger = UsageLedger(settings.voice_file.with_name("elevenlabs-usage.json"))
+        providers.append(
+            ElevenLabsProvider(
+                settings.elevenlabs_api_key.get_secret_value(),
+                ledger,
+                monthly_chars=settings.elevenlabs_monthly_chars,
+            )
+        )
+    providers += [EdgeProvider(), WindowsProvider()]
+    engine = TtsEngine(providers, settings.voice_cache_dir)
+    return VoiceService(
+        VoicePrefsStore(settings.voice_file), engine, MciPlayer(), on_change=on_change
+    )
 
 
 def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
@@ -133,6 +164,12 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
 
     timers = TimerService(on_timer, on_change=on_timers_changed)
     deps.timers = timers
+    if dry_run:  # no speakers: keep the saved choices and the settings flow, make no sound
+        deps.voice = VoiceService(
+            VoicePrefsStore(None), None, on_change=lambda v: service_ref[0].state.update(voice=v)
+        )
+    else:
+        deps.voice = build_voice(settings, on_change=lambda v: service_ref[0].state.update(voice=v))
     runner = AgentRunner(deps)
     service = CommandService(
         room_id=room_id,
@@ -147,6 +184,7 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
         remote_input=settings.remote_input,
     )
     service_ref.append(service)
+    service.state.update(voice=deps.voice.state)
     return Runtime(service, telemetry, watchdog, room_id, room_store, bus, deps, stt)
 
 
@@ -241,6 +279,8 @@ async def amain(args: argparse.Namespace) -> None:
         for task in background:
             task.cancel()
         await asyncio.gather(*background, return_exceptions=True)
+        if rt.deps is not None and rt.deps.voice is not None:
+            await rt.deps.voice.aclose()
         await rt.service.stop()
 
 

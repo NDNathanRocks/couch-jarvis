@@ -124,6 +124,7 @@ run from source overrides it. Restart the app after changing anything. The usefu
 | `CJ_OLLAMA_TEXT_MODEL` / `CJ_OLLAMA_VLM_MODEL` | `qwen2.5:7b` / `qwen2.5vl:7b` | Local models (`ollama pull ...`) |
 | `CJ_GEMINI_API_KEY` | none | Free Gemini key for understanding commands / finding buttons on screen |
 | `CJ_SUBTITLE_LANG` | `en` | Language "turn on subtitles" picks when you don't name one (`en`, `es`, `fr`, `de`...) |
+| `CJ_ELEVENLABS_API_KEY` | none | Optional. Spoken replies use ElevenLabs first (capped at `CJ_ELEVENLABS_MONTHLY_CHARS`, default 9000), then free Microsoft neural voices, then offline Windows voices. Turn replies on/off and pick the style/voice in the phone's Settings |
 | `CJ_REMOTE_INPUT` | `true` | Let paired phones move the cursor and type |
 | `CJ_HUD_SCREEN_INDEX` | `0` | Which monitor shows the QR overlay (the TV) |
 | `CJ_EDGE_PATH` | auto | Path to `msedge.exe` if it isn't found |

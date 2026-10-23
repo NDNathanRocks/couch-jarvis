@@ -17,7 +17,7 @@ for package in ("faster_whisper", "ctranslate2", "playwright", "segno", "mss", "
     binaries += b
     hiddenimports += h
 hiddenimports += collect_submodules("langgraph") + collect_submodules("uvicorn")
-hiddenimports += ["websockets.asyncio.server", "pycaw.pycaw", "comtypes.client", "qasync"]
+hiddenimports += ["edge_tts", "websockets.asyncio.server", "pycaw.pycaw", "comtypes.client", "qasync"]
 
 web_dist = os.path.join(ROOT, "web-remote", "dist")
 if os.path.isdir(web_dist):

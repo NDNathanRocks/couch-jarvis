@@ -48,7 +48,7 @@ def spans(env: AgentEnv, name: str) -> list[dict[str, Any]]:
 
 async def test_llm_route_dom_happy_path(env: AgentEnv) -> None:
     env.router.replies = [json.dumps(PLAY_PLAN)]
-    result = await env.runner().run(text("play lofi hip hop on youtube"))
+    result = await env.runner().run(text("play something chill"))
     assert result.ok and result.tier_used == "dom"
     assert result.message == "Playing lofi hip hop"
     assert env.browser.calls == ["search_and_play:youtube:lofi hip hop"]
@@ -138,7 +138,7 @@ async def test_executor_failure_retries_then_succeeds(env: AgentEnv) -> None:
         return await real(query, source)
 
     env.browser.search_and_play = flaky  # type: ignore[method-assign]
-    result = await env.runner().run(text("play lofi hip hop on youtube"))
+    result = await env.runner().run(text("play something chill"))
     assert result.ok
     assert attempts[0] == 2
     assert "refocus" in env.browser.calls  # recovery ran between the attempts
@@ -155,7 +155,7 @@ async def test_malformed_router_json_gets_one_repair_retry(env: AgentEnv) -> Non
 
 async def test_repair_retry_can_succeed(env: AgentEnv) -> None:
     env.router.replies = ["```not json```", "```json\n" + json.dumps(PLAY_PLAN) + "\n```"]
-    result = await env.runner().run(text("play lofi hip hop on youtube"))
+    result = await env.runner().run(text("play something chill"))
     assert result.ok and len(env.router.calls) == 2
 
 
@@ -188,7 +188,7 @@ async def test_hard_timeout_ceiling(env: AgentEnv) -> None:
 
     env.browser.search_and_play = hang  # type: ignore[method-assign]
     env.router.replies = [json.dumps(PLAY_PLAN)]
-    result = await env.runner(timeout_s=0.1).run(text("play lofi hip hop on youtube"))
+    result = await env.runner(timeout_s=0.1).run(text("play something chill"))
     assert not result.ok and result.message == "That took too long."
 
 

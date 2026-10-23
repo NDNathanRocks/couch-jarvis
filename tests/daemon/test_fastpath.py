@@ -54,7 +54,6 @@ def test_recognized_commands_skip_the_llm(
 @pytest.mark.parametrize(
     "utterance",
     [
-        "play lofi hip hop on youtube",
         "play the new taylor swift album",
         "what is the weather",
         "",
@@ -97,3 +96,9 @@ def test_every_quick_action_has_a_plan(action: str) -> None:
 def test_panic_is_an_idempotent_pause_not_a_toggle() -> None:
     step = plan_button("panic").steps[0]
     assert step.args["key"] == "pause" and step.expect == "paused"
+
+
+def test_naming_the_site_is_enough_to_skip_the_llm() -> None:
+    plan = plan_text("play lofi hip hop on youtube")
+    assert plan is not None and plan.source == "fastpath"
+    assert plan.steps[0].args == {"query": "lofi hip hop", "source": "youtube", "play": True}

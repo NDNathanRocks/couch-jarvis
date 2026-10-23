@@ -1870,6 +1870,9 @@
           "title": "Timers",
           "type": "array"
         },
+        "voice": {
+          "$ref": "#/$defs/VoiceState"
+        },
         "volume": {
           "default": 50,
           "maximum": 100,
@@ -2104,6 +2107,56 @@
         "ends_at"
       ],
       "title": "TimerInfo",
+      "type": "object"
+    },
+    "VoiceState": {
+      "additionalProperties": false,
+      "description": "This TV's spoken-reply preferences (saved on the PC, so every phone sees the same).",
+      "properties": {
+        "buttons": {
+          "default": false,
+          "title": "Buttons",
+          "type": "boolean"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "engine": {
+          "default": "none",
+          "enum": [
+            "elevenlabs",
+            "edge",
+            "windows",
+            "none"
+          ],
+          "title": "Engine",
+          "type": "string"
+        },
+        "style": {
+          "default": "jarvis",
+          "enum": [
+            "jarvis",
+            "friendly",
+            "brief"
+          ],
+          "title": "Style",
+          "type": "string"
+        },
+        "voice": {
+          "default": "british_male",
+          "enum": [
+            "british_male",
+            "british_female",
+            "us_male",
+            "us_female"
+          ],
+          "title": "Voice",
+          "type": "string"
+        }
+      },
+      "title": "VoiceState",
       "type": "object"
     }
   },
