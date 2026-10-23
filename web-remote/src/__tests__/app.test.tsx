@@ -108,6 +108,7 @@ describe("returning phone", () => {
     await act(async () => FakeSocket.last.receive(incoming("state.snapshot", { pc_online: true, rev: 1 })));
     expect(await screen.findByRole("button", { name: "Play / Pause" })).toBeEnabled();
 
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     fireEvent.click(screen.getByRole("button", { name: "Forget this phone" }));
     expect(await screen.findByText(/Pair this phone/)).toBeInTheDocument();
     expect(localStorage.getItem("cj.pairing")).toBeNull();
@@ -149,6 +150,7 @@ describe("transient outages", () => {
     expect(await screen.findByText(/Can't reach your TV/)).toBeInTheDocument();
     expect(screen.queryByText(/no longer paired/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Play / Pause" })).toBeDisabled(); // visible, not hidden
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     expect(screen.getByRole("button", { name: "Forget this phone" })).toBeEnabled(); // escape hatch stays
     expect(localStorage.getItem("cj.pairing")).not.toBeNull(); // the pairing is kept
   });

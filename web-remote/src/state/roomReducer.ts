@@ -1,4 +1,4 @@
-import type { DevicePresence, Incoming, NowPlaying, TimerInfo } from "../protocol";
+import type { DevicePresence, Incoming, NowPlaying, TimerInfo, VoicePrefs } from "../protocol";
 
 /**
  * "rejected" is definitive (the relay or PC said pair.denied). "unreachable" is what repeated
@@ -19,6 +19,8 @@ export interface RoomSnapshot {
   devices: DevicePresence[];
   /** The PC allows the touchpad/keyboard (CJ_REMOTE_INPUT). */
   remote_input: boolean;
+  /** Spoken replies, saved on the PC so every phone shows the same choice. */
+  voice: VoicePrefs;
   rev: number;
 }
 
@@ -88,6 +90,7 @@ export const emptyRoom: RoomSnapshot = {
   driver: null,
   devices: [],
   remote_input: true,
+  voice: { enabled: true, style: "jarvis", voice: "british_male", buttons: false, engine: "none" },
   rev: 0,
 };
 
@@ -138,7 +141,8 @@ export function mergePatch(target: unknown, patch: unknown): unknown {
 }
 
 export function normalizeRoom(partial: Partial<RoomSnapshot>): RoomSnapshot {
-  return { ...emptyRoom, ...partial };
+  // `voice` is nested: an older PC sends none, a newer one may send only the fields that changed
+  return { ...emptyRoom, ...partial, voice: { ...emptyRoom.voice, ...partial.voice } };
 }
 
 function omit<T>(record: Record<string, T>, key: string): Record<string, T> {

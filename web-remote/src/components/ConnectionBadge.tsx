@@ -36,7 +36,7 @@ export function ConnectionBadge({ view, transport }: { view: RoomView; transport
     <span
       role="status"
       aria-label={`Connection: ${label}`}
-      className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ring-1 ${TONES[tone]}`}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${TONES[tone]}`}
     >
       <span className={`h-2 w-2 rounded-full ${tone === "good" ? "bg-emerald-400" : tone === "warn" ? "bg-amber-400 animate-pulse" : "bg-rose-400"}`} />
       {label}

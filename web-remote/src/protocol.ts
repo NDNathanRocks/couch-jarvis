@@ -9,6 +9,8 @@ import type * as C from "./contracts.gen";
 export const PROTOCOL_VERSION = 1 as const;
 export type QuickAction = C.Action;
 export type { DevicePresence, NowPlaying, TimerInfo } from "./contracts.gen";
+/** This TV's spoken-reply preferences (every field present once the PC has reported them). */
+export type VoicePrefs = Required<C.VoiceState>;
 
 export interface Envelope<K extends string, P> {
   v: typeof PROTOCOL_VERSION;

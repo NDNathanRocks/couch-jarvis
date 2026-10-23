@@ -2,11 +2,14 @@ import { useMemo, useState } from "react";
 import { ConnectionBadge } from "./components/ConnectionBadge";
 import { FriendsBar } from "./components/FriendsBar";
 import { CommandBar } from "./components/CommandBar";
+import { Icon } from "./components/Icon";
 import { KeyPad } from "./components/KeyPad";
 import { LogPanel } from "./components/LogPanel";
 import { NowPlayingCard } from "./components/NowPlayingCard";
 import { QRScanner, readPairParams, stripPairParams } from "./components/QRScanner";
 import { QuickDeck } from "./components/QuickDeck";
+import { SettingsSheet } from "./components/SettingsSheet";
+import { Suggestions } from "./components/Suggestions";
 import { TimerList } from "./components/TimerList";
 import { Toasts } from "./components/Toasts";
 import { TouchPad } from "./components/TouchPad";
@@ -14,6 +17,8 @@ import { useRoomSocket } from "./hooks/useRoomSocket";
 import { loadMicMode, saveMicMode, useVoice, type MicMode } from "./hooks/useVoice";
 import { selectDevices } from "./state/roomReducer";
 import { resolveEndpoint } from "./utils/config";
+import { tap } from "./utils/haptics";
+import { loadRecents, rememberCommand } from "./utils/recents";
 import type { Pairing } from "./utils/storage";
 
 type Tab = "remote" | "touchpad";
@@ -27,6 +32,8 @@ export default function App() {
   const [self, setSelf] = useState<Pairing | null>(null);
   const [tab, setTab] = useState<Tab>("remote");
   const [logOpen, setLogOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [recents, setRecents] = useState<string[]>(loadRecents);
   const [micMode, setMicMode] = useState<MicMode>(loadMicMode);
 
   const { view, actions } = useRoomSocket({
@@ -51,17 +58,35 @@ export default function App() {
     onRecording: (recording) => actions.sendAudio(recording),
     onProblem: actions.notify,
   });
-  const switchMic = () => {
-    const next: MicMode = micMode === "tap" ? "hold" : "tap";
+  const chooseMic = (next: MicMode) => {
     setMicMode(next);
     saveMicMode(next);
+  };
+  const sendCommand = (text: string) => {
+    tap();
+    return actions.sendText(text);
+  };
+  const sendTyped = (text: string) => {
+    const sent = sendCommand(text);
+    if (sent) setRecents(rememberCommand(text));
+    return sent;
   };
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col gap-5 px-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-[calc(env(safe-area-inset-top)+1rem)]">
       <header className="flex items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold tracking-tight">Couch Jarvis</h1>
+        <h1 className="whitespace-nowrap text-lg font-semibold tracking-tight">Couch Jarvis</h1>
         <div className="flex items-center gap-2">
+          {paired && (
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Settings"
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-zinc-300 ring-1 ring-line active:bg-surface"
+            >
+              <Icon name="gear" size={18} />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setLogOpen(true)}
@@ -102,16 +127,16 @@ export default function App() {
           {tab === "remote" && (
             <>
               <NowPlayingCard playing={view.room.now_playing} pending={progress} />
-              <QuickDeck disabled={!connected} onPress={(action) => actions.sendButton(action)} />
+              {!view.room.now_playing && <Suggestions disabled={!connected} recents={recents} onSend={sendCommand} />}
+              <QuickDeck
+                disabled={!connected}
+                onPress={(action) => {
+                  tap();
+                  actions.sendButton(action);
+                }}
+              />
               <TimerList timers={view.room.timers} />
               <FriendsBar devices={selectDevices(view)} selfId={self?.deviceId ?? null} />
-              <button
-                type="button"
-                onClick={switchMic}
-                className="min-h-11 self-center px-3 text-xs text-muted underline underline-offset-2"
-              >
-                {micMode === "tap" ? "Mic mode: tap on, tap off (switch to press and hold)" : "Mic mode: press and hold (switch to tap on, tap off)"}
-              </button>
             </>
           )}
 
@@ -127,18 +152,25 @@ export default function App() {
               </p>
             ))}
 
-          <button
-            type="button"
-            onClick={() => void actions.unpair()}
-            className="mt-2 min-h-11 self-center px-3 text-xs text-zinc-600 underline underline-offset-2"
-          >
-            Forget this phone
-          </button>
         </>
       )}
       <Toasts toasts={view.toasts} onDismiss={actions.dismiss} onSuggest={actions.sendText} />
       {paired && view.connection !== "rejected" && tab === "remote" && (
-        <CommandBar disabled={!connected} voice={voice} micMode={micMode} onSend={actions.sendText} />
+        <CommandBar disabled={!connected} voice={voice} micMode={micMode} onSend={sendTyped} />
+      )}
+      {settingsOpen && (
+        <SettingsSheet
+          voice={view.room.voice}
+          micMode={micMode}
+          disabled={!connected}
+          onCommand={sendCommand}
+          onMicMode={chooseMic}
+          onUnpair={() => {
+            setSettingsOpen(false);
+            void actions.unpair();
+          }}
+          onClose={() => setSettingsOpen(false)}
+        />
       )}
       {logOpen && <LogPanel entries={view.log} onClear={actions.clearLog} onClose={() => setLogOpen(false)} />}
     </main>
