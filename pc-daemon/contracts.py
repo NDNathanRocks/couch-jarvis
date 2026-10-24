@@ -205,6 +205,15 @@ class Suggestion(_Model):
     text: str = Field(min_length=1, max_length=500)
 
 
+class AskPrompt(_Model):
+    """A question the assistant needs answered before it can act; the phone shows it as a card."""
+
+    question: str = Field(min_length=1, max_length=300)
+    choices: list[str] = Field(default_factory=list, max_length=6)
+    listen: bool = False  # the phone should open its mic for the answer (voice commands only)
+    expires_s: int = Field(default=60, ge=5, le=300)
+
+
 class CmdResultPayload(_Model):
     command_id: str
     ok: bool
@@ -214,6 +223,7 @@ class CmdResultPayload(_Model):
     heard: str = Field(default="", max_length=500)  # the words we acted on (voice / typed)
     detail: str = Field(default="", max_length=400)  # why it failed, for the phone's log
     suggest: Suggestion | None = None  # "no search bar here: open a new tab and search?"
+    ask: AskPrompt | None = None  # a question for the user: the next thing they say answers it
 
 
 class PresencePayload(_Model):

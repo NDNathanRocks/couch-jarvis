@@ -8,6 +8,7 @@ intent_router -> dom_executor -> (vision_fallback) -> post_action_verifier -> (r
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import re
@@ -20,6 +21,7 @@ from langgraph.graph import END, StateGraph
 from pydantic import ValidationError
 
 from agent.fastpath import plan_button, plan_text
+from agent.memory import ConversationMemory
 from agent.policy import (
     key_allowed,
     normalize_keys,
@@ -41,7 +43,7 @@ from agent.state import (
     VerifyResult,
 )
 from command_queue import CommandRequest
-from contracts import CmdResultPayload, Suggestion
+from contracts import AskPrompt, CmdResultPayload, Suggestion
 from executors.base import ActionResult, Browser, MediaKey, OSController
 from executors.page_items import NO_SEARCH_BAR, NO_SUBTITLES
 from executors.subtitles import SubtitleController, language_name
@@ -70,6 +72,28 @@ BROWSER_NAV_ACTIONS = frozenset(
 _ASKED_TO_SEARCH = re.compile(r"\b(?:you ?tube|music|search|look up)\b", re.I)
 _ASKED_FOR_NEW_TAB = re.compile(r"\bnew (?:tab|window)\b", re.I)
 _OPENS_PAGES = frozenset({"navigate", "page_search"})
+_NEVER_MIND = re.compile(r"^(?:never ?mind|forget it|cancel(?: that)?|no thanks?|nothing)$", re.I)
+_FORGET = re.compile(r"^(?:forget (?:that|everything|all of that)|clear (?:your )?memory)$", re.I)
+
+
+def split_reply(plan: IntentPlan) -> tuple[IntentPlan, str | None, dict[str, Any] | None]:
+    """Take the assistant's own words out of a plan: (actions only, what to say, question)."""
+    say = [str(s.args.get("text", "")).strip() for s in plan.steps if s.op == "say"]
+    asks = [s for s in plan.steps if s.op == "ask"]
+    if not say and not asks:
+        return plan, None, None
+    actions = [s for s in plan.steps if s.op not in ("say", "ask")]
+    ask: dict[str, Any] | None = None
+    if asks:
+        a = asks[0].args
+        raw = str(a.get("choices", ""))
+        choices = [c.strip() for c in raw.split("|") if c.strip()][:6] if raw else []
+        ask = {"question": str(a.get("question", "")).strip()[:300], "choices": choices}
+    return (
+        plan.model_copy(update={"steps": actions}),
+        " ".join(t for t in say if t)[:400] or None,
+        ask,
+    )
 
 
 def with_requested_new_tab(plan: IntentPlan, utterance: str) -> IntentPlan:
@@ -104,6 +128,7 @@ class AgentDeps:
     subtitles: SubtitleController | None = None
     subtitle_lang: str = "en"  # default language for "turn on subtitles"
     voice: VoiceService | None = None  # spoken replies; None = silent (tests, no speakers)
+    memory: ConversationMemory | None = None  # last few turns + a question awaiting an answer
     show_qr: Callable[[], None] = lambda: None  # set by main when a HUD exists
     progress: ProgressFn = lambda *_: None
     verify_delays_s: tuple[float, ...] = (0.0, 0.4, 0.8)
@@ -227,6 +252,16 @@ def build_graph(deps: AgentDeps) -> Any:
             f"<untrusted_page_items>{listing}</untrusted_page_items> "
             f"playing={snap.is_playing} fullscreen={snap.is_fullscreen}"
         )
+        if deps.memory is not None:
+            recent = deps.memory.render()
+            pending = deps.memory.pending(state.issued_by)
+            if recent:
+                context += "\n" + recent
+            if pending is not None:
+                context += (
+                    f'\n<pending_question>{sanitize_untrusted(pending.question, 200)}'
+                    f"</pending_question>"
+                )
         user = router_user_prompt(state.utterance, context)
         bad_reply, error = "", ""
         for attempt in range(2):  # one repair retry
@@ -253,8 +288,19 @@ def build_graph(deps: AgentDeps) -> Any:
     @node("intent_router")
     async def intent_router(state: AgentState, span: Span) -> dict[str, Any]:
         plan = state.plan
+        said = state.utterance.strip().strip(" .!?").lower()
+        if deps.memory is not None and plan is None:
+            if _FORGET.match(said):
+                deps.memory.clear()
+                return {"status": "done", "final_message": "Okay, forgotten."}
+            if _NEVER_MIND.match(said) and deps.memory.pending(state.issued_by) is not None:
+                deps.memory.clear_pending(state.issued_by)
+                return {"status": "done", "final_message": "Okay, never mind."}
         if plan is None:
             plan = plan_text(state.utterance)
+            waiting = deps.memory is not None and deps.memory.pending(state.issued_by) is not None
+            if plan is not None and waiting and any(s.op == "click_item" for s in plan.steps):
+                plan = None  # "the second one" answers my question, it is not a click on the page
         if plan is None:
             try:
                 plan = await route_with_llm(state, span)
@@ -263,6 +309,18 @@ def build_graph(deps: AgentDeps) -> Any:
                 return {"status": "failed", "final_message": "My brain is offline right now."}
         span.set_attribute("cj.intent", plan.intent.value if plan else "unknown")
         span.set_attribute("cj.intent_source", plan.source if plan else "llm")
+        if deps.memory is not None:
+            deps.memory.clear_pending(state.issued_by)  # the answer is being handled right now
+        reply: str | None = None
+        ask: dict[str, Any] | None = None
+        if plan is not None:
+            plan, reply, ask = split_reply(plan)
+        if reply or ask:  # the assistant is talking: no confidence gate, and maybe no actions
+            words = reply or (ask or {}).get("question") or ""
+            update: dict[str, Any] = {"plan": plan, "reply": reply, "ask": ask}
+            if not plan.steps:
+                return {**update, "status": "done", "final_message": str(words)}
+            return {**update, "status": "executing"}
         if (
             plan is None
             or plan.intent is Intent.UNKNOWN
@@ -674,11 +732,36 @@ class AgentRunner:
         self._deps.progress = progress
 
     def _announce(
-        self, req: CommandRequest, plan: IntentPlan | None, ok: bool, message: str
+        self,
+        req: CommandRequest,
+        plan: IntentPlan | None,
+        ok: bool,
+        message: str,
+        spoken: str | None = None,
     ) -> None:
         voice = self._deps.voice
         if voice is not None:
-            voice.announce(kind=req.kind, plan=plan, ok=ok, message=message)
+            voice.announce(kind=req.kind, plan=plan, ok=ok, message=message, spoken=spoken)
+
+    async def _remember(
+        self, req: CommandRequest, final: AgentState, ok: bool, ask: AskPrompt | None
+    ) -> None:
+        memory = self._deps.memory
+        if memory is None or _FORGET.match(final.utterance.strip().strip(" .!?")):
+            return
+        title = ""
+        with contextlib.suppress(Exception):
+            title = (await self._deps.browser.snapshot()).title
+        memory.record(
+            req.device_id,
+            final.utterance,
+            final.plan,
+            ok,
+            final.final_message or FAIL_MESSAGE,
+            title,
+        )
+        if ask is not None:
+            memory.set_pending(req.device_id, ask.question, ask.choices)
 
     def initial_state(self, req: CommandRequest) -> AgentState:
         plan = plan_button(req.action) if req.kind == "button" and req.action else None
@@ -719,11 +802,25 @@ class AgentRunner:
                 )
             final = raw if isinstance(raw, AgentState) else AgentState.model_validate(raw)
             ok = final.status == "done"
+            spoken: str | None = None
+            ask_prompt: AskPrompt | None = None
+            if ok and (final.reply or final.ask):
+                if final.ask:
+                    ask_prompt = AskPrompt(
+                        question=final.ask["question"] or "What do you mean?",
+                        choices=final.ask["choices"],
+                        listen=req.kind == "voice",
+                    )
+                spoken = " ".join(
+                    t for t in (final.reply, ask_prompt.question if ask_prompt else None) if t
+                )
+                final = final.model_copy(update={"final_message": spoken})
             span.set_attribute("cj.tier", final.tier_used)
             span.set_attribute("cj.ok", ok)
             if not ok:
                 span.set_error(final.final_message or "failed")
-            self._announce(req, final.plan, ok, final.final_message or FAIL_MESSAGE)
+            self._announce(req, final.plan, ok, final.final_message or FAIL_MESSAGE, spoken)
+            await self._remember(req, final, ok, ask_prompt)
             return CmdResultPayload(
                 command_id=req.command_id,
                 ok=ok,
@@ -732,4 +829,5 @@ class AgentRunner:
                 latency_ms=(time.perf_counter() - started) * 1000,
                 detail="" if ok else failure_detail(final),
                 suggest=Suggestion(**final.suggest) if final.suggest else None,
+                ask=ask_prompt,
             )

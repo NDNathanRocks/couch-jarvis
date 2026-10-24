@@ -86,6 +86,43 @@
       "title": "AgentProgressPayload",
       "type": "object"
     },
+    "AskPrompt": {
+      "additionalProperties": false,
+      "description": "A question the assistant needs answered before it can act; the phone shows it as a card.",
+      "properties": {
+        "choices": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 6,
+          "title": "Choices",
+          "type": "array"
+        },
+        "expires_s": {
+          "default": 60,
+          "maximum": 300,
+          "minimum": 5,
+          "title": "Expires S",
+          "type": "integer"
+        },
+        "listen": {
+          "default": false,
+          "title": "Listen",
+          "type": "boolean"
+        },
+        "question": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Question",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question"
+      ],
+      "title": "AskPrompt",
+      "type": "object"
+    },
     "AudioBegin": {
       "additionalProperties": false,
       "properties": {
@@ -641,6 +678,17 @@
     "CmdResultPayload": {
       "additionalProperties": false,
       "properties": {
+        "ask": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AskPrompt"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "command_id": {
           "title": "Command Id",
           "type": "string"

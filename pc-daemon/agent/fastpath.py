@@ -298,12 +298,12 @@ def plan_text(utterance: str) -> IntentPlan | None:
 _WEB_QUESTION = re.compile(
     r"^(?:what(?:'s| is| are| was| were)|who(?:'s| is| was| are| won| wins| invented| made| wrote| directed| plays)|when (?:is|was|did|does)|"
     r"where (?:is|are|was)|why (?:is|are|do|does|did)|how (?:do|does|did|many|much|old|tall|far|long)"
-    r"(?: i| you| to)?|how's|how is|which|is it|are there|can you tell me|tell me|do you know)\b.+"
+    r"(?: i| you| to)?|how's|how is|can you tell me|tell me|do you know)\b.+"
     r"|^.*\b(?:weather|forecast|temperature|news|score|scores|stock price|exchange rate)\b.*$"
 )
 # "what is playing", "what episode is this", "who sings this": about the screen, the LLM answers.
 _ABOUT_THE_SCREEN = re.compile(
-    r"\b(?:this|that|these|those|playing|on (?:the )?screen|here|current|now playing|"
+    r"\b(?:this|that|these|those|it|its|playing|on (?:the )?screen|here|current|now playing|"
     r"i (?:just )?(?:said|asked|played)|you (?:just )?(?:did|said|played|opened))\b"
 )
 

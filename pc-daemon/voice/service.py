@@ -131,7 +131,15 @@ class VoiceService:
 
     # ------------------------------------------------------------------ speaking
 
-    def announce(self, *, kind: str, plan: IntentPlan | None, ok: bool, message: str) -> None:
+    def announce(
+        self,
+        *,
+        kind: str,
+        plan: IntentPlan | None,
+        ok: bool,
+        message: str,
+        spoken: str | None = None,
+    ) -> None:
         """Say how a command went. Spoken commands always; buttons only if asked; typed never."""
         if not self._prefs.enabled or kind == "text":
             return
@@ -139,6 +147,9 @@ class VoiceService:
             return
         if plan is not None and any(step.op == "voice_pref" for step in plan.steps):
             return  # settings changes speak their own preview
+        if spoken:  # the assistant's own answer or question: say it as written
+            self.speak(spoken)
+            return
         text = (
             self._phraser.success(self._prefs.style, plan)
             if ok

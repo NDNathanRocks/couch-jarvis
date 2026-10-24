@@ -43,6 +43,7 @@ from stt_engine import STTEngine, build_stt_engine
 from telemetry import Telemetry
 from timers import TimerService
 from voice import VoicePrefsStore, VoiceService
+from agent.memory import ConversationMemory
 from watchdog import EdgeWatchdog, make_edge_launcher, make_http_probe
 
 log = logging.getLogger("couch-jarvis")
@@ -140,6 +141,7 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
     grounder = VisionGrounder(vlm, screen, telemetry)
     fullscreener = VideoFullscreener(browser, grounder, os_ctl, telemetry)
     deps = AgentDeps(router, browser, os_ctl, fullscreener, grounder, telemetry)
+    deps.memory = ConversationMemory(None if dry_run else settings.memory_file)
     deps.subtitles = SubtitleController(browser, grounder, os_ctl)
     deps.subtitle_lang = settings.subtitle_lang.strip().lower() or "en"
     service_ref: list[CommandService] = []
