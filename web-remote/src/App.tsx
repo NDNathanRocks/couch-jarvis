@@ -82,7 +82,9 @@ export default function App() {
   const askId = view.ask?.listen ? view.ask.id : null;
   const askLength = view.ask?.question.length ?? 0;
   const voiceRef = useRef(voice);
-  voiceRef.current = voice;
+  useEffect(() => {
+    voiceRef.current = voice; // always the latest, without reading a ref while rendering
+  });
   useEffect(() => {
     if (askId === null) return;
     const open = setTimeout(() => {
