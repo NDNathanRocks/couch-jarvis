@@ -221,6 +221,12 @@ async def test_on_by_default_and_voice_commands_are_answered(tmp_path: Path) -> 
     assert len(player.played) == 1 and svc.spoken
 
 
+async def test_typed_commands_are_never_spoken(tmp_path: Path) -> None:
+    svc, player, _ = service(tmp_path)
+    svc.announce(kind="text", plan=plan_text("pause"), ok=True, message="x")
+    assert svc._task is None and not player.played
+
+
 async def test_button_taps_are_quiet_unless_asked(tmp_path: Path) -> None:
     svc, player, _ = service(tmp_path)
     svc.announce(kind="button", plan=plan_text("pause"), ok=True, message="x")
@@ -310,7 +316,7 @@ async def test_a_new_reply_cuts_off_the_old_one(tmp_path: Path) -> None:
 # ------------------------------------------------------------------ in the agent
 
 
-def request(text: str, kind: str = "text") -> CommandRequest:
+def request(text: str, kind: str = "voice") -> CommandRequest:
     return CommandRequest(
         command_id=f"c-{text}",
         idempotency_key=f"k-{text}",

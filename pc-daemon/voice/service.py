@@ -132,8 +132,10 @@ class VoiceService:
     # ------------------------------------------------------------------ speaking
 
     def announce(self, *, kind: str, plan: IntentPlan | None, ok: bool, message: str) -> None:
-        """Say how a command went. Voice and typed commands always; buttons only if asked."""
-        if not self._prefs.enabled or (kind == "button" and not self._prefs.buttons):
+        """Say how a command went. Spoken commands always; buttons only if asked; typed never."""
+        if not self._prefs.enabled or kind == "text":
+            return
+        if kind == "button" and not self._prefs.buttons:
             return
         if plan is not None and any(step.op == "voice_pref" for step in plan.steps):
             return  # settings changes speak their own preview

@@ -74,7 +74,7 @@ export default function App() {
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col gap-5 px-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-[calc(env(safe-area-inset-top)+1rem)]">
-      <header className="flex items-center justify-between gap-2">
+      <header className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <h1 className="whitespace-nowrap text-lg font-semibold tracking-tight">Couch Jarvis</h1>
         <div className="flex items-center gap-2">
           {paired && (
