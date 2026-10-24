@@ -311,6 +311,37 @@ def _plan_browser_prefs(t: str) -> IntentPlan | None:
     return None
 
 
+_SAVED = r"(?:bookmarks?|bookmarked|saved|favou?rites?|favou?rite)"
+
+
+def _bookmark(**args: str | bool) -> IntentPlan:
+    return _plan(Intent.SYSTEM, [ActionStep(op="bookmark", args=dict(args))])
+
+
+def _plan_bookmarks(t: str) -> IntentPlan | None:
+    """"save this page", "open my bookmark netflix", "remove the bookmark for bbc"."""
+    this = r"(?:this|the current|the open)(?: page| site| tab| link| website)?"
+    mine = rf"(?:my |the )?{_SAVED}(?: pages| list)?"
+    if re.fullmatch(rf"(?:save|bookmark|favou?rite|pin|keep) {this}(?: for later)?", t):
+        return _bookmark(action="add")
+    if re.fullmatch(rf"(?:add|put) {this} (?:to|in|into|on) {mine}", t):
+        return _bookmark(action="add")
+    if re.fullmatch(rf"(?:remove|delete|forget|unsave|unbookmark|take) {this} (?:from )?{mine}", t):
+        return _bookmark(action="remove", current=True)
+    if re.fullmatch(r"(?:unsave|unbookmark) (?:this|it)(?: page)?", t):
+        return _bookmark(action="remove", current=True)
+    named = r"(?: page| site| link)?(?: for| called| named|:)? (.+)"
+    m = re.fullmatch(rf"(?:remove|delete|forget|unsave|unbookmark) (?:the |my )?{_SAVED}{named}", t)
+    if m:
+        return _bookmark(action="remove", name=m.group(1).strip())
+    m = re.fullmatch(
+        rf"(?:open|go to|load|show|pull up|take me to|play) (?:my |the |a )?{_SAVED}{named}", t
+    ) or re.fullmatch(rf"(?:open|go to|load|pull up|take me to) (.+?) (?:from|in|on) {mine}", t)
+    if m:
+        return _bookmark(action="open", name=m.group(1).strip())
+    return None
+
+
 def _plan_voice(t: str) -> IntentPlan | None:
     """Spoken-reply settings, so the phone's settings sheet and "stop talking" share one path."""
     noun = r"(?:the )?(?:voice|spoken|talking|audio) (?:replies|reply|responses|feedback)"
@@ -435,6 +466,7 @@ def _plan_single(utterance: str) -> IntentPlan | None:
 
     page = (
         _plan_voice(t)
+        or _plan_bookmarks(t)
         or _plan_browser_prefs(t)
         or _plan_subtitles(t)
         or _plan_browser(t)
@@ -512,6 +544,17 @@ def _plan_single(utterance: str) -> IntentPlan | None:
             {"minutes": minutes},
         )
 
+    qr = r"(?:the |a |my )?(?:pairing )?qr(?: code)?(?: on (?:the )?(?:tv|screen))?"
+    if re.fullmatch(
+        rf"(?:hide|remove|clear|dismiss|get rid of|turn off|take down|stop showing) {qr}", t
+    ):
+        return _plan(Intent.SYSTEM, [ActionStep(op="qr_control", args={"action": "hide"})])
+    if re.fullmatch(rf"(?:toggle|flip) {qr}", t):
+        return _plan(Intent.SYSTEM, [ActionStep(op="qr_control", args={"action": "toggle"})])
+    if re.fullmatch(
+        rf"(?:reset|refresh|regenerate|renew|rotate|change|new|make a new|generate a new) {qr}", t
+    ):
+        return _plan(Intent.SYSTEM, [ActionStep(op="qr_control", args={"action": "reset"})])
     if re.fullmatch(
         r"(?:show|display|bring up|pull up)(?: me)?(?: the| a)?(?: pairing)? ?qr(?: code)?", t
     ) or re.fullmatch(r"(?:pair|add|connect)(?: a| another)? (?:friend|phone|device)s?", t):

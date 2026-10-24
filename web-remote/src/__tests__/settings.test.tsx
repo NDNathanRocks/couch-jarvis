@@ -114,3 +114,17 @@ describe("ad blocking setting", () => {
     expect(texts(sock)).toEqual(["turn off ad blocking", "turn on ad blocking"]);
   });
 });
+
+describe("QR code settings", () => {
+  it("shows, hides and (after confirming) resets the QR on the TV", async () => {
+    const sock = await openSettings();
+    fireEvent.click(screen.getByRole("button", { name: "Show QR" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hide QR" }));
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    fireEvent.click(screen.getByRole("button", { name: "Reset QR code" }));
+    expect(texts(sock)).toEqual(["show the qr code", "hide the qr code"]); // declined: nothing sent
+    fireEvent.click(screen.getByRole("button", { name: "Reset QR code" }));
+    expect(texts(sock).at(-1)).toBe("reset the qr code");
+    confirm.mockRestore();
+  });
+});

@@ -382,6 +382,36 @@
       "title": "AudioEndPayload",
       "type": "object"
     },
+    "Bookmark": {
+      "additionalProperties": false,
+      "description": "A page saved with \"Save this page\"; tapping it opens it in the current tab.",
+      "properties": {
+        "id": {
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 120,
+          "title": "Title",
+          "type": "string"
+        },
+        "url": {
+          "maxLength": 2000,
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "url"
+      ],
+      "title": "Bookmark",
+      "type": "object"
+    },
     "BrowserState": {
       "additionalProperties": false,
       "description": "Browsing preferences saved on the PC.",
@@ -1860,6 +1890,14 @@
     "RoomState": {
       "additionalProperties": false,
       "properties": {
+        "bookmarks": {
+          "items": {
+            "$ref": "#/$defs/Bookmark"
+          },
+          "maxItems": 100,
+          "title": "Bookmarks",
+          "type": "array"
+        },
         "browser": {
           "$ref": "#/$defs/BrowserState"
         },

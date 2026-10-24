@@ -96,6 +96,25 @@ def _already_running() -> bool:
     return bool(kernel32.GetLastError() == 183)  # ERROR_ALREADY_EXISTS
 
 
+def toggle_running_qr(port: int | None = None) -> bool | None:
+    """Ask the running daemon (loopback only) to show or hide the QR; None if it did not answer."""
+    import json
+    import urllib.request
+
+    if port is None:
+        from config import get_settings
+
+        port = get_settings().lan_port
+    req = urllib.request.Request(  # noqa: S310 - fixed http://127.0.0.1 URL
+        f"http://127.0.0.1:{port}/api/qr/toggle", method="POST", data=b""
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=3) as resp:  # noqa: S310
+            return bool(json.loads(resp.read())["shown"])
+    except (OSError, ValueError, KeyError):
+        return None
+
+
 def run_worker(argv: list[str]) -> int:
     configure_logging("daemon")
     import main as daemon_main
@@ -107,7 +126,9 @@ def run_supervisor(argv: list[str]) -> int:
     configure_logging("app")
     log = logging.getLogger("couch-jarvis.app")
     if _already_running():
-        log.info("another CouchJarvis is already running; exiting")
+        # Opening the app again (taskbar, Start menu) flips the pairing QR on the TV.
+        shown = toggle_running_qr()
+        log.info("another CouchJarvis is already running; QR toggled (%s); exiting", shown)
         return 0
     ensure_user_config(user_config_file(), resource_root() / "installer" / "defaults.env")
 

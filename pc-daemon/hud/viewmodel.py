@@ -61,7 +61,7 @@ class HudViewModel:
         clock: Callable[[], float] = time.time,
         toast_ttl_s: float = 5.0,
         max_toasts: int = 3,
-        qr_linger_s: float = 45.0,
+        qr_linger_s: float = 10.0,
         qr_requested_s: float = 90.0,
     ) -> None:
         self._cloud_url = cloud_url
@@ -73,6 +73,9 @@ class HudViewModel:
         self._requested = qr_requested_s
         self._toasts: list[ToastItem] = []
         self._qr_until = 0.0
+        self._pinned = False  # "show the QR" stays up until it is hidden or a friend connects
+        self._suppressed = False  # hidden by hand before anyone paired
+        self._ever_online = False  # once a phone has connected the QR never comes back by itself
         self._progress: dict[str, str] = {}
         # mirror of the PC's RoomState (only what the HUD needs)
         self._mode: Literal["cloud", "lan"] = "cloud"
@@ -84,7 +87,32 @@ class HudViewModel:
 
     def request_qr(self, seconds: float | None = None) -> None:
         """Show the pairing QR for a while (e.g. a friend asked to join)."""
+        self._suppressed = False
         self._qr_until = max(self._qr_until, self._clock() + (seconds or self._requested))
+
+    def show_qr(self) -> None:
+        """Show the QR until it is hidden again or the next phone connects."""
+        self._suppressed = False
+        self._pinned = True
+
+    def hide_qr(self) -> None:
+        self._pinned = False
+        self._suppressed = True
+        self._qr_until = 0.0
+
+    def qr_visible(self) -> bool:
+        return self._wants_qr(self._clock())
+
+    def toggle_qr(self) -> bool:
+        """Flip the QR on the TV; returns whether it is now shown."""
+        if self.qr_visible():
+            self.hide_qr()
+        else:
+            self.show_qr()
+        return self.qr_visible()
+
+    def _wants_qr(self, now: float) -> bool:
+        return self._pinned or now < self._qr_until or not (self._ever_online or self._suppressed)
 
     def toast(self, text: str, kind: ToastKind = "info", ttl_s: float | None = None) -> None:
         now = self._clock()
@@ -124,8 +152,12 @@ class HudViewModel:
                     self.toast(
                         f"{self._devices[device_id].get('name', 'A phone')} connected", "info"
                     )
-            if announce and not before and after:  # first friend just paired (live): linger
-                self._qr_until = max(self._qr_until, self._clock() + self._linger)
+            if after:
+                if announce and after - before and self._wants_qr(self._clock()):
+                    # someone just scanned it: show it worked for a moment, then clear the picture
+                    self._pinned = False
+                    self._qr_until = self._clock() + self._linger
+                self._ever_online = True
 
     # ------------------------------------------------------------------ output
 
@@ -134,8 +166,8 @@ class HudViewModel:
         return sum(1 for d in self._devices.values() if d.get("online"))
 
     def _qr_card(self, now: float) -> QrCard | None:
-        if self.online_count > 0 and now >= self._qr_until:
-            return None  # everyone who needs to be paired is paired: keep the picture clear
+        if not self._wants_qr(now):
+            return None  # nobody is asking for it: keep the picture clear
         lan, cloud = self._lan_url(), self._cloud_url()
         # With the internet down only the LAN address can work, so it wins.
         if self._mode == "lan" and lan:

@@ -42,6 +42,7 @@ from agent.state import (
     StepOutcome,
     VerifyResult,
 )
+from bookmarks import BookmarkStore
 from browser_prefs import BrowserPrefs
 from command_queue import CommandRequest
 from contracts import AskPrompt, CmdResultPayload, Suggestion
@@ -169,9 +170,12 @@ class AgentDeps:
     subtitles: SubtitleController | None = None
     subtitle_lang: str = "en"  # default language for "turn on subtitles"
     voice: VoiceService | None = None  # spoken replies; None = silent (tests, no speakers)
+    bookmarks: BookmarkStore | None = None  # saved pages
     prefs: BrowserPrefs | None = None  # ad blocking etc.
     memory: ConversationMemory | None = None  # last few turns + a question awaiting an answer
     show_qr: Callable[[], None] = lambda: None  # set by main when a HUD exists
+    # "hide" | "toggle" | "reset" -> what happened; set by main (None = no TV overlay here)
+    qr_action: Callable[[str], Awaitable[ActionResult]] | None = None
     progress: ProgressFn = lambda *_: None
     verify_delays_s: tuple[float, ...] = (0.0, 0.4, 0.8)
 
@@ -188,6 +192,18 @@ def success_message(plan: IntentPlan) -> str:
     for step in plan.steps:
         if step.op == "voice_pref":
             return pref_message(step.args)
+        if step.op == "bookmark":
+            return {
+                "add": "Saved this page",
+                "remove": "Removed the saved page",
+                "open": "Opened your saved page",
+            }.get(str(step.args.get("action")), "Done")
+        if step.op == "qr_control":
+            return {
+                "hide": "QR code hidden",
+                "reset": "New QR code ready",
+                "toggle": "QR code toggled",
+            }.get(str(step.args.get("action")), "Done")
         if step.op == "browser_pref":
             return "Ad blocking on" if step.args.get("adblock") else "Ad blocking off"
     several = written_message(plan)
@@ -380,6 +396,30 @@ def build_graph(deps: AgentDeps) -> Any:
             }
         return {"plan": plan, "status": "executing"}
 
+    async def run_bookmark(a: dict[str, str | int | float | bool]) -> ActionResult:
+        store = deps.bookmarks
+        if store is None:
+            return ActionResult(False, "os", "Saved pages are not set up here", "unsupported")
+        action = str(a.get("action", "add"))
+        if action == "add":
+            snap = await deps.browser.snapshot()
+            try:
+                store.add(sanitize_untrusted(snap.title, 120), snap.url)
+            except ValueError:
+                return ActionResult(False, "os", "I can only save web pages", "unsupported")
+            return ActionResult(True, "os")
+        if a.get("current"):
+            url = (await deps.browser.snapshot()).url
+            found = next((b for b in store.items() if b.url == url), None)
+        else:
+            found = store.find(str(a.get("id") or a.get("name") or ""))
+        if found is None:
+            return ActionResult(False, "os", "I can not find that saved page", "item_not_found")
+        if action == "remove":
+            store.remove(found.id)
+            return ActionResult(True, "os")
+        return await deps.browser.open_saved(found.url)
+
     async def run_step(step: ActionStep, utterance: str = "") -> ActionResult:
         a = step.args
         op = step.op
@@ -463,6 +503,12 @@ def build_graph(deps: AgentDeps) -> Any:
                     False, "os", "Browser settings are not set up here", "unsupported"
                 )
             return ActionResult(True, "os", deps.prefs.apply(a))
+        if op == "bookmark":
+            return await run_bookmark(a)
+        if op == "qr_control":
+            if deps.qr_action is None:
+                return ActionResult(False, "os", "There is no QR code on this TV", "unsupported")
+            return await deps.qr_action(str(a.get("action", "toggle")))
         if op == "show_qr":
             deps.show_qr()
             return ActionResult(True, "os")

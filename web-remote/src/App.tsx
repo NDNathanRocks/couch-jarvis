@@ -9,6 +9,7 @@ import { NowPlayingCard } from "./components/NowPlayingCard";
 import { QRScanner, readPairParams, stripPairParams } from "./components/QRScanner";
 import { QuickDeck } from "./components/QuickDeck";
 import { SettingsSheet } from "./components/SettingsSheet";
+import { BookmarkList } from "./components/BookmarkList";
 import { QuestionCard } from "./components/QuestionCard";
 import { Suggestions } from "./components/Suggestions";
 import { TimerList } from "./components/TimerList";
@@ -22,7 +23,7 @@ import { tap } from "./utils/haptics";
 import { loadRecents, rememberCommand } from "./utils/recents";
 import type { Pairing } from "./utils/storage";
 
-type Tab = "remote" | "touchpad";
+type Tab = "remote" | "saved" | "touchpad";
 
 /** How long the mic stays open for the answer to a spoken question. */
 const ASK_LISTEN_MS = 8000;
@@ -128,17 +129,19 @@ export default function App() {
 
       {paired && view.connection !== "rejected" && (
         <>
-          <nav role="tablist" aria-label="Views" className="grid grid-cols-2 gap-2 rounded-2xl bg-surface p-1 ring-1 ring-line">
+          <nav role="tablist" aria-label="Views" className="grid grid-cols-3 gap-2 rounded-2xl bg-surface p-1 ring-1 ring-line">
             {(
               [
                 ["remote", "Remote"],
-                ["touchpad", "Touchpad & keys"],
+                ["saved", "Saved"],
+                ["touchpad", "Touchpad"],
               ] as const
             ).map(([id, label]) => (
               <button
                 key={id}
                 type="button"
                 role="tab"
+                aria-label={id === "touchpad" ? "Touchpad & keys" : undefined}
                 aria-selected={tab === id}
                 onClick={() => setTab(id)}
                 className={`min-h-11 rounded-xl text-sm font-medium ${tab === id ? "bg-line text-white" : "text-muted"}`}
@@ -174,6 +177,10 @@ export default function App() {
               <TimerList timers={view.room.timers} />
               <FriendsBar devices={selectDevices(view)} selfId={self?.deviceId ?? null} />
             </>
+          )}
+
+          {tab === "saved" && (
+            <BookmarkList items={view.room.bookmarks} disabled={!connected} onCommand={sendCommand} />
           )}
 
           {tab === "touchpad" &&

@@ -298,3 +298,34 @@ describe("suggestion toast", () => {
     expect(onSuggest).not.toHaveBeenCalled();
   });
 });
+
+describe("BookmarkList", () => {
+  const items = [
+    { id: "ab12cd", title: "The Big Bang Theory - S1", url: "https://www.heartive.example/tbbt" },
+    { id: "ef34ab", title: "BBC News", url: "https://www.bbc.co.uk/news" },
+  ];
+
+  it("lists saved pages with their site, opens one by tap and removes one", async () => {
+    const { BookmarkList } = await import("../components/BookmarkList");
+    const onCommand = vi.fn();
+    render(<BookmarkList items={items} disabled={false} onCommand={onCommand} />);
+    expect(screen.getByText("heartive.example")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /^BBC News/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove BBC News" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save the page on the TV" }));
+    expect(onCommand.mock.calls.map((c) => c[0])).toEqual([
+      "open my bookmark ef34ab",
+      "remove the bookmark ef34ab",
+      "save this page",
+    ]);
+  });
+
+  it("explains the empty state and is inert while disconnected", async () => {
+    const { BookmarkList } = await import("../components/BookmarkList");
+    const onCommand = vi.fn();
+    render(<BookmarkList items={[]} disabled onCommand={onCommand} />);
+    expect(screen.getByText(/Nothing saved yet/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Save the page on the TV" }));
+    expect(onCommand).not.toHaveBeenCalled();
+  });
+});

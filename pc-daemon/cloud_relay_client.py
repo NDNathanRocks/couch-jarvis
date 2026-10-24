@@ -102,6 +102,7 @@ class CloudRelayClient:
         self._sleep = sleep
         self._clock = clock
         self.status: Status = "down"
+        self._ws: ClientConnection | None = None
 
     def _set_status(self, status: Status) -> None:
         if status != self.status:
@@ -146,6 +147,12 @@ class CloudRelayClient:
             ):
                 await self._sleep(delay)
 
+    async def reconnect(self) -> None:
+        """Drop the connection so the next one announces the current room secret (QR reset)."""
+        ws, self._ws = self._ws, None
+        if ws is not None:
+            await ws.close()
+
     def _endpoint(self) -> str:
         sep = "&" if "?" in self._url else "?"
         return f"{self._url}{sep}{urlencode({'room': self._store.identity.room_id, 'role': 'pc'})}"
@@ -160,6 +167,7 @@ class CloudRelayClient:
         async with connect(
             self._endpoint(), additional_headers=headers, open_timeout=10, max_size=64 * 1024
         ) as ws:
+            self._ws = ws
             self._set_status("up")
             await ws.send(dump_message(envelope(StateSync, room_id, {})))  # hello -> room.key
             await self._send_snapshot(ws)

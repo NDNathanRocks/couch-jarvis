@@ -64,6 +64,39 @@ class TestQrPolicy:
         clock.now += 50
         assert vm.frame().qr is not None
 
+    def test_qr_stays_hidden_when_the_phone_disconnects(self) -> None:
+        vm, clock = make(qr_linger_s=10)
+        vm.handle_event("state.snapshot", {"devices": []})
+        vm.handle_event("state.patch", {"devices": [device("a", "Ann")], "rev": 2})
+        clock.now += 11
+        assert vm.frame().qr is None
+        vm.handle_event("state.patch", {"devices": [device("a", "Ann", online=False)], "rev": 3})
+        assert vm.frame().qr is None  # phone locked: the show must go on
+        clock.now += 3600
+        assert vm.frame().qr is None
+
+    def test_toggle_shows_it_for_a_friend_until_they_connect(self) -> None:
+        vm, clock = make(qr_linger_s=10)
+        vm.handle_event("state.snapshot", {"devices": [device("a", "Ann")]})
+        assert vm.frame().qr is None
+        assert vm.toggle_qr() is True and vm.frame().qr is not None
+        clock.now += 3600
+        assert vm.frame().qr is not None  # stays until hidden or used
+        vm.handle_event(
+            "state.patch", {"devices": [device("a", "Ann"), device("b", "Ben")], "rev": 3}
+        )
+        assert vm.frame().qr is not None  # shown briefly so Ben sees it worked
+        clock.now += 11
+        assert vm.frame().qr is None
+
+    def test_toggle_hides_it_and_hiding_before_anyone_paired_sticks(self) -> None:
+        vm, _ = make()
+        assert vm.frame().qr is not None
+        assert vm.toggle_qr() is False and vm.frame().qr is None
+        assert vm.toggle_qr() is True and vm.frame().qr is not None
+        vm.hide_qr()
+        assert vm.frame().qr is None
+
     def test_offline_phones_do_not_count_as_paired(self) -> None:
         vm, _ = make()
         vm.handle_event("state.snapshot", {"devices": [device("a", "Ann", online=False)]})

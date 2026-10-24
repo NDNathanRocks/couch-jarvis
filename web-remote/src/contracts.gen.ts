@@ -216,6 +216,13 @@ export type Type13 = "cmd.result";
 export type V13 = 1;
 export type From14 = string;
 export type Id14 = string;
+export type Id15 = string;
+export type Title = string;
+export type Url = string;
+/**
+ * @maxItems 100
+ */
+export type Bookmarks = Bookmark[];
 export type Adblock = boolean;
 export type DeviceId1 = string;
 export type LastSeen = number;
@@ -230,7 +237,7 @@ export type IsPlaying = boolean;
 export type PositionS = number;
 export type Source = "youtube" | "ytmusic" | "other";
 export type ThumbnailUrl = string | null;
-export type Title = string;
+export type Title1 = string;
 export type PcOnline = boolean;
 export type QueueDepth = number;
 export type RemoteInput = boolean;
@@ -252,21 +259,21 @@ export type Ts14 = number;
 export type Type14 = "state.snapshot";
 export type V14 = 1;
 export type From15 = string;
-export type Id15 = string;
+export type Id16 = string;
 export type ReplyTo15 = string | null;
 export type RoomId15 = string;
 export type Ts15 = number;
 export type Type15 = "state.patch";
 export type V15 = 1;
 export type From16 = string;
-export type Id16 = string;
+export type Id17 = string;
 export type ReplyTo16 = string | null;
 export type RoomId16 = string;
 export type Ts16 = number;
 export type Type16 = "state.sync";
 export type V16 = 1;
 export type From17 = string;
-export type Id17 = string;
+export type Id18 = string;
 export type Devices1 = DevicePresence[];
 export type PcOnline1 = boolean;
 /**
@@ -279,7 +286,7 @@ export type Ts17 = number;
 export type Type17 = "presence";
 export type V17 = 1;
 export type From18 = string;
-export type Id18 = string;
+export type Id19 = string;
 export type Key1 = string;
 export type KeyId = string;
 export type ReplyTo18 = string | null;
@@ -288,7 +295,7 @@ export type Ts18 = number;
 export type Type18 = "room.key";
 export type V18 = 1;
 export type From19 = string;
-export type Id19 = string;
+export type Id20 = string;
 export type DeviceId2 = string;
 export type ReplyTo19 = string | null;
 export type RoomId19 = string;
@@ -296,21 +303,21 @@ export type Ts19 = number;
 export type Type19 = "device.revoke";
 export type V19 = 1;
 export type From20 = string;
-export type Id20 = string;
+export type Id21 = string;
 export type ReplyTo20 = string | null;
 export type RoomId20 = string;
 export type Ts20 = number;
 export type Type20 = "ping";
 export type V20 = 1;
 export type From21 = string;
-export type Id21 = string;
+export type Id22 = string;
 export type ReplyTo21 = string | null;
 export type RoomId21 = string;
 export type Ts21 = number;
 export type Type21 = "pong";
 export type V21 = 1;
 export type From22 = string;
-export type Id22 = string;
+export type Id23 = string;
 export type Code = string;
 export type Message2 = string;
 export type Retryable = boolean;
@@ -568,6 +575,7 @@ export interface StateSnapshot {
   v?: V14;
 }
 export interface RoomState {
+  bookmarks?: Bookmarks;
   browser?: BrowserState;
   devices?: Devices;
   driver?: Driver;
@@ -581,6 +589,14 @@ export interface RoomState {
   timers?: Timers;
   voice?: VoiceState;
   volume?: Volume;
+}
+/**
+ * A page saved with "Save this page"; tapping it opens it in the current tab.
+ */
+export interface Bookmark {
+  id: Id15;
+  title: Title;
+  url: Url;
 }
 /**
  * Browsing preferences saved on the PC.
@@ -600,7 +616,7 @@ export interface NowPlaying {
   position_s?: PositionS;
   source?: Source;
   thumbnail_url?: ThumbnailUrl;
-  title: Title;
+  title: Title1;
 }
 export interface TimerInfo {
   action?: Action2;
@@ -623,7 +639,7 @@ export interface VoiceState {
  */
 export interface StatePatch {
   from: From15;
-  id: Id15;
+  id: Id16;
   payload: Payload;
   reply_to?: ReplyTo15;
   room_id: RoomId15;
@@ -636,7 +652,7 @@ export interface Payload {
 }
 export interface StateSync {
   from: From16;
-  id: Id16;
+  id: Id17;
   payload?: Empty;
   reply_to?: ReplyTo16;
   room_id: RoomId16;
@@ -647,7 +663,7 @@ export interface StateSync {
 export interface Empty {}
 export interface Presence {
   from: From17;
-  id: Id17;
+  id: Id18;
   payload: PresencePayload;
   reply_to?: ReplyTo17;
   room_id: RoomId17;
@@ -662,7 +678,7 @@ export interface PresencePayload {
 }
 export interface RoomKey {
   from: From18;
-  id: Id18;
+  id: Id19;
   payload: RoomKeyPayload;
   reply_to?: ReplyTo18;
   room_id: RoomId18;
@@ -682,7 +698,7 @@ export interface RoomKeyPayload {
  */
 export interface DeviceRevoke {
   from: From19;
-  id: Id19;
+  id: Id20;
   payload: DeviceRevokePayload;
   reply_to?: ReplyTo19;
   room_id: RoomId19;
@@ -695,7 +711,7 @@ export interface DeviceRevokePayload {
 }
 export interface Ping {
   from: From20;
-  id: Id20;
+  id: Id21;
   payload?: Empty;
   reply_to?: ReplyTo20;
   room_id: RoomId20;
@@ -705,7 +721,7 @@ export interface Ping {
 }
 export interface Pong {
   from: From21;
-  id: Id21;
+  id: Id22;
   payload?: Empty;
   reply_to?: ReplyTo21;
   room_id: RoomId21;
@@ -715,7 +731,7 @@ export interface Pong {
 }
 export interface ErrorMsg {
   from: From22;
-  id: Id22;
+  id: Id23;
   payload: ErrorPayload;
   reply_to?: ReplyTo22;
   room_id: RoomId22;

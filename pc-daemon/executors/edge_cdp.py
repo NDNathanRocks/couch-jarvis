@@ -617,6 +617,17 @@ class EdgeCDP:
                     continue
         return None
 
+    async def open_saved(self, url: str) -> ActionResult:
+        """Open a page the user saved, in the tab being shown (not limited to media sites)."""
+        if urlparse(url).scheme not in ("http", "https"):
+            return ActionResult(False, "dom", "only web pages can be opened", "blocked")
+
+        async def go(page: Any) -> ActionResult:
+            await page.goto(url, wait_until="domcontentloaded", timeout=20000)
+            return ActionResult(True, "dom")
+
+        return await self._guard(go)
+
     async def click_text(self, text: str) -> ActionResult:
         """Click the thing on screen that says ``text`` (or pick it in a dropdown showing others)."""
         script = (

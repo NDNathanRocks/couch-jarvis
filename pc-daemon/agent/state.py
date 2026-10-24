@@ -49,6 +49,8 @@ StepOp = Literal[
     "web_search",
     "browser_pref",
     "click_text",
+    "qr_control",
+    "bookmark",
 ]
 
 Tier = Literal["dom", "js", "vision", "os"]

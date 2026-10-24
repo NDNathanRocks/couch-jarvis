@@ -170,6 +170,45 @@ export function SettingsSheet({ voice, adblock, micMode, disabled, onCommand, on
           </div>
         </section>
 
+        <section aria-labelledby="qr-h" className="mt-6 space-y-2">
+          <h3 id="qr-h" className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            QR code on the TV
+          </h3>
+          <p className="text-xs text-muted">
+            It hides itself once a phone is connected and stays hidden, even if your phone locks.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onCommand("show the qr code")}
+              className="min-h-11 rounded-xl bg-surface text-sm font-medium ring-1 ring-line active:bg-surface-2 disabled:opacity-40"
+            >
+              Show QR
+            </button>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onCommand("hide the qr code")}
+              className="min-h-11 rounded-xl bg-surface text-sm font-medium ring-1 ring-line active:bg-surface-2 disabled:opacity-40"
+            >
+              Hide QR
+            </button>
+          </div>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => {
+              if (window.confirm("Reset the QR code? Old QR codes stop working. Phones already paired keep working.")) {
+                onCommand("reset the qr code");
+              }
+            }}
+            className="min-h-11 w-full rounded-xl text-sm text-muted ring-1 ring-line active:bg-surface disabled:opacity-40"
+          >
+            Reset QR code
+          </button>
+        </section>
+
         <section aria-labelledby="mic-h" className="mt-6 space-y-2">
           <h3 id="mic-h" className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
             Microphone

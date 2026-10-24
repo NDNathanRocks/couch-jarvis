@@ -106,6 +106,14 @@ class BrowserState(_Model):
     adblock: bool = True  # close ad popups / block redirects from third-party sites
 
 
+class Bookmark(_Model):
+    """A page saved with "Save this page"; tapping it opens it in the current tab."""
+
+    id: str = Field(min_length=1, max_length=32, pattern=r"^[A-Za-z0-9_-]+$")
+    title: str = Field(max_length=120)
+    url: str = Field(max_length=2000)
+
+
 class RoomState(_Model):
     pc_online: bool = False
     mode: Literal["cloud", "lan"] = "cloud"
@@ -119,6 +127,7 @@ class RoomState(_Model):
     remote_input: bool = True  # touchpad/keyboard allowed (CJ_REMOTE_INPUT on the PC)
     voice: VoiceState = Field(default_factory=VoiceState)
     browser: BrowserState = Field(default_factory=BrowserState)
+    bookmarks: list[Bookmark] = Field(default_factory=list, max_length=100)
     rev: int = 0
 
 

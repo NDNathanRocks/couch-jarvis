@@ -22,13 +22,14 @@ import uvicorn
 
 from agent.graph import AgentDeps, AgentRunner
 from agent.memory import ConversationMemory
+from bookmarks import BookmarkStore
 from browser_prefs import BrowserPrefs
 from cloud_relay_client import CloudRelayClient
 from command_queue import CommandRequest
 from config import Settings, get_settings, init_dpi_awareness, resource_root
-from contracts import BrowserState, TimerInfo, VoiceState, new_id
+from contracts import Bookmark, BrowserState, TimerInfo, VoiceState, new_id
 from event_bus import EventBus
-from executors.base import Browser, OSController, Screen
+from executors.base import ActionResult, Browser, OSController, Screen
 from executors.fakes import FakeBrowser, FakeOS, FakeScreen
 from executors.subtitles import SubtitleController
 from executors.video_fullscreener import VideoFullscreener
@@ -61,6 +62,8 @@ class Runtime:
     bus: EventBus | None = None
     deps: AgentDeps | None = None
     stt: STTEngine | None = None
+    cloud: CloudRelayClient | None = None
+    tray: object | None = None
 
 
 def build_llms(settings: Settings) -> tuple[TextLLM, VisionLLM]:
@@ -119,6 +122,12 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
     prefs = BrowserPrefs(
         None if dry_run else settings.browser_file, on_change=browser_prefs_changed
     )
+    def bookmarks_changed(items: list[Bookmark]) -> None:
+        service_ref[0].state.update(bookmarks=items)
+
+    bookmarks = BookmarkStore(
+        None if dry_run else settings.bookmarks_file, on_change=bookmarks_changed
+    )
     browser: Browser
     os_ctl: OSController
     screen: Screen
@@ -149,6 +158,7 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
     fullscreener = VideoFullscreener(browser, grounder, os_ctl, telemetry)
     deps = AgentDeps(router, browser, os_ctl, fullscreener, grounder, telemetry)
     deps.prefs = prefs
+    deps.bookmarks = bookmarks
     deps.memory = ConversationMemory(None if dry_run else settings.memory_file)
     deps.subtitles = SubtitleController(browser, grounder, os_ctl)
     deps.subtitle_lang = settings.subtitle_lang.strip().lower() or "en"
@@ -194,7 +204,9 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
         remote_input=settings.remote_input,
     )
     service_ref.append(service)
-    service.state.update(voice=deps.voice.state, browser=prefs.state)
+    service.state.update(
+        voice=deps.voice.state, browser=prefs.state, bookmarks=bookmarks.items()
+    )
     return Runtime(service, telemetry, watchdog, room_id, room_store, bus, deps, stt)
 
 
@@ -274,6 +286,7 @@ async def amain(args: argparse.Namespace) -> None:
             telemetry=rt.telemetry,
             on_status=on_cloud_status,
         )
+        rt.cloud = cloud
         background.append(asyncio.create_task(cloud.run(), name="cloud-relay"))
     elif not args.dry_run:
         log.warning("CJ_RELAY_WS_URL is not set: running in LAN-only mode")
@@ -296,7 +309,10 @@ async def amain(args: argparse.Namespace) -> None:
 
 def start_hud(rt: Runtime, settings: Settings, host: str, port: int) -> asyncio.Task[None]:
     """Create the TV overlay (needs a running QApplication) and the task that feeds it."""
+    from PySide6.QtWidgets import QApplication
+
     from hud.controller import HudController
+    from hud.tray import QrTray
     from hud.tv_overlay import TvOverlay
 
     store = rt.room_store
@@ -313,8 +329,42 @@ def start_hud(rt: Runtime, settings: Settings, host: str, port: int) -> asyncio.
     vm = HudViewModel(cloud_url=cloud_url, lan_url=lan_url)
     overlay = TvOverlay(vm, settings.hud_screen_index)
     overlay.show()
+
+    def toggle_qr() -> bool:
+        shown = vm.toggle_qr()
+        overlay.refresh()
+        return shown
+
+    async def reset_qr() -> ActionResult:
+        """New secret: old QR codes stop pairing (paired phones keep working)."""
+        store.rotate_secret()
+        if rt.cloud is not None:
+            await rt.cloud.reconnect()  # tell the relay the new secret
+        vm.show_qr()
+        overlay.refresh()
+        return ActionResult(True, "os")
+
+    async def qr_action(action: str) -> ActionResult:
+        if action == "hide":
+            vm.hide_qr()
+            overlay.refresh()
+            return ActionResult(True, "os")
+        if action == "reset":
+            return await reset_qr()
+        toggle_qr()
+        return ActionResult(True, "os")
+
+    rt.service.on_qr_toggle = toggle_qr
     if rt.deps is not None:
-        rt.deps.show_qr = vm.request_qr
+        rt.deps.qr_action = qr_action
+
+        def show_qr() -> None:
+            vm.show_qr()
+            overlay.refresh()
+
+        rt.deps.show_qr = show_qr
+    tray = QrTray(toggle_qr, reset_qr, lambda: QApplication.quit())
+    rt.tray = tray  # keep the tray icon alive for the life of the app
     controller = HudController(rt.service, vm, on_change=overlay.refresh)
     return asyncio.create_task(controller.run(), name="hud")
 

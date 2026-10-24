@@ -151,6 +151,13 @@ def create_app(
         service.revoke_device(device_id)
         return {"revoked": device_id}
 
+    @app.post("/api/qr/toggle")
+    async def toggle_qr(_: Local) -> dict[str, object]:
+        """Show or hide the pairing QR on the TV (second launch of the app, tray menu)."""
+        if service.on_qr_toggle is None:
+            raise HTTPException(status_code=409, detail="no TV overlay")
+        return {"shown": service.on_qr_toggle()}
+
     @app.get("/api/metrics")
     async def metrics(_: DeviceId) -> dict[str, object]:
         return telemetry.rollup()

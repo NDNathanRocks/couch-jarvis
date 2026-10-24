@@ -122,3 +122,18 @@ def test_scales_with_the_screen_height(qapp: QApplication) -> None:
     assert big is not None and small is not None
     assert small[0].width() < big[0].width()
     assert small[0].right() <= 1280 and small[0].bottom() <= 720
+
+
+def test_tray_icon_builds_and_its_actions_call_through() -> None:
+    from hud.tray import QrTray
+
+    QApplication.instance() or QApplication([])
+    calls: list[str] = []
+
+    async def reset() -> None:
+        calls.append("reset")
+
+    tray = QrTray(lambda: calls.append("toggle") or True, reset, lambda: calls.append("quit"))
+    tray._toggle_action.trigger()
+    tray._quit_action.trigger()
+    assert calls == ["toggle", "quit"]

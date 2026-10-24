@@ -184,6 +184,7 @@ class CommandService:
         self._cloud_devices: list[DevicePresence] = []
         self.revoked: set[str] = set()
         self.on_revoke: Callable[[str], None] = lambda _device_id: None
+        self.on_qr_toggle: Callable[[], bool] | None = None  # set when a TV overlay exists
         self._bg: set[asyncio.Task[None]] = set()
         self._poller: asyncio.Task[None] | None = None
 

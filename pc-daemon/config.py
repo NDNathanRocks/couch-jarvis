@@ -94,6 +94,7 @@ class Settings(BaseSettings):
     elevenlabs_api_key: SecretStr | None = None
     elevenlabs_monthly_chars: int = 9000  # stop before the free allowance runs out
     voice_file: Path = _roaming_app_dir() / "voice.json"
+    bookmarks_file: Path = _roaming_app_dir() / "bookmarks.json"
     browser_file: Path = _roaming_app_dir() / "browser.json"
     memory_file: Path = _roaming_app_dir() / "memory.json"  # the last few commands, PC only
     voice_cache_dir: Path = _local_app_dir() / "voice-cache"

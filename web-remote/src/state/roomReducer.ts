@@ -1,3 +1,4 @@
+import type { Bookmark } from "../contracts.gen";
 import type { DevicePresence, Incoming, NowPlaying, TimerInfo, VoicePrefs } from "../protocol";
 
 /**
@@ -23,6 +24,8 @@ export interface RoomSnapshot {
   voice: VoicePrefs;
   /** Browsing preferences, saved on the PC. */
   browser: { adblock: boolean };
+  /** Pages saved on the PC with "Save this page". */
+  bookmarks: Bookmark[];
   rev: number;
 }
 
@@ -107,6 +110,7 @@ export const emptyRoom: RoomSnapshot = {
   remote_input: true,
   voice: { enabled: true, style: "jarvis", voice: "british_male", buttons: false, engine: "none" },
   browser: { adblock: true },
+  bookmarks: [],
   rev: 0,
 };
 

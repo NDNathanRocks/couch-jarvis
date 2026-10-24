@@ -99,6 +99,11 @@ class FakeBrowser:
             return ActionResult(False, "dom", "no subtitles control found", "no_subtitle_control")
         return ActionResult(True, "dom")
 
+    async def open_saved(self, url: str) -> ActionResult:
+        self._log(f"open_saved:{url}")
+        self.snap = self.snap.model_copy(update={"url": url})
+        return ActionResult(True, "dom")
+
     async def click_text(self, text: str) -> ActionResult:
         self._log(f"click_text:{text}")
         if text.lower() not in self.visible_text:
