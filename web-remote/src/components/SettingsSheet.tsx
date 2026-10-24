@@ -32,6 +32,7 @@ const ENGINES: Record<VoicePrefs["engine"], string> = {
 
 interface Props {
   voice: VoicePrefs;
+  adblock: boolean;
   micMode: MicMode;
   disabled: boolean;
   /** Send a command to the TV (the same words you could say). */
@@ -41,7 +42,7 @@ interface Props {
   onClose: () => void;
 }
 
-export function SettingsSheet({ voice, micMode, disabled, onCommand, onMicMode, onUnpair, onClose }: Props) {
+export function SettingsSheet({ voice, adblock, micMode, disabled, onCommand, onMicMode, onUnpair, onClose }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     closeRef.current?.focus();
@@ -148,6 +149,25 @@ export function SettingsSheet({ voice, micMode, disabled, onCommand, onMicMode, 
               </div>
             </>
           )}
+        </section>
+
+        <section aria-labelledby="web-h" className="mt-6 space-y-3">
+          <div className="flex items-center gap-3 rounded-2xl bg-surface p-4 ring-1 ring-line">
+            <div className="min-w-0 flex-1">
+              <h3 id="web-h" className="text-[15px] font-semibold">
+                Block ads &amp; popups
+              </h3>
+              <p className="mt-0.5 text-xs text-muted">
+                Closes tabs that other websites open on their own. Links you pick from search results always open.
+              </p>
+            </div>
+            <Switch
+              label="Block ads and popups"
+              checked={adblock}
+              disabled={disabled}
+              onChange={(on) => onCommand(on ? "turn on ad blocking" : "turn off ad blocking")}
+            />
+          </div>
         </section>
 
         <section aria-labelledby="mic-h" className="mt-6 space-y-2">

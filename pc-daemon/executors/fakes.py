@@ -31,6 +31,7 @@ class FakeBrowser:
         self.items: list[str] = []  # clickable things "on the page", in DOM order
         self.wakes = 0  # times the player controls were woken (mouse wiggle)
         self.search_bar = True  # the page has a search bar
+        self.visible_text: set[str] = set()  # words click_text can find on the page
         self.subtitle_dom_fail = False  # no usable subtitles control in the DOM
         # failure scripting
         self.dom_fail_reason: str | None = None  # applies to click/fullscreen/close_ad dom tier
@@ -98,8 +99,18 @@ class FakeBrowser:
             return ActionResult(False, "dom", "no subtitles control found", "no_subtitle_control")
         return ActionResult(True, "dom")
 
+    async def click_text(self, text: str) -> ActionResult:
+        self._log(f"click_text:{text}")
+        if text.lower() not in self.visible_text:
+            return ActionResult(
+                False, "dom", f"I can't see '{text}' on the page.", "text_not_found"
+            )
+        return ActionResult(True, "dom")
+
     async def open_search_tab(self, query: str, engine: str = "bing") -> ActionResult:
-        self._log(f"open_search_tab:{query}" if engine == "bing" else f"open_search_tab:{engine}:{query}")
+        self._log(
+            f"open_search_tab:{query}" if engine == "bing" else f"open_search_tab:{engine}:{query}"
+        )
         self.snap = self.snap.model_copy(
             update={"url": f"https://www.bing.com/search?q={query}", "title": f"{query} - Search"}
         )

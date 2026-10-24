@@ -211,6 +211,31 @@ def _plan_page_actions(t: str) -> IntentPlan | None:
     return None
 
 
+_CLICK_NOT_TEXT = {"it", "that", "this", "there", "here", "screen", "the screen", "mouse", "button"}
+
+
+def _plan_click_text(t: str) -> IntentPlan | None:
+    """ "click on Season 1", "press Play", "tap the button that says Next": by what it says."""
+    q = chr(34) + chr(39) + chr(8220) + chr(8221)
+    m = re.fullmatch(
+        r"(?:click|press|tap|hit|select|choose|touch)(?: on)?(?: the)?"
+        r"(?: (?:button|link|option|tab|text|word|menu|dropdown|drop down))?"
+        r"(?: (?:that |which )?(?:says|reads|called|named|labeled|labelled|with))?"
+        rf"[ {q}]*(.+?)[ {q}]*"
+        r"(?: (?:on|in) (?:the|this) (?:screen|page|tv))?(?: (?:button|link|option|tab))?"
+        r"(?: please)?",
+        t,
+    )
+    if m is None:
+        return None
+    text = m.group(1).strip()
+    if text in _CLICK_NOT_TEXT or len(text) > 60:
+        return None
+    return _plan(
+        Intent.NAVIGATE, [ActionStep(op="click_text", args={"text": text})], {"text": text}
+    )
+
+
 _ENGINE_NAMES = {
     "google": "google", "bing": "bing", "duckduckgo": "duckduckgo",
     "edge": "bing", "the web": "bing", "the internet": "bing",
@@ -272,7 +297,7 @@ _AD = r"(?:ads?|ad ?block(?:ing|er)?|popups?|pop[- ]ups?|popup blocker|ad blocke
 
 
 def _plan_browser_prefs(t: str) -> IntentPlan | None:
-    """"turn off ad blocking" / "block ads" / "allow popups": the same switch the phone has."""
+    """ "turn off ad blocking" / "block ads" / "allow popups": the same switch the phone has."""
     blocker = r"(?:ad ?block(?:ing|er)?|pop[- ]?up blocker|pop[- ]?up blocking)"
     allow = r"(?:allow|let|stop blocking) (?:all )?(?:ads?|pop[- ]?ups?)(?: through)?"
     if re.fullmatch(rf"(?:turn off|switch off|disable|stop|deactivate) (?:the )?{blocker}", t) or (
@@ -415,6 +440,7 @@ def _plan_single(utterance: str) -> IntentPlan | None:
         or _plan_browser(t)
         or _plan_site(t)
         or _plan_page_actions(t)
+        or _plan_click_text(t)
     )
     if page is not None:
         return page

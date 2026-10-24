@@ -29,6 +29,8 @@ Ops and their args:
 - seek: {"delta_s": int}   (negative = rewind)
 - fullscreen: {}   close_ad: {}   close_tab: {}   sleep_display: {}   show_qr: {} (show the pairing QR on the TV)
 - timer_start: {"minutes": number, "label": string, "action": "pause"|"sleep_display"|"notify"}
+- click_text: {"text": "<the words on screen>"} click whatever says that, or choose it in a
+  dropdown ("click on Season 1", "press Next", "tap the Subscribe button"). Use the exact words.
 - vision_click: {"target": "<what to click, described visually>"}
 - click_selector: {"selector": "<css>", "description": "<what it is>"}
 - browser_nav: {"action": "back"|"forward"|"reload"|"new_tab"|"next_tab"|"prev_tab"|"scroll_up"|

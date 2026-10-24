@@ -26,7 +26,7 @@ from browser_prefs import BrowserPrefs
 from cloud_relay_client import CloudRelayClient
 from command_queue import CommandRequest
 from config import Settings, get_settings, init_dpi_awareness, resource_root
-from contracts import TimerInfo, VoiceState, new_id
+from contracts import BrowserState, TimerInfo, VoiceState, new_id
 from event_bus import EventBus
 from executors.base import Browser, OSController, Screen
 from executors.fakes import FakeBrowser, FakeOS, FakeScreen
@@ -113,9 +113,11 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
     stt: STTEngine | None = None
     room_store: RoomStore | None = None
 
+    def browser_prefs_changed(state: BrowserState) -> None:
+        service_ref[0].state.update(browser=state)
+
     prefs = BrowserPrefs(
-        None if dry_run else settings.browser_file,
-        on_change=lambda s: service_ref[0].state.update(browser=s),
+        None if dry_run else settings.browser_file, on_change=browser_prefs_changed
     )
     browser: Browser
     os_ctl: OSController
@@ -136,9 +138,7 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
             make_edge_launcher(settings.edge_path, settings.edge_profile_dir, settings.cdp_port),
             telemetry=telemetry,
         )
-        browser = EdgeCDP(
-            settings.cdp_url, ensure_edge=watchdog.ensure_edge, prefs=prefs
-        )
+        browser = EdgeCDP(settings.cdp_url, ensure_edge=watchdog.ensure_edge, prefs=prefs)
         os_ctl, screen = WindowsOS(), MssScreen()
         router, vlm = build_llms(settings)
         stt = build_stt_engine(settings, telemetry)

@@ -100,3 +100,17 @@ describe("suggestions", () => {
     expect(JSON.parse(localStorage.getItem("cj.recentCommands") ?? "[]")).toEqual(["go fullscreen"]);
   });
 });
+
+describe("ad blocking setting", () => {
+  it("shows the PC's choice and flips it with an ordinary command", async () => {
+    const sock = await openSettings();
+    const toggle = screen.getByRole("switch", { name: "Block ads and popups" });
+    expect(toggle).toBeChecked(); // on until the PC says otherwise
+    fireEvent.click(toggle);
+    expect(texts(sock)).toEqual(["turn off ad blocking"]);
+    await act(async () => sock.receive(incoming("state.patch", { browser: { adblock: false }, rev: 2 })));
+    expect(screen.getByRole("switch", { name: "Block ads and popups" })).not.toBeChecked();
+    fireEvent.click(screen.getByRole("switch", { name: "Block ads and popups" }));
+    expect(texts(sock)).toEqual(["turn off ad blocking", "turn on ad blocking"]);
+  });
+});

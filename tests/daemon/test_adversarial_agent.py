@@ -130,7 +130,7 @@ async def test_llm_can_navigate_to_youtube(env: AgentEnv) -> None:
 async def test_generic_clicks_are_refused_off_media_sites(env: AgentEnv) -> None:
     env.browser.snap = env.browser.snap.model_copy(update={"url": "https://mybank.example/pay"})
     env.router.replies = [plan({"op": "click_selector", "args": {"selector": "#transfer"}})]
-    result = await env.runner(max_attempts=0).run(text("click transfer", "c1"))
+    result = await env.runner(max_attempts=0).run(text("do the transfer", "c1"))
     assert not result.ok and not any(c.startswith("click_selector") for c in env.browser.calls)
     env.router.replies = [plan({"op": "vision_click", "args": {"target": "Confirm payment"}})]
     result = await env.runner(max_attempts=0).run(text("click it", "c2"))
@@ -139,7 +139,15 @@ async def test_generic_clicks_are_refused_off_media_sites(env: AgentEnv) -> None
 
 async def test_generic_clicks_work_on_media_sites(env: AgentEnv) -> None:
     env.router.replies = [plan({"op": "click_selector", "args": {"selector": ".ytp-play-button"}})]
-    assert (await env.runner().run(text("click play", "c3"))).ok
+    assert (await env.runner().run(text("do the thing", "c3"))).ok
+
+
+async def test_click_by_words_only_clicks_what_the_user_said(env: AgentEnv) -> None:
+    env.browser.snap = env.browser.snap.model_copy(update={"url": "https://mybank.example/pay"})
+    env.router.replies = [plan({"op": "click_text", "args": {"text": "Confirm payment"}})]
+    result = await env.runner(max_attempts=0).run(text("what is on this page", "c4"))
+    assert not result.ok and not any(c.startswith("click_text") for c in env.browser.calls)
+    assert env.os.clicks == [] and env.vlm.image_calls == 0
 
 
 async def test_hostile_page_title_cannot_break_out_of_the_prompt(env: AgentEnv) -> None:

@@ -14,9 +14,8 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 from urllib.parse import quote_plus, urlparse
 
-from browser_prefs import BrowserPrefs
-from executors.site_policy import is_search_page, opens_freely
 from agent.policy import url_allowed
+from browser_prefs import BrowserPrefs
 from executors.base import ActionResult, BrowserSnapshot, MediaCommand, Tier
 from executors.page_items import (
     ITEM_NOT_FOUND,
@@ -25,6 +24,7 @@ from executors.page_items import (
     Candidate,
     pick_item,
 )
+from executors.site_policy import is_search_page, opens_freely
 from executors.subtitles import language_names
 
 log = logging.getLogger(__name__)
@@ -349,6 +349,65 @@ def _source_for(url: str) -> str:
     return "other"
 
 
+# "click on Season 1": the best visible element showing exactly these words. Looks at the text a
+# person sees (own text, aria-label, title, button values, a <select>'s chosen option) and prefers
+# the smallest exact match, climbing to the nearest clickable parent. An option inside a <select>
+# comes back as {select, option} so the caller can choose it instead of clicking.
+JS_FIND_TEXT = r"""(want) => {
+  const norm = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const target = norm(want);
+  if (!target) return null;
+  const visible = (el) => {
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return false;
+    const st = getComputedStyle(el);
+    return st.visibility !== 'hidden' && st.display !== 'none' && Number(st.opacity) > 0.05;
+  };
+  const clickable = (el) => {
+    for (let n = el, up = 0; n && up < 4; n = n.parentElement, up++) {
+      const tag = n.tagName;
+      if (['A', 'BUTTON', 'SELECT', 'INPUT', 'SUMMARY', 'LABEL'].includes(tag)) return n;
+      if (n.getAttribute('role') && /button|tab|link|option|menuitem|combobox/.test(n.getAttribute('role'))) return n;
+      if (n.hasAttribute('onclick') || n.tabIndex >= 0 || getComputedStyle(n).cursor === 'pointer') return n;
+    }
+    return el;
+  };
+  const labels = (el) => {
+    const out = [];
+    const own = Array.from(el.childNodes).filter((c) => c.nodeType === 3).map((c) => c.textContent).join(' ');
+    out.push(own, el.getAttribute('aria-label'), el.getAttribute('title'), el.getAttribute('placeholder'));
+    if (el.tagName === 'INPUT' && ['button', 'submit'].includes(el.type)) out.push(el.value);
+    if (el.tagName === 'SELECT' && el.selectedOptions[0]) out.push(el.selectedOptions[0].textContent);
+    if (el.children.length === 0 || ['A', 'BUTTON', 'LI', 'SPAN', 'DIV', 'H1', 'H2', 'H3', 'LABEL'].includes(el.tagName)) {
+      if (el.innerText && el.innerText.length < 80) out.push(el.innerText);
+    }
+    return out.map(norm).filter(Boolean);
+  };
+  for (const sel of document.querySelectorAll('select')) {
+    for (const opt of sel.options) {
+      if (norm(opt.textContent) === target && visible(sel) && !(sel.selectedOptions[0] === opt)) {
+        return { kind: 'option', select: sel, value: opt.value };
+      }
+    }
+  }
+  let best = null;
+  let bestScore = 0;
+  for (const el of document.querySelectorAll('body *')) {
+    if (!visible(el)) continue;
+    for (const text of labels(el)) {
+      let score = 0;
+      if (text === target) score = 100;
+      else if (text.startsWith(target + ' ') || text.endsWith(' ' + target)) score = 40;
+      else if (text.includes(target) && text.length < target.length * 2.5) score = 20;
+      if (!score) continue;
+      const r = el.getBoundingClientRect();
+      score -= Math.min(30, (r.width * r.height) / 20000);
+      if (score > bestScore) { bestScore = score; best = el; }
+    }
+  }
+  return best ? { kind: 'element', el: clickable(best) } : null;
+}"""
+
 SEARCH_ENGINES = {
     "bing": "https://www.bing.com/search?q={q}",
     "google": "https://www.google.com/search?q={q}",
@@ -430,7 +489,7 @@ class EdgeCDP:
         Yields the list of URLs the site tried to send us to so the caller can tell the user.
         Request interception is deliberately not used: it stalls cross-origin player iframes.
         """
-        start, hijacks = page.url, []
+        start, hijacks = page.url, list[str]()
         if self._free_to_open(start):  # a search page, or ad blocking is off: let it open things
             yield hijacks
             return
@@ -557,6 +616,50 @@ class EdgeCDP:
                 except Exception:
                     continue
         return None
+
+    async def click_text(self, text: str) -> ActionResult:
+        """Click the thing on screen that says ``text`` (or pick it in a dropdown showing others)."""
+        script = (
+            "(w) => { window.__cjText = ("
+            + JS_FIND_TEXT
+            + ")(w); return window.__cjText && window.__cjText.kind; }"
+        )
+
+        async def run(page: Any) -> ActionResult:
+            for frame in page.frames:
+                try:
+                    kind = await frame.evaluate(script, text)
+                except Exception:
+                    continue  # a frame that navigated away while we looked
+                if not kind:
+                    continue
+                if kind == "option":
+                    select = (
+                        await frame.evaluate_handle("() => window.__cjText.select")
+                    ).as_element()
+                    value = await frame.evaluate("() => window.__cjText.value")
+                    if select is None:
+                        continue
+                    await select.select_option(value=value, timeout=3000)
+                    return ActionResult(True, "dom")
+                handle = (await frame.evaluate_handle("() => window.__cjText.el")).as_element()
+                if handle is None:
+                    continue
+                await handle.scroll_into_view_if_needed(timeout=3000)
+                async with self._hold_origin(page) as blocked:
+                    try:
+                        await handle.click(timeout=4000)
+                    except Exception:
+                        await handle.evaluate("(e) => e.click()")  # covered by an overlay
+                    await asyncio.sleep(0.8)
+                if blocked:
+                    return ActionResult(False, "dom", REDIRECT_BLOCKED, "off_site")
+                return ActionResult(True, "dom")
+            return ActionResult(
+                False, "dom", f"I can't see '{text}' on the page.", "text_not_found"
+            )
+
+        return await self._guard(run)
 
     async def open_search_tab(self, query: str, engine: str = "bing") -> ActionResult:
         """A question for the web: a fresh tab on the Edge/Bing results page (Copilot summarises)."""
@@ -796,9 +899,7 @@ class EdgeCDP:
         self._page_ref = page
         if id(page) not in self._hooked:
             self._hooked.add(id(page))
-            page.on(
-                "popup", lambda popup: asyncio.ensure_future(self._on_popup(page, popup))
-            )
+            page.on("popup", lambda popup: asyncio.ensure_future(self._on_popup(page, popup)))
             page.on("close", lambda _: self._hooked.discard(id(page)))
 
     def _adblock(self) -> bool:

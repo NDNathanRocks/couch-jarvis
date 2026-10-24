@@ -8,10 +8,12 @@ from typing import Any
 import pytest
 
 from agent.fastpath import plan_text
+from agent.graph import without_unrequested_clicks
+from agent.state import ActionStep, Intent, IntentPlan
 from browser_prefs import BrowserPrefs
+from command_queue import CommandRequest
 from executors.edge_cdp import EdgeCDP
 from support import make_env
-from command_queue import CommandRequest
 
 
 class FakePage:
@@ -59,7 +61,10 @@ async def test_third_party_popup_is_closed_while_blocking() -> None:
 
 async def test_same_site_tab_is_allowed_while_blocking() -> None:
     cdp = edge(True)
-    opener, popup = FakePage("https://stream.example.com/w/1"), FakePage("https://www.example.com/p")
+    opener, popup = (
+        FakePage("https://stream.example.com/w/1"),
+        FakePage("https://www.example.com/p"),
+    )
     await cdp._on_popup(opener, popup)
     assert not popup.closed
 
@@ -109,9 +114,6 @@ async def test_the_agent_flips_the_switch() -> None:
     assert env.deps.prefs.adblock is False
 
 
-from agent.graph import without_unrequested_clicks
-from agent.state import ActionStep, Intent, IntentPlan
-
 
 def _plan(*steps: ActionStep) -> IntentPlan:
     return IntentPlan(intent=Intent.MEDIA_PLAY, confidence=0.9, steps=list(steps))
@@ -149,4 +151,68 @@ def test_search_never_autoplays() -> None:
 def test_named_search_engines_open_a_results_tab(said: str, query: str, engine: str) -> None:
     plan = plan_text(said)
     assert plan is not None
-    assert [(s.op, s.args) for s in plan.steps] == [("web_search", {"query": query, "engine": engine})]
+    assert [(s.op, s.args) for s in plan.steps] == [
+        ("web_search", {"query": query, "engine": engine})
+    ]
+
+
+@pytest.mark.parametrize(
+    ("said", "text"),
+    [
+        ("click on season 1", "season 1"),
+        ("click on the season 1 on the screen", "season 1"),
+        ("press play", "play"),
+        ("tap the button that says Next Episode", "next episode"),
+        ("select the subscribe button", "subscribe"),
+        ('click on "Watch now"', "watch now"),
+    ],
+)
+def test_click_on_what_it_says(said: str, text: str) -> None:
+    plan = plan_text(said)
+    assert plan is not None
+    assert [(s.op, s.args) for s in plan.steps] == [("click_text", {"text": text})]
+
+
+@pytest.mark.parametrize("said", ["click it", "click on the first one", "click episode 5", "click"])
+def test_clicks_that_are_not_by_text(said: str) -> None:
+    plan = plan_text(said)
+    assert plan is None or all(s.op != "click_text" for s in plan.steps)
+
+
+async def test_click_text_uses_the_dom_then_the_screen() -> None:
+    env = make_env()
+    env.browser.visible_text.add("season 1")
+    ok = await env.runner().run(
+        CommandRequest(
+            command_id="a",
+            idempotency_key="a",
+            device_id="d",
+            kind="text",
+            text="click on season 1",
+        )
+    )
+    assert ok.ok and env.browser.calls[-1] == "click_text:season 1"
+
+
+async def test_click_text_falls_back_to_the_screen_on_any_site() -> None:
+    import json
+
+    env = make_env()
+    env.browser.snap = env.browser.snap.model_copy(update={"url": "https://example.com/"})
+    env.vlm.replies = [
+        json.dumps(
+            {"found": True, "mark_id": 5, "bbox_norm": [0.4, 0.4, 0.6, 0.6], "rationale": "x"}
+        )
+    ]
+    result = await env.runner().run(
+        CommandRequest(
+            command_id="b",
+            idempotency_key="b",
+            device_id="d",
+            kind="text",
+            text="click on season 1",
+        )
+    )
+    assert result.ok and result.tier_used == "vision"
+    assert env.os.clicks == [(960, 540)]
+    assert "season 1" in env.vlm.calls[-1][1]

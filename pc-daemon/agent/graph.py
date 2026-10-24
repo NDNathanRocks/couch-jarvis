@@ -22,7 +22,6 @@ from pydantic import ValidationError
 
 from agent.fastpath import plan_button, plan_text
 from agent.memory import ConversationMemory
-from browser_prefs import BrowserPrefs
 from agent.policy import (
     key_allowed,
     normalize_keys,
@@ -43,6 +42,7 @@ from agent.state import (
     StepOutcome,
     VerifyResult,
 )
+from browser_prefs import BrowserPrefs
 from command_queue import CommandRequest
 from contracts import AskPrompt, CmdResultPayload, Suggestion
 from executors.base import ActionResult, Browser, MediaKey, OSController
@@ -60,7 +60,14 @@ log = logging.getLogger(__name__)
 
 ProgressFn = Callable[[str, str, str, str], None]  # command_id, node, status, detail
 
-VISION_ELIGIBLE = {"click_selector", "fullscreen", "close_ad", "vision_click", "subtitles"}
+VISION_ELIGIBLE = {
+    "click_text",
+    "click_selector",
+    "fullscreen",
+    "close_ad",
+    "vision_click",
+    "subtitles",
+}
 BROWSER_MEDIA = {"play", "pause", "play_pause", "next", "prev"}
 OS_FALLBACK_KEYS: dict[str, MediaKey] = {"play_pause": "play_pause", "next": "next", "prev": "prev"}
 FAIL_MESSAGE = "Sorry, that did not work. Try again."
@@ -82,7 +89,7 @@ _SEARCHING = re.compile(r"^(?:search|look up|find|google)\b", re.I)
 
 
 def without_unrequested_clicks(plan: IntentPlan, utterance: str) -> IntentPlan:
-    """"Search for X" types it in, presses Enter and waits: the user picks the result.
+    """ "Search for X" types it in, presses Enter and waits: the user picks the result.
 
     The router sometimes tacks on a click on the first result or sets play=true; drop that
     unless the user actually asked to open or play something."""
@@ -100,6 +107,13 @@ def without_unrequested_clicks(plan: IntentPlan, utterance: str) -> IntentPlan:
 
 _NEVER_MIND = re.compile(r"^(?:never ?mind|forget it|cancel(?: that)?|no thanks?|nothing)$", re.I)
 _FORGET = re.compile(r"^(?:forget (?:that|everything|all of that)|clear (?:your )?memory)$", re.I)
+
+
+def user_said(text: str, utterance: str) -> bool:
+    """A click by words is only trusted when the user actually said those words, so a page (or a
+    confused model) can never make us click something the user did not name."""
+    words = re.findall(r"[a-z0-9]+", text.lower())
+    return bool(words) and " ".join(words) in " ".join(re.findall(r"[a-z0-9]+", utterance.lower()))
 
 
 def split_reply(plan: IntentPlan) -> tuple[IntentPlan, str | None, dict[str, Any] | None]:
@@ -395,6 +409,11 @@ def build_graph(deps: AgentDeps) -> Any:
             return await deps.fullscreener.dom_js_tiers(op)
         if op == "close_tab":
             return await deps.browser.close_tab()
+        if op == "click_text":
+            wanted = str(a.get("text", "")).strip()
+            if not user_said(wanted, utterance):
+                return ActionResult(False, "dom", "I only click on words you say", "blocked")
+            return await deps.browser.click_text(wanted)
         if op == "web_search":
             return await deps.browser.open_search_tab(
                 str(a.get("query", "")).strip(), str(a.get("engine", "bing"))
@@ -439,7 +458,9 @@ def build_graph(deps: AgentDeps) -> Any:
             return deps.voice.apply(a)
         if op == "browser_pref":
             if deps.prefs is None:
-                return ActionResult(False, "os", "Browser settings are not set up here", "unsupported")
+                return ActionResult(
+                    False, "os", "Browser settings are not set up here", "unsupported"
+                )
             return ActionResult(True, "os", deps.prefs.apply(a))
         if op == "show_qr":
             deps.show_qr()
@@ -597,11 +618,16 @@ def build_graph(deps: AgentDeps) -> Any:
                     "status": "failed",
                     "final_message": NO_SUBTITLES,
                 }
-        elif not on_media_site((await deps.browser.snapshot()).url):
+        elif not (
+            step.op == "click_text" and user_said(str(step.args.get("text", "")), state.utterance)
+        ) and not on_media_site((await deps.browser.snapshot()).url):
             res = ActionResult(False, "vision", "clicks are only allowed on media sites", "blocked")
         else:
             target = str(
-                step.args.get("target")
+                f"the text '{step.args['text']}'"
+                if step.op == "click_text"
+                else None
+                or step.args.get("target")
                 or step.args.get("description")
                 or step.args.get("selector", "")
             )

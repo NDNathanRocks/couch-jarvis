@@ -197,6 +197,7 @@ export default function App() {
       {settingsOpen && (
         <SettingsSheet
           voice={view.room.voice}
+          adblock={view.room.browser.adblock}
           micMode={micMode}
           disabled={!connected}
           onCommand={sendCommand}

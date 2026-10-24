@@ -21,6 +21,8 @@ export interface RoomSnapshot {
   remote_input: boolean;
   /** Spoken replies, saved on the PC so every phone shows the same choice. */
   voice: VoicePrefs;
+  /** Browsing preferences, saved on the PC. */
+  browser: { adblock: boolean };
   rev: number;
 }
 
@@ -104,6 +106,7 @@ export const emptyRoom: RoomSnapshot = {
   devices: [],
   remote_input: true,
   voice: { enabled: true, style: "jarvis", voice: "british_male", buttons: false, engine: "none" },
+  browser: { adblock: true },
   rev: 0,
 };
 
@@ -156,7 +159,12 @@ export function mergePatch(target: unknown, patch: unknown): unknown {
 
 export function normalizeRoom(partial: Partial<RoomSnapshot>): RoomSnapshot {
   // `voice` is nested: an older PC sends none, a newer one may send only the fields that changed
-  return { ...emptyRoom, ...partial, voice: { ...emptyRoom.voice, ...partial.voice } };
+  return {
+    ...emptyRoom,
+    ...partial,
+    voice: { ...emptyRoom.voice, ...partial.voice },
+    browser: { ...emptyRoom.browser, ...partial.browser },
+  };
 }
 
 function omit<T>(record: Record<string, T>, key: string): Record<string, T> {
