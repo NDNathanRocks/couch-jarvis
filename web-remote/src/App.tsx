@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ConnectionBadge } from "./components/ConnectionBadge";
 import { FriendsBar } from "./components/FriendsBar";
 import { CommandBar } from "./components/CommandBar";
@@ -9,6 +9,7 @@ import { NowPlayingCard } from "./components/NowPlayingCard";
 import { QRScanner, readPairParams, stripPairParams } from "./components/QRScanner";
 import { QuickDeck } from "./components/QuickDeck";
 import { SettingsSheet } from "./components/SettingsSheet";
+import { QuestionCard } from "./components/QuestionCard";
 import { Suggestions } from "./components/Suggestions";
 import { TimerList } from "./components/TimerList";
 import { Toasts } from "./components/Toasts";
@@ -22,6 +23,9 @@ import { loadRecents, rememberCommand } from "./utils/recents";
 import type { Pairing } from "./utils/storage";
 
 type Tab = "remote" | "touchpad";
+
+/** How long the mic stays open for the answer to a spoken question. */
+const ASK_LISTEN_MS = 8000;
 
 export default function App() {
   const endpoint = useMemo(
@@ -71,6 +75,26 @@ export default function App() {
     if (sent) setRecents(rememberCommand(text));
     return sent;
   };
+
+  // A spoken command that ended in a question: let the answer be spoken too. Wait for the TV to
+  // finish asking, or the mic would hear the question, and stop listening if nothing is said.
+  const askId = view.ask?.listen ? view.ask.id : null;
+  const askLength = view.ask?.question.length ?? 0;
+  const voiceRef = useRef(voice);
+  voiceRef.current = voice;
+  useEffect(() => {
+    if (askId === null) return;
+    const open = setTimeout(() => {
+      if (voiceRef.current.supported && !voiceRef.current.active) voiceRef.current.toggle();
+    }, 1500 + askLength * 70);
+    const close = setTimeout(() => {
+      if (voiceRef.current.active) voiceRef.current.toggle(); // sends what was said
+    }, 1500 + askLength * 70 + ASK_LISTEN_MS);
+    return () => {
+      clearTimeout(open);
+      clearTimeout(close);
+    };
+  }, [askId, askLength]);
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col gap-5 px-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-[calc(env(safe-area-inset-top)+1rem)]">
@@ -126,6 +150,18 @@ export default function App() {
 
           {tab === "remote" && (
             <>
+              {view.ask && (
+                <QuestionCard
+                  ask={view.ask}
+                  disabled={!connected}
+                  listening={voice.active}
+                  onAnswer={(choice) => {
+                    actions.dismissAsk();
+                    sendCommand(choice);
+                  }}
+                  onDismiss={actions.dismissAsk}
+                />
+              )}
               <NowPlayingCard playing={view.room.now_playing} pending={progress} />
               {!view.room.now_playing && <Suggestions disabled={!connected} recents={recents} onSend={sendCommand} />}
               <QuickDeck

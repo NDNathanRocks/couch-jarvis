@@ -186,6 +186,20 @@ export type Type12 = "agent.progress";
 export type V12 = 1;
 export type From13 = string;
 export type Id13 = string;
+/**
+ * @maxItems 6
+ */
+export type Choices =
+  | []
+  | [string]
+  | [string, string]
+  | [string, string, string]
+  | [string, string, string, string]
+  | [string, string, string, string, string]
+  | [string, string, string, string, string, string];
+export type ExpiresS = number;
+export type Listen = boolean;
+export type Question = string;
 export type CommandId7 = string;
 export type Detail1 = string;
 export type Heard = string;
@@ -516,6 +530,7 @@ export interface CmdResult {
   v?: V13;
 }
 export interface CmdResultPayload {
+  ask?: AskPrompt | null;
   command_id: CommandId7;
   detail?: Detail1;
   heard?: Heard;
@@ -524,6 +539,15 @@ export interface CmdResultPayload {
   ok: Ok;
   suggest?: Suggestion | null;
   tier_used?: TierUsed;
+}
+/**
+ * A question the assistant needs answered before it can act; the phone shows it as a card.
+ */
+export interface AskPrompt {
+  choices?: Choices;
+  expires_s?: ExpiresS;
+  listen?: Listen;
+  question: Question;
 }
 /**
  * A one-tap follow-up offered with a failed result: the phone sends ``text`` as a command.

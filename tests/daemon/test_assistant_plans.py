@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from agent.fastpath import plan_text
 from agent.state import ActionStep, Intent, IntentPlan
 
 
@@ -19,9 +20,6 @@ def test_ask_must_be_last_and_unique() -> None:
         IntentPlan(intent=Intent.UNKNOWN, confidence=0.9, steps=steps("ask", "say"))
     with pytest.raises(ValidationError):
         IntentPlan(intent=Intent.UNKNOWN, confidence=0.9, steps=steps("ask", "ask"))
-
-
-from agent.fastpath import plan_text
 
 
 @pytest.mark.parametrize(

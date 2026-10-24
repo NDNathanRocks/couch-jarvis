@@ -43,8 +43,20 @@ export interface Toast {
   suggest?: { label: string; text: string };
 }
 
+/** A question from the assistant, waiting for the next thing this phone says or taps. */
+export interface AskCard {
+  id: string;
+  question: string;
+  choices: string[];
+  /** Open the mic by itself: only after a spoken command. */
+  listen: boolean;
+  expiresAt: number;
+}
+
 export interface RoomView {
   connection: Connection;
+  /** The assistant's open question for this phone, if any. */
+  ask: AskCard | null;
   /** The last snapshot/patches from the PC. */
   room: RoomSnapshot;
   hasSnapshot: boolean;
@@ -72,6 +84,7 @@ export type RoomAction =
   | { type: "msg"; msg: Incoming }
   | { type: "toast"; toast: Toast }
   | { type: "dismiss"; id: string }
+  | { type: "dismiss_ask" }
   | { type: "synced" }
   | { type: "reset" };
 
@@ -96,6 +109,7 @@ export const emptyRoom: RoomSnapshot = {
 
 export const initialView: RoomView = {
   connection: "idle",
+  ask: null,
   room: emptyRoom,
   hasSnapshot: false,
   relayPcOnline: null,
@@ -187,6 +201,8 @@ export function roomReducer(view: RoomView, action: RoomAction): RoomView {
     }
     case "toast":
       return { ...view, toasts: pushToast(view.toasts, action.toast) };
+    case "dismiss_ask":
+      return { ...view, ask: null };
     case "dismiss":
       return { ...view, toasts: view.toasts.filter((t) => t.id !== action.id) };
     case "synced":
@@ -275,15 +291,26 @@ function reduceMessage(view: RoomView, msg: Incoming): RoomView {
       return mine ? withLog(next, { id: msg.id, at: msgTime(msg), level: "error", text, detail: `rejected: ${msg.payload.reason ?? "unknown"}` }) : next;
     }
     case "cmd.result": {
-      const { command_id, ok, message, heard, detail, tier_used, latency_ms, suggest } = msg.payload;
+      const { command_id, ok, message, heard, detail, tier_used, latency_ms, suggest, ask } = msg.payload;
       const mine = command_id in view.pending;
       const pending = omit(view.pending, command_id);
       const pendingAt = omit(view.pendingAt, command_id);
+      const card: AskCard | null =
+        mine && ask
+          ? {
+              id: msg.id,
+              question: ask.question,
+              choices: ask.choices ?? [],
+              listen: ask.listen ?? false,
+              expiresAt: msgTime(msg) + (ask.expires_s ?? 60) * 1000,
+            }
+          : null;
       const next = {
         ...view,
         pending,
         pendingAt,
-        toasts: pushToast(view.toasts, {
+        ask: mine ? card : view.ask, // my next result closes my open question
+        toasts: card ? view.toasts : pushToast(view.toasts, {
           id: msg.id,
           kind: ok ? "ok" : "error",
           text: message,

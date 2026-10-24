@@ -259,7 +259,7 @@ def build_graph(deps: AgentDeps) -> Any:
                 context += "\n" + recent
             if pending is not None:
                 context += (
-                    f'\n<pending_question>{sanitize_untrusted(pending.question, 200)}'
+                    f"\n<pending_question>{sanitize_untrusted(pending.question, 200)}"
                     f"</pending_question>"
                 )
         user = router_user_prompt(state.utterance, context)
@@ -315,7 +315,7 @@ def build_graph(deps: AgentDeps) -> Any:
         ask: dict[str, Any] | None = None
         if plan is not None:
             plan, reply, ask = split_reply(plan)
-        if reply or ask:  # the assistant is talking: no confidence gate, and maybe no actions
+        if plan is not None and (reply or ask):  # the assistant is talking: no confidence gate
             words = reply or (ask or {}).get("question") or ""
             update: dict[str, Any] = {"plan": plan, "reply": reply, "ask": ask}
             if not plan.steps:

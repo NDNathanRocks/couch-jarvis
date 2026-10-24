@@ -16,7 +16,9 @@ class Clock:
 
 def plan(op: str = "navigate", **args: str | bool) -> IntentPlan:
     return IntentPlan(
-        intent=Intent.MEDIA_PLAY, confidence=0.9, steps=[ActionStep(op=op, args=args)]  # type: ignore[arg-type]
+        intent=Intent.MEDIA_PLAY,
+        confidence=0.9,
+        steps=[ActionStep(op=op, args=args)],  # type: ignore[arg-type]
     )
 
 

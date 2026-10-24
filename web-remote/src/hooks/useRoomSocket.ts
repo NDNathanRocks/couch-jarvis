@@ -33,6 +33,7 @@ export interface RoomActions {
   sendTyped(text: string): boolean;
   unpair(): Promise<void>;
   dismiss(toastId: string): void;
+  dismissAsk(): void;
   notify(text: string): void;
   clearLog(): void;
 }
@@ -99,6 +100,7 @@ export function useRoomSocket(options: RoomSocketOptions): { view: RoomView; act
         await connection.current?.unpair();
       },
       dismiss: (id) => dispatch({ type: "dismiss", id }),
+      dismissAsk: () => dispatch({ type: "dismiss_ask" }),
       notify: (text) => dispatch({ type: "toast", toast: { id: uuid(), kind: "info", text, mine: true } }),
       clearLog: () => dispatch({ type: "clear_log" }),
     }),

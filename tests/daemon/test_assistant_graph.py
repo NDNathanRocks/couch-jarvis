@@ -27,7 +27,13 @@ def env_with_memory() -> AgentEnv:
 
 def plan_json(*steps: dict, intent: str = "unknown", confidence: float = 0.9) -> str:
     return json.dumps(
-        {"intent": intent, "confidence": confidence, "slots": {}, "steps": list(steps), "source": "llm"}
+        {
+            "intent": intent,
+            "confidence": confidence,
+            "slots": {},
+            "steps": list(steps),
+            "source": "llm",
+        }
     )
 
 
@@ -41,7 +47,9 @@ async def test_world_question_opens_a_search_tab_without_the_llm() -> None:
 
 async def test_say_answers_about_the_screen_and_runs_no_actions() -> None:
     env = env_with_memory()
-    env.router.replies.append(plan_json({"op": "say", "args": {"text": "Season one, episode three."}}))
+    env.router.replies.append(
+        plan_json({"op": "say", "args": {"text": "Season one, episode three."}})
+    )
     result = await env.runner().run(request("which episode is it", "voice"))
     assert result.ok and result.message == "Season one, episode three."
     assert result.ask is None and env.browser.calls == []
@@ -76,7 +84,11 @@ async def test_the_next_utterance_is_routed_with_the_pending_question() -> None:
     await env.runner().run(request("play something by ariana grande", "voice"))
     env.router.replies.append(
         plan_json(
-            {"op": "navigate", "args": {"query": "7 rings", "source": "ytmusic", "play": True}, "expect": "video_playing"},
+            {
+                "op": "navigate",
+                "args": {"query": "7 rings", "source": "ytmusic", "play": True},
+                "expect": "video_playing",
+            },
             intent="media.play",
         )
     )
@@ -102,14 +114,22 @@ async def test_recent_actions_reach_the_router_for_retry_on_a_new_tab() -> None:
     env.router.replies.append(
         plan_json(
             {"op": "browser_nav", "args": {"action": "new_tab"}},
-            {"op": "navigate", "args": {"query": "lofi beats", "source": "youtube", "play": True}, "expect": "video_playing"},
+            {
+                "op": "navigate",
+                "args": {"query": "lofi beats", "source": "youtube", "play": True},
+                "expect": "video_playing",
+            },
             intent="media.play",
         )
     )
     result = await env.runner().run(request("retry that but in a new tab", "voice"))
     prompt = env.router.calls[-1][1]
     assert "<recent_actions>" in prompt and "play lofi beats on youtube" in prompt
-    assert result.ok and "new_tab" in "".join(env.browser.calls) or any("new_tab" in c for c in env.browser.calls)
+    assert (
+        result.ok
+        and "new_tab" in "".join(env.browser.calls)
+        or any("new_tab" in c for c in env.browser.calls)
+    )
 
 
 async def test_forget_that_clears_memory() -> None:

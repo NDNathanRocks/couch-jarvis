@@ -83,7 +83,8 @@ class ConversationMemory:
         lines = []
         for t in turns:
             steps = ", ".join(
-                f"{op}({json.dumps(a, separators=(',', ':'))})" for op, a in zip(t.ops, t.args)
+                f"{op}({json.dumps(a, separators=(',', ':'))})"
+                for op, a in zip(t.ops, t.args, strict=True)
             )
             title = f' page="{sanitize_untrusted(t.page_title, 60)}"' if t.page_title else ""
             lines.append(

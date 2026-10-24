@@ -21,6 +21,7 @@ from pathlib import Path
 import uvicorn
 
 from agent.graph import AgentDeps, AgentRunner
+from agent.memory import ConversationMemory
 from cloud_relay_client import CloudRelayClient
 from command_queue import CommandRequest
 from config import Settings, get_settings, init_dpi_awareness, resource_root
@@ -43,7 +44,6 @@ from stt_engine import STTEngine, build_stt_engine
 from telemetry import Telemetry
 from timers import TimerService
 from voice import VoicePrefsStore, VoiceService
-from agent.memory import ConversationMemory
 from watchdog import EdgeWatchdog, make_edge_launcher, make_http_probe
 
 log = logging.getLogger("couch-jarvis")
