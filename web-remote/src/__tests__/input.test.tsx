@@ -110,6 +110,20 @@ describe("KeyPad", () => {
     expect(SHORTCUTS.find((s) => s.label === "Prev tab")).toMatchObject({ key: "tab", mods: ["ctrl", "shift"] });
   });
 
+  it("has F1-F12 and a one-tap F11 full screen", () => {
+    const onKey = vi.fn();
+    render(<KeyPad onKey={onKey} onText={vi.fn()} disabled={false} />);
+    for (let n = 1; n <= 12; n++) {
+      expect(screen.getByRole("button", { name: `Key f${n}` })).toHaveTextContent(`F${n}`);
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Key f11" }));
+    fireEvent.click(screen.getByRole("button", { name: "Full screen (F11)" }));
+    expect(onKey.mock.calls).toEqual([
+      ["f11", []],
+      ["f11", []],
+    ]);
+  });
+
   it("modifiers latch for one key, then release", () => {
     const onKey = vi.fn();
     render(<KeyPad onKey={onKey} onText={vi.fn()} disabled={false} />);

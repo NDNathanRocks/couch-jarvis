@@ -16,7 +16,7 @@ class OllamaClient:
         model: str,
         *,
         client: httpx.AsyncClient | None = None,
-        timeout_s: float = 20.0,
+        timeout_s: float = 90.0,
     ) -> None:
         self._url = base_url.rstrip("/") + "/api/chat"
         self._model = model
@@ -30,6 +30,7 @@ class OllamaClient:
             "model": self._model,
             "stream": False,
             "format": "json",
+            "keep_alive": "30m",  # keep the model loaded between commands: the first load is slow
             "options": {"temperature": 0},
             "messages": [{"role": "system", "content": system}, message],
         }
@@ -37,8 +38,15 @@ class OllamaClient:
             resp = await self._client.post(self._url, json=body)
             resp.raise_for_status()
             data = resp.json()
-        except (httpx.HTTPError, ValueError) as exc:
-            raise LLMError(f"ollama request failed: {type(exc).__name__}") from exc
+        except httpx.HTTPStatusError as exc:
+            kind = "model_missing" if exc.response.status_code == 404 else "unavailable"
+            raise LLMError(f"ollama request failed: HTTP {exc.response.status_code}", kind) from exc
+        except httpx.TimeoutException as exc:
+            raise LLMError("ollama request timed out", "timeout") from exc
+        except httpx.HTTPError as exc:
+            raise LLMError(f"ollama request failed: {type(exc).__name__}", "unavailable") from exc
+        except ValueError as exc:
+            raise LLMError("ollama returned unreadable JSON", "bad_reply") from exc
         return LLMReply(
             text=str(data.get("message", {}).get("content", "")),
             system="ollama",

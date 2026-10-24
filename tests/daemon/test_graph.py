@@ -86,7 +86,7 @@ async def test_cross_origin_iframe_falls_back_to_vision(env: AgentEnv) -> None:
     ]
     result = await env.runner().run(text("fullscreen"))
     assert result.ok and result.tier_used == "vision"
-    assert env.browser.calls == ["fullscreen_dom", "fullscreen_js"]
+    assert env.browser.calls == ["fullscreen_dom", "fullscreen_js", "settle_fullscreen"]
     assert env.os.clicks == [(960, 540)]  # center of the grounded box on a 1920x1080 screen
     assert env.vlm.image_calls == 1
     tiers = [s["attributes"].get("cj.tier") for s in spans(env, "executor.step")]
@@ -178,7 +178,7 @@ async def test_unknown_intent_is_a_polite_failure(env: AgentEnv) -> None:
 async def test_llm_outage_is_reported(env: AgentEnv) -> None:
     env.router.replies = [LLMError("down")]
     result = await env.runner().run(text("play something nice"))
-    assert not result.ok and "offline" in result.message
+    assert not result.ok and "Set up AI brain" in result.message
 
 
 async def test_hard_timeout_ceiling(env: AgentEnv) -> None:

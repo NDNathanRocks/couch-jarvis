@@ -11,7 +11,7 @@ HIT = json.dumps({"found": True, "bbox_norm": [0.9, 0.9, 1.0, 1.0], "mark_id": 9
 async def test_tier1_dom_success_short_circuits(env: AgentEnv) -> None:
     result = await env.fullscreener.run("fullscreen")
     assert result.ok and result.tier == "dom"
-    assert env.browser.calls == ["fullscreen_dom"]
+    assert env.browser.calls == ["fullscreen_dom", "settle_fullscreen"]
     assert env.vlm.image_calls == 0
 
 
@@ -20,7 +20,7 @@ async def test_tier2_js_runs_only_after_dom_fails(env: AgentEnv) -> None:
     env.browser.js_ok = True
     result = await env.fullscreener.run("fullscreen")
     assert result.ok and result.tier == "js"
-    assert env.browser.calls == ["fullscreen_dom", "fullscreen_js"]
+    assert env.browser.calls == ["fullscreen_dom", "fullscreen_js", "settle_fullscreen"]
     assert env.vlm.image_calls == 0 and env.os.clicks == []
 
 
@@ -29,7 +29,7 @@ async def test_tier3_vision_runs_last_in_order(env: AgentEnv) -> None:
     env.vlm.replies = [HIT]
     result = await env.fullscreener.run("fullscreen")
     assert result.ok and result.tier == "vision"
-    assert env.browser.calls == ["fullscreen_dom", "fullscreen_js"]
+    assert env.browser.calls == ["fullscreen_dom", "fullscreen_js", "settle_fullscreen"]
     assert env.vlm.image_calls == 1 and len(env.os.clicks) == 1
     tiers = [
         r["attributes"]["cj.tier"] for r in env.telemetry.recent() if r["name"] == "executor.step"
@@ -46,7 +46,7 @@ async def test_failed_tiers_report_the_root_cause(env: AgentEnv) -> None:
 async def test_already_satisfied_does_nothing(env: AgentEnv) -> None:
     env.browser.snap = env.browser.snap.model_copy(update={"is_fullscreen": True})
     result = await env.fullscreener.run("fullscreen")
-    assert result.ok and env.browser.calls == []
+    assert result.ok and env.browser.calls == ["settle_fullscreen"]
 
 
 async def test_success_claim_without_effect_escalates(env: AgentEnv) -> None:

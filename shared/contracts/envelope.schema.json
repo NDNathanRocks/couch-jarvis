@@ -1128,7 +1128,7 @@
       "additionalProperties": false,
       "properties": {
         "key": {
-          "pattern": "^(?:[a-z0-9=\\-]|enter|backspace|delete|tab|esc|space|left|right|up|down|home|end|pageup|pagedown|f5|f6|f11)$",
+          "pattern": "^(?:[a-z0-9=\\-]|enter|backspace|delete|tab|esc|space|left|right|up|down|home|end|pageup|pagedown|f[1-9]|f1[0-2])$",
           "title": "Key",
           "type": "string"
         },

@@ -73,7 +73,19 @@ class VideoFullscreener:
                 span.set_error(result.error or "failed")
             return result
 
+    async def _settle(self, op: Op, result: ActionResult) -> ActionResult:
+        """Fullscreen is not done until the Edge window itself is fullscreen and the pointer is
+        out of the way: a tab strip left on screen means getting up to press F11."""
+        if op == "fullscreen" and result.ok:
+            spot = await self._browser.settle_fullscreen()
+            if spot is not None:
+                await self._os.move_to(*spot)
+        return result
+
     async def dom_js_tiers(self, op: Op) -> ActionResult:
+        return await self._settle(op, await self._dom_js(op))
+
+    async def _dom_js(self, op: Op) -> ActionResult:
         """Tiers 1 and 2. A failure carries the DOM-tier (root cause) fallback reason."""
         if _satisfied(op, await self._browser.snapshot()):
             return ActionResult(True, "dom", observed={"already": True})
@@ -91,6 +103,9 @@ class VideoFullscreener:
         )
 
     async def vision_tier(self, op: Op) -> ActionResult:
+        return await self._settle(op, await self._vision(op))
+
+    async def _vision(self, op: Op) -> ActionResult:
         """Tier 3: ground the control visually and click it with PyAutoGUI."""
 
         async def act() -> ActionResult:

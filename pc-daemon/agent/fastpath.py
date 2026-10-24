@@ -319,7 +319,7 @@ def _bookmark(**args: str | bool) -> IntentPlan:
 
 
 def _plan_bookmarks(t: str) -> IntentPlan | None:
-    """"save this page", "open my bookmark netflix", "remove the bookmark for bbc"."""
+    """ "save this page", "open my bookmark netflix", "remove the bookmark for bbc"."""
     this = r"(?:this|the current|the open)(?: page| site| tab| link| website)?"
     mine = rf"(?:my |the )?{_SAVED}(?: pages| list)?"
     if re.fullmatch(rf"(?:save|bookmark|favou?rite|pin|keep) {this}(?: for later)?", t):
@@ -386,7 +386,9 @@ def plan_text(utterance: str) -> IntentPlan | None:
     A request made of several recognized commands ("open a new tab and play X on youtube music")
     becomes ONE plan whose steps run in order."""
     if _SEARCH_THEN_PICK.match(normalize(utterance)):
-        return None  # "search X and play a song with Y": needs a look at the results, so ask the LLM
+        return (
+            None  # "search X and play a song with Y": needs a look at the results, so ask the LLM
+        )
     return _plan_single(utterance) or _plan_web_question(utterance) or _plan_compound(utterance)
 
 
@@ -470,11 +472,43 @@ def merge_plans(plans: list[IntentPlan]) -> IntentPlan | None:
     )
 
 
+_KEY_NAMES = {
+    "escape": "esc", "esc": "esc", "enter": "enter", "return": "enter", "tab": "tab",
+    "space": "space", "spacebar": "space", "space bar": "space", "backspace": "backspace",
+    "delete": "delete", "home": "home", "end": "end", "page up": "pageup", "page down": "pagedown",
+    "left": "left", "right": "right", "up": "up", "down": "down",
+    "left arrow": "left", "right arrow": "right", "up arrow": "up", "down arrow": "down",
+}  # fmt: skip
+_MOD_NAMES = {"control": "ctrl", "ctrl": "ctrl", "alt": "alt", "shift": "shift"}
+_KEY_WORD = "|".join(sorted((re.escape(k) for k in _KEY_NAMES), key=len, reverse=True))
+_MOD_WORD = "|".join(_MOD_NAMES)
+_ONE_KEY = rf"(?:f ?(?:1[0-2]|[1-9])|{_KEY_WORD}|[a-z0-9])"
+_PRESS = re.compile(
+    rf"(?:press|hit|tap|push|send)(?: the)?"
+    rf"((?: (?:{_MOD_WORD})(?: key)?(?: and| plus|\+)?)*) ?({_ONE_KEY})(?: key| button)?"
+)
+
+
+def _plan_keypress(t: str) -> IntentPlan | None:
+    """ "press F11", "hit escape", "press control L", "press alt left": a key chord, as said."""
+    m = _PRESS.fullmatch(t)
+    if m is None:
+        return None
+    mods = [_MOD_NAMES[w] for w in re.findall(_MOD_WORD, m.group(1))]
+    name = m.group(2).replace("f ", "f")  # "f 11" is how it hears "F11"
+    key = _KEY_NAMES.get(name, name)
+    args: dict[str, str | int | float | bool] = {"key": key}
+    if mods:
+        args["mods"] = "+".join(dict.fromkeys(mods))
+    return _plan(Intent.SYSTEM, [ActionStep(op="press_key", args=args)])
+
+
 def _plan_single(utterance: str) -> IntentPlan | None:
     t = normalize(utterance)
 
     page = (
         _plan_voice(t)
+        or _plan_keypress(t)
         or _plan_bookmarks(t)
         or _plan_browser_prefs(t)
         or _plan_subtitles(t)

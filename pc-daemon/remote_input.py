@@ -24,6 +24,7 @@ _DENIED: frozenset[tuple[frozenset[str], str]] = frozenset(
         (frozenset({"ctrl", "shift"}), "esc"),  # task manager
         (frozenset({"ctrl"}), "esc"),  # start menu
         (frozenset({"alt"}), "esc"),
+        (frozenset({"alt"}), "f4"),  # closes the window
         (frozenset({"ctrl", "shift"}), "delete"),  # clear browsing data
         (frozenset({"ctrl", "shift"}), "backspace"),
     }

@@ -52,6 +52,7 @@ StepOp = Literal[
     "qr_control",
     "bookmark",
     "choose",
+    "press_key",
 ]
 
 Tier = Literal["dom", "js", "vision", "os"]

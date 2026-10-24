@@ -9,8 +9,8 @@ Time needed: about 10 minutes, plus a few more the first time voice is used (it 
 |---|---|
 | **The TV PC** | Windows 10 or 11 (64-bit) with **Microsoft Edge** (it's built into Windows) and an internet connection |
 | **A phone** | Any phone with a camera and a browser (Chrome, Safari, Samsung Internet...) |
-| **Optional: an NVIDIA GPU** | Makes voice recognition fast. Without one it still works, just slower, or use a free Groq key (below) |
-| **Optional: Ollama** | Lets it understand free-form requests like "put on the one with the cat". Basic commands work without it |
+| **Optional: an NVIDIA GPU** | Makes voice recognition fast. Without one it uses a smaller speech model automatically, or use a free Groq key (below) |
+| **The AI brain** | Understands free-form requests like "put on the one with the cat". Either a **free Gemini key** (fast, no download) or a **local model** the installer can download for you (2-8 GB). Basic commands work without either |
 | **Disk space** | About 2 GB for the app, plus the speech model (0.5-1.5 GB, downloaded on first voice use) |
 
 ## Option A: the installer (recommended)
@@ -53,16 +53,19 @@ Tip: add the page to your phone's home screen (Share -> Add to Home Screen) so i
   installer does **not** bundle them (about 1 GB), so out of the box it quietly uses the **CPU** instead, which is slower but
   works; the log says "GPU speech failed ... using the CPU". Running from source, `uv pip install -r requirements-gpu.txt`
   adds them and the GPU is used automatically.
-- *No GPU, or the PC is slow?* In your settings file (below) set `CJ_STT_MODEL=small`, or get a free key from
+- *No GPU, or the PC is slow?* The app picks the `small` speech model by itself without an NVIDIA GPU (and `large-v3-turbo` with one). You can force a size with `CJ_STT_MODEL=base` in your settings file (below), or get a free key from
   [console.groq.com](https://console.groq.com) and set `CJ_GROQ_API_KEY=gsk_...` to do voice in the cloud.
 
 **Free-form commands.** "pause", "volume to 30", "new tab", "play episode 5", "search for ..." work immediately. For anything
-else the app needs an AI model:
+else the app needs an AI model ("the brain"). Without one you will hear *"My brain is not set up on this PC yet"*.
 
-- *Local:* install [Ollama](https://ollama.com), then in a terminal run `ollama pull qwen2.5:7b` and
-  `ollama pull qwen2.5vl:7b` (the second one lets it find buttons by looking at the screen).
-- *Cloud (no download):* get a free key at [aistudio.google.com](https://aistudio.google.com) and set
-  `CJ_ROUTER_PROVIDER=gemini` and `CJ_GEMINI_API_KEY=...`.
+- *Cloud, fastest (recommended):* get a free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) and paste it
+  into the installer's "AI brain" page, or add `CJ_GEMINI_API_KEY=...` to your settings file. Nothing to download.
+- *Local, private, works offline:* tick **Download the local AI brain now** on the last page of the installer, or run
+  **Set up AI brain** from the Start menu any time. It installs [Ollama](https://ollama.com) and downloads `qwen2.5:7b`
+  (NVIDIA GPU) or the smaller `qwen2.5:3b` (no GPU), plus `qwen2.5vl:7b` for finding buttons on screen when there is a GPU.
+  Without a GPU, local answers take several seconds: a Gemini key is much faster.
+- With both, the key is used first and the local model is the fallback. Couch Jarvis starts Ollama and loads the model for you at startup.
 
 ## Your settings file
 
@@ -95,8 +98,10 @@ Tap **Log** at the top of the phone app first: it shows what the PC heard and wh
 | The phone stays on **Connecting...** | Open the link in Chrome to rule out a Safari quirk; check the PC has internet; look at `daemon.log` for `cloud relay: up` |
 | **"Recording was incomplete"** | Update both the PC app and the cloud relay to the latest version |
 | Voice says it couldn't hear you | The Log shows `heard:`. Allow the mic in the phone browser. First use downloads the model, so wait. Try `CJ_STT_DEVICE=cpu` or a Groq key |
-| It misunderstands a command | The Log shows what it heard. Free-form commands need Ollama or a Gemini key |
-| Fullscreen doesn't work | Tap it twice (ad pages swallow the first click). The Log shows what failed |
+| **"My brain is not set up"** / **"missing its model"** | Run **Set up AI brain** from the Start menu, or add a Gemini key (see *Free-form commands* above) |
+| **"My brain took too long"** | The local model is slow on a CPU. Add a Gemini key, or use a smaller model: `CJ_OLLAMA_TEXT_MODEL=qwen2.5:1.5b` |
+| It misunderstands a command | The Log shows what it heard. Free-form commands need the AI brain (above) |
+| Fullscreen doesn't work | Tap it twice (ad pages swallow the first click). The Log shows what failed. If Edge's tab strip still shows, use **Touchpad & keys -> F11** or say "press F11" |
 | Edge doesn't open / commands do nothing | Close every Edge window and restart Couch Jarvis; it owns the TV browser on debug port 9222 |
 | I want to remove someone's access | On the PC: `curl.exe http://127.0.0.1:8765/api/devices` lists phones; `curl.exe -X POST http://127.0.0.1:8765/api/devices/<id>/revoke` removes one. Or delete `%APPDATA%\CouchJarvis\room.json` and restart: that makes a new room and QR, and every phone has to pair again |
 | Touchpad / keyboard tab is missing | `CJ_REMOTE_INPUT=false` is set on the PC, or the phone isn't connected |

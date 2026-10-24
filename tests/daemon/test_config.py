@@ -11,7 +11,7 @@ def test_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     s = Settings(_env_file=None)
     assert s.cdp_port == 9222
     assert s.lan_port == 8765
-    assert s.stt_device == "cuda"
+    assert s.stt_device == "auto"
     assert s.cdp_url == "http://127.0.0.1:9222"
     assert not s.lan_tls_enabled
 

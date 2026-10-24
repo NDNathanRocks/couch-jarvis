@@ -168,6 +168,16 @@ class WindowsOS:
 
         return await self._run(do_click)
 
+    async def move_to(self, x: int, y: int) -> ActionResult:
+        def move() -> ActionResult:
+            import pyautogui
+
+            pyautogui.FAILSAFE = False
+            pyautogui.moveTo(x, y)
+            return ActionResult(True, "os")
+
+        return await self._run(move)
+
     async def key_combo(self, *keys: str) -> ActionResult:
         if not key_allowed("+".join(keys)):  # second line of defense behind the agent policy
             return ActionResult(False, "os", "key combination is not allowed")

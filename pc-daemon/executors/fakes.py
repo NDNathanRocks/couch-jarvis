@@ -38,6 +38,7 @@ class FakeBrowser:
         self.js_ok = False
         self.search_ok = True
         self.playing_after_search = True
+        self.park_spot: tuple[int, int] | None = (960, 800)
         self.fail_verify_times = 0  # number of play commands that do not take effect
 
     def _log(self, name: str) -> None:
@@ -93,6 +94,10 @@ class FakeBrowser:
 
     async def wake_controls(self) -> None:
         self.wakes += 1
+
+    async def settle_fullscreen(self) -> tuple[int, int] | None:
+        self._log("settle_fullscreen")
+        return self.park_spot
 
     async def set_subtitles(self, state: str, lang: str) -> ActionResult:
         self._log(f"subtitles:{state}:{lang}")
@@ -223,6 +228,7 @@ class FakeOS:
         self.volume = 50
         self.muted = False
         self.clicks: list[tuple[int, int]] = []
+        self.parked: list[tuple[int, int]] = []
         self.keys: list[str] = []
         self.pointer_log: list[tuple[object, ...]] = []
         self.pressed: list[tuple[str, tuple[str, ...]]] = []
@@ -255,6 +261,10 @@ class FakeOS:
 
     async def key_combo(self, *keys: str) -> ActionResult:
         self.keys.append("+".join(keys))
+        return ActionResult(True, "os")
+
+    async def move_to(self, x: int, y: int) -> ActionResult:
+        self.parked.append((x, y))
         return ActionResult(True, "os")
 
     async def move_rel(self, dx: int, dy: int) -> ActionResult:

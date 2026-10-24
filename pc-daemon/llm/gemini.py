@@ -38,26 +38,30 @@ class GeminiClient:
         }
         headers = {"x-goog-api-key": self._api_key}
         url = f"{_BASE}/{self._model}:generateContent"
-        last = "no attempts made"
+        last, kind = "no attempts made", "unavailable"
         for attempt in range(self._max_attempts):
             try:
                 resp = await self._client.post(url, json=body, headers=headers)
             except httpx.HTTPError as exc:
                 last = f"network error: {type(exc).__name__}"
+                kind = "timeout" if isinstance(exc, httpx.TimeoutException) else "unavailable"
             else:
                 if resp.status_code == 200:
                     return self._parse(resp.json())
                 last = f"HTTP {resp.status_code}"
+                kind = {429: "rate_limited", 401: "bad_key", 403: "bad_key"}.get(
+                    resp.status_code, "unavailable"
+                )
                 if resp.status_code not in (429, 500, 502, 503, 504):
                     break
             await self._sleep(min(1.0 * 2**attempt, 8.0))
-        raise LLMError(f"gemini request failed: {last}")
+        raise LLMError(f"gemini request failed: {last}", kind)
 
     def _parse(self, data: dict[str, Any]) -> LLMReply:
         try:
             text = data["candidates"][0]["content"]["parts"][0]["text"]
         except (KeyError, IndexError, TypeError) as exc:
-            raise LLMError("gemini returned no candidate text") from exc
+            raise LLMError("gemini returned no candidate text", "bad_reply") from exc
         usage = data.get("usageMetadata", {})
         return LLMReply(
             text=str(text),

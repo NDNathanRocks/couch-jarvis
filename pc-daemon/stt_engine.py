@@ -15,6 +15,7 @@ from typing import Any, Protocol
 import httpx
 
 from config import Settings
+from hardware import speech_model
 from telemetry import Telemetry
 
 log = logging.getLogger(__name__)
@@ -103,7 +104,12 @@ class FasterWhisperTranscriber:
         if device == "cuda":
             register_cuda_dll_dirs()
         compute_type = "int8_float16" if device == "cuda" else "int8"
-        model = WhisperModel(self._model_name, device=device, compute_type=compute_type)
+        name = speech_model(
+            self._model_name, device
+        )  # "auto" picks a size the device can keep up with
+        threads = 0 if device == "cuda" else max(4, (os.cpu_count() or 4) - 2)
+        log.info("loading speech model %s on %s", name, device)
+        model = WhisperModel(name, device=device, compute_type=compute_type, cpu_threads=threads)
         self._active_device = device
         return model
 

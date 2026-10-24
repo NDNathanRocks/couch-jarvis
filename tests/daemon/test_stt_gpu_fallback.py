@@ -24,7 +24,9 @@ class FakeFasterWhisper:
         outer = self
 
         class WhisperModel:
-            def __init__(self, name: str, device: str, compute_type: str) -> None:
+            def __init__(
+                self, name: str, device: str, compute_type: str, cpu_threads: int = 0
+            ) -> None:
                 if device == outer.fail_load_on:
                     raise RuntimeError(f"cannot load on {device}")
                 outer.built.append(device)

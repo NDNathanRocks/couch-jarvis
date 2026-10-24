@@ -88,7 +88,8 @@ $defaults = @(
     "CJ_PWA_BASE_URL=$PwaUrl"
     '# Speech-to-text: auto uses an NVIDIA GPU when there is one, otherwise the CPU.'
     'CJ_STT_DEVICE=auto'
-    '# CJ_STT_MODEL=small          lighter model for PCs without a GPU (default: large-v3-turbo)'
+    '# CJ_STT_MODEL=small          speech model (default: auto = large-v3-turbo on a GPU, small on a CPU)'
+    '# CJ_GEMINI_API_KEY=...      free key from aistudio.google.com/apikey: fast cloud understanding of commands'
     '# CJ_GROQ_API_KEY=gsk_...     free-tier cloud speech-to-text (no GPU needed)'
     '# CJ_REMOTE_INPUT=true        false = phones cannot move the mouse or type'
 )

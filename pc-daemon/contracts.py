@@ -48,7 +48,7 @@ Modifier = Literal["ctrl", "alt", "shift"]
 # One printable key or a named key. Dangerous ones (F4, Win, ...) are simply not expressible.
 REMOTE_KEY_PATTERN = (
     r"^(?:[a-z0-9=\-]|enter|backspace|delete|tab|esc|space|left|right|up|down|home|end"
-    r"|pageup|pagedown|f5|f6|f11)$"
+    r"|pageup|pagedown|f[1-9]|f1[0-2])$"
 )
 
 

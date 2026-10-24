@@ -114,7 +114,6 @@ async def test_the_agent_flips_the_switch() -> None:
     assert env.deps.prefs.adblock is False
 
 
-
 def _plan(*steps: ActionStep) -> IntentPlan:
     return IntentPlan(intent=Intent.MEDIA_PLAY, confidence=0.9, steps=list(steps))
 

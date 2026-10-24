@@ -53,7 +53,8 @@ from executors.page_items import NO_SEARCH_BAR, NO_SUBTITLES
 from executors.subtitles import SubtitleController, language_name
 from executors.video_fullscreener import VideoFullscreener
 from executors.vision_grounding import VisionGrounder
-from llm.base import LLMError, TextLLM
+from llm.base import LLMError, TextLLM, brain_message
+from remote_input import key_combo_allowed
 from telemetry import AttrValue, Span, Telemetry, new_trace_id
 from timers import TimerService
 from voice import VoiceService, pref_message
@@ -173,6 +174,7 @@ class AgentDeps:
     subtitle_lang: str = "en"  # default language for "turn on subtitles"
     voice: VoiceService | None = None  # spoken replies; None = silent (tests, no speakers)
     bookmarks: BookmarkStore | None = None  # saved pages
+    remote_input: bool = True  # spoken key presses follow CJ_REMOTE_INPUT like the phone keyboard
     prefs: BrowserPrefs | None = None  # ad blocking etc.
     memory: ConversationMemory | None = None  # last few turns + a question awaiting an answer
     show_qr: Callable[[], None] = lambda: None  # set by main when a HUD exists
@@ -194,6 +196,9 @@ def success_message(plan: IntentPlan) -> str:
     for step in plan.steps:
         if step.op == "voice_pref":
             return pref_message(step.args)
+        if step.op == "press_key":
+            mods = str(step.args.get("mods", "")).replace("+", " ")
+            return f"Pressed {(mods + ' ' + str(step.args.get('key', ''))).strip().upper()}"
         if step.op == "choose":
             return f"Playing {plan.slots.get('query', 'your pick')}"
         if step.op == "bookmark":
@@ -341,6 +346,8 @@ def build_graph(deps: AgentDeps) -> Any:
             try:
                 plan = IntentPlan.model_validate(json.loads(extract_json(reply.text)))
                 plan = plan.model_copy(update={"source": "llm"})
+                if any(step.op == "press_key" for step in plan.steps):
+                    raise ValueError("press_key is only for the user's own key commands")
                 return without_unrequested_clicks(
                     with_requested_new_tab(plan, state.utterance), state.utterance
                 )
@@ -372,7 +379,7 @@ def build_graph(deps: AgentDeps) -> Any:
                 plan = await route_with_llm(state, span)
             except LLMError as exc:
                 span.set_error(exc)
-                return {"status": "failed", "final_message": "My brain is offline right now."}
+                return {"status": "failed", "final_message": brain_message(exc)}
         span.set_attribute("cj.intent", plan.intent.value if plan else "unknown")
         span.set_attribute("cj.intent_source", plan.source if plan else "llm")
         if deps.memory is not None:
@@ -416,8 +423,12 @@ def build_graph(deps: AgentDeps) -> Any:
         try:
             reply = await deps.router.complete(CHOOSER_SYSTEM, chooser_user_prompt(goal, listing))
             picked = json.loads(extract_json(reply.text)).get("index")
-        except (LLMError, ValueError):
-            return ActionResult(False, "dom", "I could not decide which result to open", "unsupported")
+        except LLMError as exc:
+            return ActionResult(False, "dom", brain_message(exc), "unsupported")
+        except ValueError:
+            return ActionResult(
+                False, "dom", "I could not decide which result to open", "unsupported"
+            )
         if not isinstance(picked, int) or not any(c.index == picked for c in items):
             return ActionResult(False, "dom", "None of the results look right", "item_not_found")
         return await deps.browser.click_item(index=picked)
@@ -544,6 +555,14 @@ def build_graph(deps: AgentDeps) -> Any:
                     False, "dom", "clicks are only allowed on media sites", "blocked"
                 )
             return await deps.browser.click_selector(str(a["selector"]), step.timeout_ms)
+        if op == "press_key":  # "press F11": the user's own words, never model output
+            if not deps.remote_input:
+                return ActionResult(False, "os", "key presses are turned off on this PC", "blocked")
+            key = str(a.get("key", "")).lower()
+            mods = tuple(m for m in str(a.get("mods", "")).split("+") if m)
+            if not key_combo_allowed(key, mods):
+                return ActionResult(False, "os", "that key is not allowed", "blocked")
+            return await deps.os_ctl.press_key(key, mods)
         if op == "key":
             keys = normalize_keys(str(a.get("keys", "")))
             if not key_allowed(keys):  # never let model output press arbitrary OS shortcuts

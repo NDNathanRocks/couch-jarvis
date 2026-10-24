@@ -67,17 +67,45 @@ class Runtime:
 
 
 def build_llms(settings: Settings) -> tuple[TextLLM, VisionLLM]:
+    """Text router and screen-reading model, preferred provider first, the other as fallback."""
+    from hardware import text_model
+    from llm.fallback import FallbackLLM
     from llm.gemini import GeminiClient
     from llm.ollama import OllamaClient
 
-    vlm = OllamaClient(settings.ollama_url, settings.ollama_vlm_model, timeout_s=40.0)
-    if settings.router_provider == "gemini" and settings.gemini_api_key is not None:
-        gemini = GeminiClient(settings.gemini_api_key.get_secret_value())
-        return gemini, gemini
-    text = OllamaClient(settings.ollama_url, settings.ollama_text_model)
-    if settings.gemini_api_key is not None:  # free-tier cloud VLM when local VRAM is tight
-        return text, GeminiClient(settings.gemini_api_key.get_secret_value())
-    return text, vlm
+    local_text = OllamaClient(settings.ollama_url, text_model(settings.ollama_text_model))
+    local_vlm = OllamaClient(settings.ollama_url, settings.ollama_vlm_model, timeout_s=90.0)
+    if settings.gemini_api_key is None:
+        return local_text, local_vlm
+    cloud = GeminiClient(settings.gemini_api_key.get_secret_value())
+    if (
+        settings.router_provider == "ollama"
+    ):  # local first, the cloud key only for the screen reader
+        return local_text, FallbackLLM([cloud, local_vlm])
+    return FallbackLLM([cloud, local_text]), FallbackLLM([cloud, local_vlm])
+
+
+async def prepare_brain(settings: Settings) -> None:
+    """Make the local model ready in the background and say plainly if it cannot be."""
+    from brain import prepare_ollama
+    from hardware import text_model
+
+    try:
+        status = await prepare_ollama(settings.ollama_url, text_model(settings.ollama_text_model))
+    except Exception:  # a warm-up must never take the daemon down
+        log.warning("brain warm-up failed", exc_info=True)
+        return
+    if status.usable:
+        log.info("brain ready: %s", status.detail)
+    elif settings.gemini_api_key is not None:
+        log.info("local brain unavailable (%s); using the Gemini key", status.state)
+    else:
+        log.warning(
+            "brain %s (%s): free-form commands will not work until you run Set up AI brain "
+            "or add CJ_GEMINI_API_KEY",
+            status.state,
+            status.detail,
+        )
 
 
 def build_voice(settings: Settings, *, on_change: Callable[[VoiceState], None]) -> VoiceService:
@@ -122,6 +150,7 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
     prefs = BrowserPrefs(
         None if dry_run else settings.browser_file, on_change=browser_prefs_changed
     )
+
     def bookmarks_changed(items: list[Bookmark]) -> None:
         service_ref[0].state.update(bookmarks=items)
 
@@ -158,6 +187,7 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
     fullscreener = VideoFullscreener(browser, grounder, os_ctl, telemetry)
     deps = AgentDeps(router, browser, os_ctl, fullscreener, grounder, telemetry)
     deps.prefs = prefs
+    deps.remote_input = settings.remote_input
     deps.bookmarks = bookmarks
     deps.memory = ConversationMemory(None if dry_run else settings.memory_file)
     deps.subtitles = SubtitleController(browser, grounder, os_ctl)
@@ -204,9 +234,7 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
         remote_input=settings.remote_input,
     )
     service_ref.append(service)
-    service.state.update(
-        voice=deps.voice.state, browser=prefs.state, bookmarks=bookmarks.items()
-    )
+    service.state.update(voice=deps.voice.state, browser=prefs.state, bookmarks=bookmarks.items())
     return Runtime(service, telemetry, watchdog, room_id, room_store, bus, deps, stt)
 
 
@@ -266,6 +294,8 @@ async def amain(args: argparse.Namespace) -> None:
 
     await rt.service.start()
     background: list[asyncio.Task[None]] = []
+    if not args.dry_run:  # start/preload the local model now, not during your first command
+        background.append(asyncio.create_task(prepare_brain(settings), name="brain-warm-up"))
     if rt.stt is not None:  # load the speech model now, not during your first voice command
         background.append(asyncio.create_task(rt.stt.warm_up(), name="stt-warm-up"))
     if args.hud and rt.room_store is not None:

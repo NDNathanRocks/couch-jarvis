@@ -44,6 +44,14 @@ function pick(code) { window.sub = code; document.getElementById('menu').style.d
 
 PAGES: dict[str, bytes] = {
     "/heartive-player": HEARTIVE_PLAYER,
+    # The menu stays open after a pick (as on the real site) until Esc or a click on the video.
+    "/sticky-menu": HEARTIVE_PLAYER.replace(
+        b"function pick(code) { window.sub = code; document.getElementById('menu').style.display = 'none'; }",
+        b"function pick(code) { window.sub = code; }"
+        b"const closeMenu = () => { document.getElementById('menu').style.display = 'none'; };"
+        b"document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });"
+        b"document.getElementById('v').addEventListener('click', () => { window.videoClicks = (window.videoClicks||0)+1; closeMenu(); });",
+    ),
     "/in-iframe": b'<!doctype html><title>show</title><iframe src="/heartive-player" width="700" height="420"></iframe>',
     "/youtube": b"""<!doctype html><title>x - YouTube</title>
 <div id="movie_player"><video id="v" width="320" height="180"></video>
@@ -132,6 +140,14 @@ async def test_custom_player_menu_picks_the_language(
     result = await cdp.set_subtitles("on", lang)
     assert result.ok, result.error
     assert await player_state(page) == expected
+
+
+async def test_the_language_menu_is_closed_after_picking(cdp: EdgeCDP, site: str) -> None:
+    page = await open_page(cdp, site, "/sticky-menu")
+    result = await cdp.set_subtitles("on", "en")
+    assert result.ok, result.error
+    assert await player_state(page) == "en"
+    assert await player_state(page, "document.getElementById('menu').style.display") == "none"
 
 
 async def test_off_picks_the_off_entry(cdp: EdgeCDP, site: str) -> None:

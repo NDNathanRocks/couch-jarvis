@@ -29,9 +29,13 @@ const KEYS: readonly Key[] = [
   { key: "end", label: "End" },
   { key: "pageup", label: "PgUp" },
   { key: "pagedown", label: "PgDn" },
-  { key: "f5", label: "F5" },
-  { key: "f11", label: "F11" },
 ];
+
+/** F1-F12. F11 is the browser's own full screen: it hides the tab strip that fullscreen can leave. */
+const FUNCTION_KEYS: readonly Key[] = Array.from({ length: 12 }, (_, i) => ({
+  key: `f${i + 1}`,
+  label: `F${i + 1}`,
+}));
 
 const ARROWS: readonly Key[] = [
   { key: "left", label: "←" },
@@ -60,6 +64,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { label: "Zoom out", key: "-", mods: ["ctrl"] },
   { label: "Reset zoom", key: "0", mods: ["ctrl"] },
   { label: "Switch window", key: "tab", mods: ["alt"] },
+  { label: "Full screen (F11)", key: "f11", mods: [] },
 ];
 
 const SENTINEL = "​"; // so Backspace always has something to delete on a phone keyboard
@@ -176,6 +181,14 @@ export function KeyPad({ onKey, onText, disabled }: Props) {
           </button>
         ))}
         {KEYS.map((k) => (
+          <button key={k.key} type="button" disabled={disabled} aria-label={`Key ${k.key}`} onClick={() => press(k.key)} className={keyButton}>
+            {k.label}
+          </button>
+        ))}
+      </div>
+
+      <div role="group" aria-label="Function keys" className="grid grid-cols-6 gap-2">
+        {FUNCTION_KEYS.map((k) => (
           <button key={k.key} type="button" disabled={disabled} aria-label={`Key ${k.key}`} onClick={() => press(k.key)} className={keyButton}>
             {k.label}
           </button>

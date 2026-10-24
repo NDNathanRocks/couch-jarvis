@@ -246,6 +246,17 @@ JS_MENU_ENTRY = """(names) => {
   return null;
 }"""
 
+JS_VIDEO_PAUSED = """() => {
+  const v = document.querySelector('video');
+  return v ? (v.paused ? 'paused' : 'playing') : null;
+}"""
+JS_SET_PAUSED = """(wantPaused) => {
+  const v = document.querySelector('video');
+  if (!v || v.paused === wantPaused) return false;
+  if (wantPaused) v.pause(); else v.play();
+  return true;
+}"""
+
 # Page search: any visible, editable search field; icons that reveal one.
 SEARCH_INPUTS = ", ".join(
     [
@@ -750,9 +761,20 @@ class EdgeCDP:
                     await button.click(timeout=2500)
             if want and names[0] != "english":  # English is what YouTube picks for most viewers
                 await self._pick_in_menu(page, ".ytp-settings-button", "subtitles", names)
+                await self._close_youtube_menu(page)
             return True
         except Exception:
             return False
+
+    async def _close_youtube_menu(self, page: Any) -> None:
+        """YouTube keeps its settings popup open after a pick on some layouts."""
+        try:
+            await asyncio.sleep(0.3)
+            menu = page.locator(".ytp-settings-menu").first
+            if await menu.is_visible():
+                await page.locator(".ytp-settings-button").first.click(timeout=1500)
+        except Exception:
+            log.debug("youtube settings menu was already closed", exc_info=True)
 
     async def _pick_in_menu(self, page: Any, opener: str, section: str, names: list[str]) -> None:
         """Best effort: settings gear -> the section ("Subtitles/CC") -> the language entry."""
@@ -764,6 +786,29 @@ class EdgeCDP:
             ".ytp-menuitem", has_text=re.compile(rf"^\s*{re.escape(names[0])}", re.I)
         )
         await entry.first.click(timeout=2000)
+
+    async def _close_subtitle_menu(
+        self, page: Any, frame: Any, wanted: list[str], was: Any
+    ) -> None:
+        """Leave the video on screen, not the language list: if the menu is still open, close it
+        (Esc, unless that would also leave fullscreen; else a click on the video) and put the
+        video back as it was playing or paused."""
+        try:
+            for attempt in range(2):
+                await asyncio.sleep(0.5)
+                still_open = (await frame.evaluate_handle(JS_MENU_ENTRY, wanted)).as_element()
+                if still_open is None:
+                    break
+                fullscreen = bool(await page.evaluate("() => !!document.fullscreenElement"))
+                if attempt == 0 and not fullscreen:
+                    await page.keyboard.press("Escape")
+                else:
+                    box = await page.evaluate(JS_PLAYER_BOX)
+                    await page.mouse.click(box["x"] + box["w"] / 2, box["y"] + box["h"] / 3)
+            if was in ("paused", "playing"):  # a click on the video may have toggled playback
+                await _first_in_frames(page, JS_SET_PAUSED, was == "paused")
+        except Exception:
+            log.warning("could not close the subtitle menu", exc_info=True)
 
     async def _generic_subtitles(self, page: Any, state: str, names: list[str]) -> bool:
         control, frame = None, None
@@ -801,8 +846,10 @@ class EdgeCDP:
             await asyncio.sleep(0.5)
             entry = (await frame.evaluate_handle(JS_MENU_ENTRY, wanted)).as_element()
         if entry is not None:  # the control opened a menu: choose the language (or "Off")
+            was = await _first_in_frames(page, JS_VIDEO_PAUSED)
             async with self._hold_origin(page):
                 await _click_itself(entry)
+            await self._close_subtitle_menu(page, frame, wanted, was)
             return True
         # No menu: only a plain toggle button can have done it, and then the button changes
         # (class or aria state). A control that did nothing is a failure, not a success.
@@ -820,6 +867,36 @@ class EdgeCDP:
             await asyncio.sleep(0.2)
         except Exception:
             log.warning("wake_controls failed", exc_info=True)
+
+    async def settle_fullscreen(self) -> tuple[int, int] | None:
+        """After the page went fullscreen, make the Edge *window* fullscreen too (that is what
+        hides the tab strip and address bar) and say where the pointer can rest out of the way:
+        Edge slides its toolbar back in when the real pointer sits near the top edge."""
+        try:
+            page = await self._page()
+            session = await page.context.new_cdp_session(page)
+            try:
+                win = await session.send("Browser.getWindowForTarget")
+                bounds = win.get("bounds", {})
+                if bounds.get("windowState") != "fullscreen":
+                    await session.send(
+                        "Browser.setWindowBounds",
+                        {"windowId": win["windowId"], "bounds": {"windowState": "fullscreen"}},
+                    )
+                    await asyncio.sleep(0.4)
+                    win = await session.send("Browser.getWindowForTarget")
+                    bounds = win.get("bounds", {})
+            finally:
+                await session.detach()
+            width, height = int(bounds.get("width", 0)), int(bounds.get("height", 0))
+            if width <= 0 or height <= 0:
+                return None
+            return int(bounds.get("left", 0)) + width // 2, int(
+                bounds.get("top", 0)
+            ) + height * 4 // 5
+        except Exception:
+            log.warning("settle_fullscreen failed", exc_info=True)
+            return None
 
     async def click_selector(self, selector: str, timeout_ms: int) -> ActionResult:
         async def click(page: Any) -> ActionResult:

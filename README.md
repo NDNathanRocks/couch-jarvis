@@ -14,48 +14,60 @@ can scan the same QR and get their own remote.
 ### Talk to it
 
 Tap the round **mic** in the bar at the bottom, say a command, then tap **Tap to send** (or **Cancel**). Or type in
-the same bar. Prefer press-and-hold? Switch with the small "Mic mode" link at the bottom of the Remote tab. Commands
-that don't need any thinking are matched instantly; anything else goes to the AI router (needs Ollama or a Gemini key,
-see [Settings](#settings)).
+the same bar. Prefer press-and-hold? Switch with the small "Mic mode" link at the bottom of the Remote tab. Simple
+commands are matched instantly; anything else goes to the **AI brain**: a free Gemini key (fast) or a local model
+(`Set up AI brain` in the Start menu), see [Settings](#settings).
+
+**Playback and volume**
 
 | You say | What happens |
 |---|---|
 | "pause" / "stop" / "play" / "resume" | Pause or resume the video |
 | "next" / "skip" / "previous" | Next or previous track/video |
-| "skip ahead" / "skip ahead 30 seconds" / "rewind" / "rewind 20 seconds" | Seek (default 10 s) |
+| "skip ahead 30 seconds" / "rewind 20 seconds" | Seek (default 10 s) |
 | "volume up" / "louder" / "volume down" / "quieter" | Volume steps |
 | "volume to 30" / "mute" / "unmute" | Exact volume, mute state |
-| "fullscreen" | Fullscreen the player (works on YouTube and on most embedded players) |
+| "fullscreen" | Fullscreen the player **and the Edge window**, so no tab strip is left on the TV |
 | "skip the ad" | Skip or close a video ad |
-| "new tab" / "close this tab" | Open or close a tab |
-| "next tab" / "previous tab" | Switch tabs |
-| "go back" / "go forward" / "previous page" | Browser history |
-| "reload" / "refresh the page" | Reload the page |
-| "scroll down" / "scroll up a bit" | Scroll the page |
-| "search big bang theory" | Types it into the **search bar of the page you're on** and submits it. If the page has no search bar, you get a one-tap prompt: **Open a new tab and search YouTube** / Not now |
-| "search for bruno mars on YouTube" / "search uptown funk on YouTube Music" | Shows **YouTube's search results and waits**, so you choose |
-| "turn on subtitles" / "subtitles off" / "spanish subtitles" / "captions in german" | Turns subtitles on or off. **English by default** (`CJ_SUBTITLE_LANG`). Works on YouTube and on custom players such as Heartive's, including ones inside an iframe; players with unlabelled icons are found by looking at the screen |
+| "turn on subtitles" / "subtitles off" / "spanish subtitles" | Turns subtitles on or off (**English by default**, `CJ_SUBTITLE_LANG`) and closes the language menu so the video carries on. Works on YouTube and custom players, including ones in an iframe |
+
+**Finding things**
+
+| You say | What happens |
+|---|---|
 | "play bruno mars on YouTube" / "play lofi on YouTube Music" | Searches and plays the first result |
-| "play episode 5" / "play the third episode" | Plays that episode from the list on the page you're looking at |
-| "open the second result" / "click the first video" / "play number 3" | Picks the Nth item on the current page |
-| "set a timer for 10 minutes" / "timer 90 seconds" | A timer with a countdown on the TV |
-| "sleep timer 30 minutes" | Pauses the video when it ends |
+| "search for bruno mars on YouTube" / "search X on Google" (or Bing, DuckDuckGo) | Shows the search results and **waits**, so you choose |
+| "search big bang theory" | Types it into the search bar of the page you're on. No search bar: a one-tap prompt to search YouTube in a new tab |
+| "search ariana grande on YouTube Music and play a song featuring the weeknd" | Searches, then **reads the results and opens the one that fits** |
+| "play episode 5" / "open the second result" / "play number 3" | Picks that item from the list on the current page |
+| "click on Season 1" / "press Next" | Clicks whatever says that on the page (also in dropdowns); only words you said |
+| "what is the capital of Greece" / "weather today" | Opens a new tab and searches it on Edge/Bing |
+
+**Browser and keyboard**
+
+| You say | What happens |
+|---|---|
+| "new tab" / "close this tab" / "next tab" / "previous tab" | Tabs |
+| "go back" / "go forward" / "reload" / "scroll down" | Page navigation |
+| "press F11" / "hit escape" / "press control L" / "press alt left" | Presses that key or chord on the PC (F1-F12, arrows, Enter, letters, with Ctrl/Alt/Shift). Some chords such as Alt+F4 are refused |
+| "turn off ad blocking" / "block ads" | The same switch as the phone Settings. Pop-ups are handled per page type |
+
+**Timers, pairing and saved pages**
+
+| You say | What happens |
+|---|---|
+| "set a timer for 10 minutes" / "sleep timer 30 minutes" | A countdown on the TV; the sleep timer pauses the video when it ends |
 | "turn off the screen" | Blanks the TV without stopping anything |
 | "show the QR code" / "pair a friend" | Shows the pairing QR on the TV for 90 s |
-| "hide the QR code" / "toggle the QR code" / "reset the QR code" | Hides or toggles the QR on the TV. **Reset** makes a new code and the old ones stop working |
-| "save this page" / "open my bookmark netflix" / "remove the bookmark for bbc" | Saved pages: a list you can also tap on the phone |
-| "search ariana grande on YouTube Music and play a song featuring the weeknd" | Searches, then **reads the results and opens the one that fits** what you asked for |
-| "search X on Google" / "on Bing" / "on DuckDuckGo" | Searches with that engine and stops on the results (it never auto-clicks) |
-| "click on Season 1" / "press Next" | Clicks whatever says that on the page (also picks it in a dropdown); only words you said |
-| "turn off ad blocking" / "block ads" | The same switch as the phone Settings. Pop-ups are handled per page type |
-| "what is the capital of Greece" / "weather today" | Opens a new tab and searches it on Edge/Bing (it does not guess an answer) |
+| "hide / toggle / reset the QR code" | Hides or toggles the QR. **Reset** makes a new code; the old ones stop working |
+| "save this page" / "open my bookmark netflix" / "remove the bookmark for bbc" | Saved pages, also a tap-able list on the phone |
 
 The assistant remembers the last few things you asked (about 30 minutes), so "retry that on a new tab" works. It can answer
-questions about the screen, and ask you a follow-up ("Which Ariana Grande song?") with tap-able choices; the phone then
-reopens the mic for a few seconds. Spoken replies play after *spoken* commands only (voice and volume are in Settings).
+questions about the screen and ask a follow-up ("Which Ariana Grande song?") with tap-able choices; the phone then reopens the
+mic for a few seconds. Spoken replies play after *spoken* commands only (voice and volume are in Settings).
 
-Anything else ("put on the one with the cat", "play the pilot") is understood by the AI router, which sees the
-items on the current page and picks one. It stays on the current site unless you say *search*, *YouTube* or *music*.
+Anything else ("put on the one with the cat", "play the pilot") goes to the AI brain, which sees the items on the current
+page and picks one. It stays on the current site unless you say *search*, *YouTube* or *music*.
 
 ### Press buttons (Remote tab)
 
@@ -70,7 +82,7 @@ items on the current page and picks one. It stays on the current site unless you
 - **Touchpad:** drag to move the cursor, tap to click, two-finger tap to right-click, two-finger drag to scroll,
   press-and-hold then drag to select or drag things. There are also Left / Double / Right click and Scroll buttons.
 - **Keyboard:** tap the box to bring up your phone's keyboard and type straight onto the TV (Enter and Backspace work).
-- **Keys:** arrows, Esc, Tab, Enter, Backspace, Delete, Space, Home/End, PgUp/PgDn, F5, F11.
+- **Keys:** arrows, Esc, Tab, Enter, Backspace, Delete, Space, Home/End, PgUp/PgDn, and a row of **F1-F12**.
   **Ctrl / Alt / Shift** latch for the next key, so **Alt then ←** is "Back".
 - **One-tap shortcuts:** Back (Alt+←), Forward, Reload, New tab, Close tab, Next/Prev tab, Address bar, Zoom in/out/reset,
   Switch window (Alt+Tab).
@@ -128,11 +140,11 @@ run from source overrides it. Restart the app after changing anything. The usefu
 |---|---|---|
 | `CJ_RELAY_WS_URL` | set by the installer | The cloud relay (WebSocket URL from `sam deploy`) |
 | `CJ_PWA_BASE_URL` | set by the installer | Where the phone app is hosted; the QR points here |
-| `CJ_STT_DEVICE` | `cuda` | `cuda` (NVIDIA GPU), `cpu`, or `auto` |
-| `CJ_STT_MODEL` | `large-v3-turbo` | Whisper model; use `small` or `base` on a weak PC |
+| `CJ_STT_DEVICE` | `auto` | `auto` (GPU if there is one), `cuda` or `cpu` |
+| `CJ_STT_MODEL` | `auto` | Whisper model. `auto` = `large-v3-turbo` with an NVIDIA GPU, `small` without; set `base` on a very weak PC |
 | `CJ_GROQ_API_KEY` | none | Free cloud speech-to-text, used if local voice fails |
-| `CJ_ROUTER_PROVIDER` | `ollama` | `ollama` (local) or `gemini` for understanding free-form commands |
-| `CJ_OLLAMA_TEXT_MODEL` / `CJ_OLLAMA_VLM_MODEL` | `qwen2.5:7b` / `qwen2.5vl:7b` | Local models (`ollama pull ...`) |
+| `CJ_ROUTER_PROVIDER` | `auto` | `auto` = Gemini when `CJ_GEMINI_API_KEY` is set, else local Ollama (the other is the fallback); or force `ollama` / `gemini` |
+| `CJ_OLLAMA_TEXT_MODEL` / `CJ_OLLAMA_VLM_MODEL` | `auto` / `qwen2.5vl:7b` | Local models. `auto` = `qwen2.5:7b` with an NVIDIA GPU, `qwen2.5:3b` without. **Set up AI brain** (Start menu) downloads them |
 | `CJ_GEMINI_API_KEY` | none | Free Gemini key for understanding commands / finding buttons on screen |
 | `CJ_SUBTITLE_LANG` | `en` | Language "turn on subtitles" picks when you don't name one (`en`, `es`, `fr`, `de`...) |
 | `CJ_ELEVENLABS_API_KEY` | none | Optional. Spoken replies use ElevenLabs first (capped at `CJ_ELEVENLABS_MONTHLY_CHARS`, default 9000), then free Microsoft neural voices, then offline Windows voices. Turn replies on/off and pick the style/voice in the phone's Settings |
@@ -177,7 +189,8 @@ Tap **Log** on the phone first: it usually names the cause.
 | Phone stuck on "Connecting..." | Use Chrome first to rule out a browser quirk; see [INSTALL.md](docs/INSTALL.md#troubleshooting). Check the daemon log for `cloud relay: up` |
 | "Recording was incomplete" | Fixed in current versions (parts can arrive out of order); update the PC app **and** redeploy the relay |
 | Voice says "I could not hear that" / "I did not hear anything" | Check the Log's `heard:` line, then `%LOCALAPPDATA%\CouchJarvis\logs`. `cublas64_12.dll is not found` means the GPU libraries are missing: it now falls back to the CPU by itself, and `uv pip install -r requirements-gpu.txt` (from source) enables the GPU. First use downloads the speech model. Or add `CJ_GROQ_API_KEY` |
-| A command is misunderstood | The Log shows `heard:`. Free-form commands need Ollama or `CJ_GEMINI_API_KEY` |
+| "My brain is not set up" / "took too long" | No AI model yet, or a slow CPU: run **Set up AI brain** from the Start menu, or add a free `CJ_GEMINI_API_KEY` |
+| A command is misunderstood | The Log shows `heard:`. Free-form commands need the AI brain (Gemini key or local model) |
 | Fullscreen does nothing | Tap it again (ad pages eat the first click); the Log shows which step failed |
 | "Commands do nothing in Edge" | Edge is started and supervised by the app on port 9222. Close other Edge windows that use the TV profile |
 | The QR keeps showing | It hides after the first pairing. Say "hide the QR code", or click the taskbar tray icon to show/hide it. **Pair a friend** shows it again |
