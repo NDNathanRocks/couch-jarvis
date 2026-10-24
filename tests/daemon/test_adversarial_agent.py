@@ -186,3 +186,13 @@ async def test_injection_through_the_title_cannot_trigger_a_blocked_action(env: 
     result = await env.runner(max_attempts=0).run(text("play something", "inj"))
     assert not result.ok and env.os.keys == []
     assert not any(c.startswith("navigate:") for c in env.browser.calls)
+
+
+def test_user_said_matches_whole_words_only() -> None:
+    from agent.graph import user_said
+
+    assert user_said("Season 1", "click on season 1 please")
+    assert user_said("play", "press play")
+    assert not user_said("play", "open display settings")
+    assert not user_said("season 1", "click on season 12")
+    assert not user_said("", "click on it")

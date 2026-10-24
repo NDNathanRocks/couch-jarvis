@@ -113,7 +113,8 @@ def user_said(text: str, utterance: str) -> bool:
     """A click by words is only trusted when the user actually said those words, so a page (or a
     confused model) can never make us click something the user did not name."""
     words = re.findall(r"[a-z0-9]+", text.lower())
-    return bool(words) and " ".join(words) in " ".join(re.findall(r"[a-z0-9]+", utterance.lower()))
+    spoken = " " + " ".join(re.findall(r"[a-z0-9]+", utterance.lower())) + " "
+    return bool(words) and f" {' '.join(words)} " in spoken  # whole words, not "play" in "display"
 
 
 def split_reply(plan: IntentPlan) -> tuple[IntentPlan, str | None, dict[str, Any] | None]:
