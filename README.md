@@ -42,6 +42,17 @@ see [Settings](#settings)).
 | "sleep timer 30 minutes" | Pauses the video when it ends |
 | "turn off the screen" | Blanks the TV without stopping anything |
 | "show the QR code" / "pair a friend" | Shows the pairing QR on the TV for 90 s |
+| "hide the QR code" / "toggle the QR code" / "reset the QR code" | Hides or toggles the QR on the TV. **Reset** makes a new code and the old ones stop working |
+| "save this page" / "open my bookmark netflix" / "remove the bookmark for bbc" | Saved pages: a list you can also tap on the phone |
+| "search ariana grande on YouTube Music and play a song featuring the weeknd" | Searches, then **reads the results and opens the one that fits** what you asked for |
+| "search X on Google" / "on Bing" / "on DuckDuckGo" | Searches with that engine and stops on the results (it never auto-clicks) |
+| "click on Season 1" / "press Next" | Clicks whatever says that on the page (also picks it in a dropdown); only words you said |
+| "turn off ad blocking" / "block ads" | The same switch as the phone Settings. Pop-ups are handled per page type |
+| "what is the capital of Greece" / "weather today" | Opens a new tab and searches it on Edge/Bing (it does not guess an answer) |
+
+The assistant remembers the last few things you asked (about 30 minutes), so "retry that on a new tab" works. It can answer
+questions about the screen, and ask you a follow-up ("Which Ariana Grande song?") with tap-able choices; the phone then
+reopens the mic for a few seconds. Spoken replies play after *spoken* commands only (voice and volume are in Settings).
 
 Anything else ("put on the one with the cat", "play the pilot") is understood by the AI router, which sees the
 items on the current page and picks one. It stays on the current site unless you say *search*, *YouTube* or *music*.
@@ -169,7 +180,7 @@ Tap **Log** on the phone first: it usually names the cause.
 | A command is misunderstood | The Log shows `heard:`. Free-form commands need Ollama or `CJ_GEMINI_API_KEY` |
 | Fullscreen does nothing | Tap it again (ad pages eat the first click); the Log shows which step failed |
 | "Commands do nothing in Edge" | Edge is started and supervised by the app on port 9222. Close other Edge windows that use the TV profile |
-| The QR keeps showing | It hides when a phone is connected. It shows again with **Pair a friend** |
+| The QR keeps showing | It hides after the first pairing. Say "hide the QR code", or click the taskbar tray icon to show/hide it. **Pair a friend** shows it again |
 | Touchpad/keyboard missing | The PC has `CJ_REMOTE_INPUT=false`, or the phone isn't connected yet |
 
 ---
@@ -278,7 +289,7 @@ curl.exe http://127.0.0.1:8765/api/metrics          # latency, token use, DOM-vs
 
 ### Status
 
-Verified in automated tests: contracts, command queue, STT fallback chain, agent graph (including vision fallback and
+Version 0.2.0. Verified in automated tests (831 Python tests, 168 web tests): contracts, command queue, STT fallback chain, agent graph (including vision fallback and
 recovery), page-aware commands, DPI mapping, SSE/WebSocket API, Lambda relay (against moto), reconnect logic, LAN
 pairing, HUD rendering, the PWA (reducers, gestures, connection state machine, UI flows, a real-browser e2e suite) and
 the CDP executor against a real Edge. Exercised by hand against real services: a deployed AWS stack, Vercel, real Edge on a
