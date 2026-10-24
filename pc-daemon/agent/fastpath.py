@@ -385,7 +385,16 @@ def plan_text(utterance: str) -> IntentPlan | None:
 
     A request made of several recognized commands ("open a new tab and play X on youtube music")
     becomes ONE plan whose steps run in order."""
+    if _SEARCH_THEN_PICK.match(normalize(utterance)):
+        return None  # "search X and play a song with Y": needs a look at the results, so ask the LLM
     return _plan_single(utterance) or _plan_web_question(utterance) or _plan_compound(utterance)
+
+
+_SEARCH_THEN_PICK = re.compile(
+    r"^(?:search|look up|find|google)\b.+?\b(?:and|then|and then)\s+(?:play|open|click|pick|choose|"
+    r"select|watch|put on|start)\b.+\b(?:with|by|featuring|feat|from|where|that|which|any|the "
+    r"(?:best|newest|latest|first|top|most))\b"
+)
 
 
 # Questions about the world, not the screen: Edge/Bing (with Copilot's summary) answers them.

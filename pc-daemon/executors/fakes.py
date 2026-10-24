@@ -88,6 +88,7 @@ class FakeBrowser:
             is None
         ):
             return ActionResult(False, "dom", ITEM_NOT_FOUND, "item_not_found")
+        self.snap = self.snap.model_copy(update={"is_playing": True})
         return ActionResult(True, "dom")
 
     async def wake_controls(self) -> None:

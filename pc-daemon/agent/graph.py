@@ -30,7 +30,9 @@ from agent.policy import (
     url_allowed,
 )
 from agent.prompts import (
+    CHOOSER_SYSTEM,
     ROUTER_SYSTEM,
+    chooser_user_prompt,
     router_repair_prompt,
     router_user_prompt,
 )
@@ -192,6 +194,8 @@ def success_message(plan: IntentPlan) -> str:
     for step in plan.steps:
         if step.op == "voice_pref":
             return pref_message(step.args)
+        if step.op == "choose":
+            return f"Playing {plan.slots.get('query', 'your pick')}"
         if step.op == "bookmark":
             return {
                 "add": "Saved this page",
@@ -396,6 +400,28 @@ def build_graph(deps: AgentDeps) -> Any:
             }
         return {"plan": plan, "status": "executing"}
 
+    async def choose_best(goal: str) -> ActionResult:
+        """Open the result that fits what the user asked for, judged from the page's own list."""
+        if not goal:
+            return ActionResult(False, "dom", "nothing to choose", "unsupported")
+        items: list[Any] = []
+        for attempt in range(3):  # results load a moment after the page does
+            items = await deps.browser.list_items(30)
+            if len(items) >= 3 or attempt == 2:
+                break
+            await asyncio.sleep(0.0 if deps.verify_delays_s == (0.0,) else 1.0)
+        if not items:
+            return ActionResult(False, "dom", "I could not see any results", "item_not_found")
+        listing = " | ".join(f"{c.index}: {sanitize_untrusted(c.text, 90)}" for c in items)
+        try:
+            reply = await deps.router.complete(CHOOSER_SYSTEM, chooser_user_prompt(goal, listing))
+            picked = json.loads(extract_json(reply.text)).get("index")
+        except (LLMError, ValueError):
+            return ActionResult(False, "dom", "I could not decide which result to open", "unsupported")
+        if not isinstance(picked, int) or not any(c.index == picked for c in items):
+            return ActionResult(False, "dom", "None of the results look right", "item_not_found")
+        return await deps.browser.click_item(index=picked)
+
     async def run_bookmark(a: dict[str, str | int | float | bool]) -> ActionResult:
         store = deps.bookmarks
         if store is None:
@@ -537,6 +563,8 @@ def build_graph(deps: AgentDeps) -> Any:
                 float(a["minutes"]), str(a.get("label", "timer")), str(a.get("action", "notify"))
             )
             return ActionResult(True, "os")
+        if op == "choose":
+            return await choose_best(str(a.get("goal", "")).strip())
         if op == "click_item":
             # Index/episode/text pick from the list the browser itself reported: the model never
             # supplies a selector, so this is allowed on any web page (not only media sites).
