@@ -22,6 +22,7 @@ import uvicorn
 
 from agent.graph import AgentDeps, AgentRunner
 from agent.memory import ConversationMemory
+from browser_prefs import BrowserPrefs
 from cloud_relay_client import CloudRelayClient
 from command_queue import CommandRequest
 from config import Settings, get_settings, init_dpi_awareness, resource_root
@@ -112,6 +113,10 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
     stt: STTEngine | None = None
     room_store: RoomStore | None = None
 
+    prefs = BrowserPrefs(
+        None if dry_run else settings.browser_file,
+        on_change=lambda s: service_ref[0].state.update(browser=s),
+    )
     browser: Browser
     os_ctl: OSController
     screen: Screen
@@ -131,7 +136,9 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
             make_edge_launcher(settings.edge_path, settings.edge_profile_dir, settings.cdp_port),
             telemetry=telemetry,
         )
-        browser = EdgeCDP(settings.cdp_url, ensure_edge=watchdog.ensure_edge)
+        browser = EdgeCDP(
+            settings.cdp_url, ensure_edge=watchdog.ensure_edge, prefs=prefs
+        )
         os_ctl, screen = WindowsOS(), MssScreen()
         router, vlm = build_llms(settings)
         stt = build_stt_engine(settings, telemetry)
@@ -141,6 +148,7 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
     grounder = VisionGrounder(vlm, screen, telemetry)
     fullscreener = VideoFullscreener(browser, grounder, os_ctl, telemetry)
     deps = AgentDeps(router, browser, os_ctl, fullscreener, grounder, telemetry)
+    deps.prefs = prefs
     deps.memory = ConversationMemory(None if dry_run else settings.memory_file)
     deps.subtitles = SubtitleController(browser, grounder, os_ctl)
     deps.subtitle_lang = settings.subtitle_lang.strip().lower() or "en"
@@ -186,7 +194,7 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
         remote_input=settings.remote_input,
     )
     service_ref.append(service)
-    service.state.update(voice=deps.voice.state)
+    service.state.update(voice=deps.voice.state, browser=prefs.state)
     return Runtime(service, telemetry, watchdog, room_id, room_store, bus, deps, stt)
 
 

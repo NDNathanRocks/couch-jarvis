@@ -37,7 +37,7 @@ Ops and their args:
 - page_search: {"query": "<text>"} types into the search bar of the CURRENT page (use this for
   "search X" unless the user names YouTube; it stays on the site)
 - wait_for: {"ms": int}
-- web_search: {"query": "<text>"} opens a NEW tab and searches the web in Edge (Bing + Copilot
+- web_search: {"query": "<text>", "engine": "google"|"bing"|"duckduckgo"?} opens a NEW tab and searches the web in Edge (Bing + Copilot
   summarise). Use it for general-knowledge or live questions the screen cannot answer
   ("what is the weather today", "capital of Greece", "who won the game").
 - say: {"text": "<short sentence>"} the assistant answers out loud. Use it for questions ABOUT the
@@ -63,6 +63,8 @@ Rules:
   choose.
 - If the user refers to something visible on the current page ("episode 5", "the pilot", "the
   second one", a title in the items list), use click_item. Do NOT navigate away from the page.
+- "Search ..." only types the search and presses Enter, then WAITS for the next instruction. Never
+  add click_item or play=true after a search unless the user also said play/open/click/first.
 - Only use navigate when the user says search, YouTube or music, or asks for a site by name.
   "search ..." means play=false. "play <something not on this page>" on YouTube means play=true.
 - Prefer YouTube unless the user says "music" or "YouTube Music" (then source "ytmusic").

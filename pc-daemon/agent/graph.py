@@ -22,6 +22,7 @@ from pydantic import ValidationError
 
 from agent.fastpath import plan_button, plan_text
 from agent.memory import ConversationMemory
+from browser_prefs import BrowserPrefs
 from agent.policy import (
     key_allowed,
     normalize_keys,
@@ -72,6 +73,31 @@ BROWSER_NAV_ACTIONS = frozenset(
 _ASKED_TO_SEARCH = re.compile(r"\b(?:you ?tube|music|search|look up)\b", re.I)
 _ASKED_FOR_NEW_TAB = re.compile(r"\bnew (?:tab|window)\b", re.I)
 _OPENS_PAGES = frozenset({"navigate", "page_search"})
+_PICKED = re.compile(
+    r"\b(?:play|open|click|select|choose|pick|watch|put on|first|second|third|top|best|"
+    r"number|result|link|go to)\b",
+    re.I,
+)
+_SEARCHING = re.compile(r"^(?:search|look up|find|google)\b", re.I)
+
+
+def without_unrequested_clicks(plan: IntentPlan, utterance: str) -> IntentPlan:
+    """"Search for X" types it in, presses Enter and waits: the user picks the result.
+
+    The router sometimes tacks on a click on the first result or sets play=true; drop that
+    unless the user actually asked to open or play something."""
+    if not _SEARCHING.match(utterance.strip()) or _PICKED.search(utterance):
+        return plan
+    steps: list[ActionStep] = []
+    for step in plan.steps:
+        if step.op == "click_item":
+            continue
+        if step.op == "navigate" and step.args.get("play"):
+            step = step.model_copy(update={"args": {**step.args, "play": False}, "expect": None})
+        steps.append(step)
+    return plan.model_copy(update={"steps": steps}) if steps != plan.steps else plan
+
+
 _NEVER_MIND = re.compile(r"^(?:never ?mind|forget it|cancel(?: that)?|no thanks?|nothing)$", re.I)
 _FORGET = re.compile(r"^(?:forget (?:that|everything|all of that)|clear (?:your )?memory)$", re.I)
 
@@ -128,6 +154,7 @@ class AgentDeps:
     subtitles: SubtitleController | None = None
     subtitle_lang: str = "en"  # default language for "turn on subtitles"
     voice: VoiceService | None = None  # spoken replies; None = silent (tests, no speakers)
+    prefs: BrowserPrefs | None = None  # ad blocking etc.
     memory: ConversationMemory | None = None  # last few turns + a question awaiting an answer
     show_qr: Callable[[], None] = lambda: None  # set by main when a HUD exists
     progress: ProgressFn = lambda *_: None
@@ -146,6 +173,8 @@ def success_message(plan: IntentPlan) -> str:
     for step in plan.steps:
         if step.op == "voice_pref":
             return pref_message(step.args)
+        if step.op == "browser_pref":
+            return "Ad blocking on" if step.args.get("adblock") else "Ad blocking off"
     several = written_message(plan)
     if several is not None:
         return several
@@ -277,7 +306,9 @@ def build_graph(deps: AgentDeps) -> Any:
             try:
                 plan = IntentPlan.model_validate(json.loads(extract_json(reply.text)))
                 plan = plan.model_copy(update={"source": "llm"})
-                return with_requested_new_tab(plan, state.utterance)
+                return without_unrequested_clicks(
+                    with_requested_new_tab(plan, state.utterance), state.utterance
+                )
             except (ValueError, ValidationError) as exc:
                 bad_reply, error = reply.text, str(exc)
                 span.set_attribute("cj.router_repairs", attempt + 1)
@@ -365,7 +396,9 @@ def build_graph(deps: AgentDeps) -> Any:
         if op == "close_tab":
             return await deps.browser.close_tab()
         if op == "web_search":
-            return await deps.browser.open_search_tab(str(a.get("query", "")).strip())
+            return await deps.browser.open_search_tab(
+                str(a.get("query", "")).strip(), str(a.get("engine", "bing"))
+            )
         if op == "page_search":
             query = str(a.get("query", "")).strip()
             found = await deps.browser.page_search(query)
@@ -404,6 +437,10 @@ def build_graph(deps: AgentDeps) -> Any:
                     False, "os", "Spoken replies are not set up here", "unsupported"
                 )
             return deps.voice.apply(a)
+        if op == "browser_pref":
+            if deps.prefs is None:
+                return ActionResult(False, "os", "Browser settings are not set up here", "unsupported")
+            return ActionResult(True, "os", deps.prefs.apply(a))
         if op == "show_qr":
             deps.show_qr()
             return ActionResult(True, "os")

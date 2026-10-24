@@ -100,6 +100,12 @@ class VoiceState(_Model):
     engine: Literal["elevenlabs", "edge", "windows", "none"] = "none"  # what speaks right now
 
 
+class BrowserState(_Model):
+    """Browsing preferences saved on the PC."""
+
+    adblock: bool = True  # close ad popups / block redirects from third-party sites
+
+
 class RoomState(_Model):
     pc_online: bool = False
     mode: Literal["cloud", "lan"] = "cloud"
@@ -112,6 +118,7 @@ class RoomState(_Model):
     devices: list[DevicePresence] = Field(default_factory=list)
     remote_input: bool = True  # touchpad/keyboard allowed (CJ_REMOTE_INPUT on the PC)
     voice: VoiceState = Field(default_factory=VoiceState)
+    browser: BrowserState = Field(default_factory=BrowserState)
     rev: int = 0
 
 

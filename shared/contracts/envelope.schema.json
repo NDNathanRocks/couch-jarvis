@@ -382,6 +382,19 @@
       "title": "AudioEndPayload",
       "type": "object"
     },
+    "BrowserState": {
+      "additionalProperties": false,
+      "description": "Browsing preferences saved on the PC.",
+      "properties": {
+        "adblock": {
+          "default": true,
+          "title": "Adblock",
+          "type": "boolean"
+        }
+      },
+      "title": "BrowserState",
+      "type": "object"
+    },
     "CmdAck": {
       "additionalProperties": false,
       "properties": {
@@ -1847,6 +1860,9 @@
     "RoomState": {
       "additionalProperties": false,
       "properties": {
+        "browser": {
+          "$ref": "#/$defs/BrowserState"
+        },
         "devices": {
           "items": {
             "$ref": "#/$defs/DevicePresence"

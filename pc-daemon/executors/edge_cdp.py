@@ -14,6 +14,8 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 from urllib.parse import quote_plus, urlparse
 
+from browser_prefs import BrowserPrefs
+from executors.site_policy import is_search_page, opens_freely
 from agent.policy import url_allowed
 from executors.base import ActionResult, BrowserSnapshot, MediaCommand, Tier
 from executors.page_items import (
@@ -347,6 +349,13 @@ def _source_for(url: str) -> str:
     return "other"
 
 
+SEARCH_ENGINES = {
+    "bing": "https://www.bing.com/search?q={q}",
+    "google": "https://www.google.com/search?q={q}",
+    "duckduckgo": "https://duckduckgo.com/?q={q}",
+}
+
+
 class EdgeCDP:
     def __init__(
         self,
@@ -354,7 +363,10 @@ class EdgeCDP:
         *,
         ensure_edge: Callable[[], Awaitable[bool]] | None = None,
         connect_attempts: int = 3,
+        prefs: BrowserPrefs | None = None,
     ) -> None:
+        self._prefs = prefs
+        self._hooked: set[int] = set()  # tabs that already report their popups to us
         self._cdp_url = cdp_url
         self._ensure_edge = ensure_edge
         self._attempts = connect_attempts
@@ -419,6 +431,9 @@ class EdgeCDP:
         Request interception is deliberately not used: it stalls cross-origin player iframes.
         """
         start, hijacks = page.url, []
+        if self._free_to_open(start):  # a search page, or ad blocking is off: let it open things
+            yield hijacks
+            return
 
         def on_nav(frame: Any) -> None:
             if frame == page.main_frame and blocks_navigation(start, frame.url):
@@ -543,13 +558,13 @@ class EdgeCDP:
                     continue
         return None
 
-    async def open_search_tab(self, query: str) -> ActionResult:
+    async def open_search_tab(self, query: str, engine: str = "bing") -> ActionResult:
         """A question for the web: a fresh tab on the Edge/Bing results page (Copilot summarises)."""
 
         async def go(page: Any) -> ActionResult:
             fresh = await page.context.new_page()
             await fresh.goto(
-                f"https://www.bing.com/search?q={quote_plus(query)}",
+                SEARCH_ENGINES.get(engine, SEARCH_ENGINES["bing"]).format(q=quote_plus(query)),
                 wait_until="domcontentloaded",
                 timeout=15000,
             )
@@ -779,7 +794,35 @@ class EdgeCDP:
     def _adopt(self, page: Any) -> None:
         """Make this the tab we control from now on (and keep closing its ad popups)."""
         self._page_ref = page
-        page.on("popup", lambda popup: asyncio.ensure_future(_close_quietly(popup)))
+        if id(page) not in self._hooked:
+            self._hooked.add(id(page))
+            page.on(
+                "popup", lambda popup: asyncio.ensure_future(self._on_popup(page, popup))
+            )
+            page.on("close", lambda _: self._hooked.discard(id(page)))
+
+    def _adblock(self) -> bool:
+        return self._prefs.adblock if self._prefs is not None else True
+
+    def _free_to_open(self, url: str) -> bool:
+        return is_search_page(url) or not self._adblock()
+
+    async def _on_popup(self, opener: Any, popup: Any) -> None:
+        """A page opened a tab. Search results are the user's choice, and so is anything while ad
+        blocking is off; otherwise only a tab on the same site survives."""
+        try:
+            allow = self._free_to_open(opener.url)
+            if not allow:
+                with contextlib.suppress(Exception):
+                    await popup.wait_for_load_state("domcontentloaded", timeout=4000)
+                allow = opens_freely(opener.url, popup.url, adblock=True)
+            if allow:
+                await popup.bring_to_front()
+                self._adopt(popup)
+                return
+        except Exception:
+            pass  # the tab vanished while we looked at it
+        await _close_quietly(popup)
 
     async def close_ad_dom(self) -> ActionResult:
         async def run(page: Any) -> ActionResult:

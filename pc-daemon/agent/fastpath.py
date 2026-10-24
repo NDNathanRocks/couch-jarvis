@@ -160,6 +160,22 @@ def _plan_page_actions(t: str) -> IntentPlan | None:
             ],
             {"query": m.group(1)},
         )
+    engines = r"(google|bing|duckduckgo|edge|the web|the internet)"
+    for pattern in (
+        rf"(?:search|look up|find)(?: for)? (.+?) (?:on|in|with|using) {engines}",
+        rf"(?:search|look up) {engines} for (.+)",
+        r"google (.+)",
+    ):
+        m = re.fullmatch(pattern, t)
+        if m:
+            named = [g for g in m.groups() if g in _ENGINE_NAMES]
+            query = next(g for g in m.groups() if g not in _ENGINE_NAMES).strip()
+            engine = _ENGINE_NAMES[named[0]] if named else "google"
+            return _plan(
+                Intent.NAVIGATE,
+                [ActionStep(op="web_search", args={"query": query, "engine": engine})],
+                {"query": query},
+            )
     m = re.fullmatch(rf"(?:search|look up)(?: for)? (.+?) on {site}", t)
     if m:
         return _search_plan(m.group(1), "music" in m.group(2) or m.group(2) == "yt music")
@@ -195,6 +211,10 @@ def _plan_page_actions(t: str) -> IntentPlan | None:
     return None
 
 
+_ENGINE_NAMES = {
+    "google": "google", "bing": "bing", "duckduckgo": "duckduckgo",
+    "edge": "bing", "the web": "bing", "the internet": "bing",
+}  # fmt: skip
 _SITES = {"youtube music": "ytmusic", "youtube": "youtube"}
 _SITE_URLS = {"youtube music": "https://music.youtube.com/", "youtube": "https://www.youtube.com/"}
 _NEW_TAB = ActionStep(op="browser_nav", args={"action": "new_tab"})
@@ -246,6 +266,24 @@ _STYLE_NAMES = {
 
 def _voice(**args: str | int | float | bool) -> IntentPlan:
     return _plan(Intent.SYSTEM, [ActionStep(op="voice_pref", args=args)])
+
+
+_AD = r"(?:ads?|ad ?block(?:ing|er)?|popups?|pop[- ]ups?|popup blocker|ad blocker)"
+
+
+def _plan_browser_prefs(t: str) -> IntentPlan | None:
+    """"turn off ad blocking" / "block ads" / "allow popups": the same switch the phone has."""
+    blocker = r"(?:ad ?block(?:ing|er)?|pop[- ]?up blocker|pop[- ]?up blocking)"
+    allow = r"(?:allow|let|stop blocking) (?:all )?(?:ads?|pop[- ]?ups?)(?: through)?"
+    if re.fullmatch(rf"(?:turn off|switch off|disable|stop|deactivate) (?:the )?{blocker}", t) or (
+        re.fullmatch(allow, t)
+    ):
+        return _plan(Intent.SYSTEM, [ActionStep(op="browser_pref", args={"adblock": False})])
+    if re.fullmatch(rf"(?:turn on|switch on|enable|start|activate) (?:the )?{blocker}", t) or (
+        re.fullmatch(r"block (?:all )?(?:ads?|pop[- ]?ups?)", t)
+    ):
+        return _plan(Intent.SYSTEM, [ActionStep(op="browser_pref", args={"adblock": True})])
+    return None
 
 
 def _plan_voice(t: str) -> IntentPlan | None:
@@ -372,6 +410,7 @@ def _plan_single(utterance: str) -> IntentPlan | None:
 
     page = (
         _plan_voice(t)
+        or _plan_browser_prefs(t)
         or _plan_subtitles(t)
         or _plan_browser(t)
         or _plan_site(t)

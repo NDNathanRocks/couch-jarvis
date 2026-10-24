@@ -216,6 +216,7 @@ export type Type13 = "cmd.result";
 export type V13 = 1;
 export type From14 = string;
 export type Id14 = string;
+export type Adblock = boolean;
 export type DeviceId1 = string;
 export type LastSeen = number;
 export type Name = string;
@@ -567,6 +568,7 @@ export interface StateSnapshot {
   v?: V14;
 }
 export interface RoomState {
+  browser?: BrowserState;
   devices?: Devices;
   driver?: Driver;
   mode?: Mode;
@@ -579,6 +581,12 @@ export interface RoomState {
   timers?: Timers;
   voice?: VoiceState;
   volume?: Volume;
+}
+/**
+ * Browsing preferences saved on the PC.
+ */
+export interface BrowserState {
+  adblock?: Adblock;
 }
 export interface DevicePresence {
   device_id: DeviceId1;
