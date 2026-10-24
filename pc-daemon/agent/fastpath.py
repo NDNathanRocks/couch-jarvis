@@ -296,7 +296,7 @@ def plan_text(utterance: str) -> IntentPlan | None:
 
 # Questions about the world, not the screen: Edge/Bing (with Copilot's summary) answers them.
 _WEB_QUESTION = re.compile(
-    r"^(?:what(?:'s| is| are| was| were)|who(?:'s| is| was| are| won| wins| invented| made| wrote| plays)|"
+    r"^(?:what(?:'s| is| are| was| were)|who(?:'s| is| was| are| won| wins| invented| made| wrote)|"
     r"when (?:is|was|did|does)|"
     r"where (?:is|are|was)|why (?:is|are|do|does|did)|"
     r"how (?:do|does|did|many|much|old|tall|far|long)"
