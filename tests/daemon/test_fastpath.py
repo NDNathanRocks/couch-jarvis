@@ -55,11 +55,9 @@ def test_recognized_commands_skip_the_llm(
     "utterance",
     [
         "play the new taylor swift album",
-        "what is the weather",
         "",
         "volume",
         "pause the world",
-        "show me the weather",
         "pair of shoes",
     ],
 )

@@ -130,6 +130,8 @@ def success_message(plan: IntentPlan) -> str:
                 return "Subtitles off"
             lang = str(step.args.get("lang") or "")
             return f"Subtitles on ({language_name(lang)})" if lang else "Subtitles on"
+        if step.op == "web_search":
+            return f"Searching the web for {step.args.get('query', 'that')}"
         if step.op == "page_search":
             return f"Searched for {step.args.get('query', 'that')}"
     if plan.intent is Intent.MEDIA_PLAY:
@@ -304,6 +306,8 @@ def build_graph(deps: AgentDeps) -> Any:
             return await deps.fullscreener.dom_js_tiers(op)
         if op == "close_tab":
             return await deps.browser.close_tab()
+        if op == "web_search":
+            return await deps.browser.open_search_tab(str(a.get("query", "")).strip())
         if op == "page_search":
             query = str(a.get("query", "")).strip()
             found = await deps.browser.page_search(query)

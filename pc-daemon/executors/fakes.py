@@ -98,6 +98,13 @@ class FakeBrowser:
             return ActionResult(False, "dom", "no subtitles control found", "no_subtitle_control")
         return ActionResult(True, "dom")
 
+    async def open_search_tab(self, query: str) -> ActionResult:
+        self._log(f"open_search_tab:{query}")
+        self.snap = self.snap.model_copy(
+            update={"url": f"https://www.bing.com/search?q={query}", "title": f"{query} - Search"}
+        )
+        return ActionResult(True, "dom")
+
     async def page_search(self, query: str) -> ActionResult:
         self._log(f"page_search:{query}")
         if not self.search_bar:

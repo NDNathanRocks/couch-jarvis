@@ -543,6 +543,22 @@ class EdgeCDP:
                     continue
         return None
 
+    async def open_search_tab(self, query: str) -> ActionResult:
+        """A question for the web: a fresh tab on the Edge/Bing results page (Copilot summarises)."""
+
+        async def go(page: Any) -> ActionResult:
+            fresh = await page.context.new_page()
+            await fresh.goto(
+                f"https://www.bing.com/search?q={quote_plus(query)}",
+                wait_until="domcontentloaded",
+                timeout=15000,
+            )
+            await fresh.bring_to_front()
+            self._adopt(fresh)
+            return ActionResult(True, "dom")
+
+        return await self._guard(go)
+
     async def page_search(self, query: str) -> ActionResult:
         """Type the query into the page's own search bar and submit it."""
 

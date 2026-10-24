@@ -291,7 +291,33 @@ def plan_text(utterance: str) -> IntentPlan | None:
 
     A request made of several recognized commands ("open a new tab and play X on youtube music")
     becomes ONE plan whose steps run in order."""
-    return _plan_single(utterance) or _plan_compound(utterance)
+    return _plan_single(utterance) or _plan_web_question(utterance) or _plan_compound(utterance)
+
+
+# Questions about the world, not the screen: Edge/Bing (with Copilot's summary) answers them.
+_WEB_QUESTION = re.compile(
+    r"^(?:what(?:'s| is| are| was| were)|who(?:'s| is| was| are| won| wins| invented| made| wrote| directed| plays)|when (?:is|was|did|does)|"
+    r"where (?:is|are|was)|why (?:is|are|do|does|did)|how (?:do|does|did|many|much|old|tall|far|long)"
+    r"(?: i| you| to)?|how's|how is|which|is it|are there|can you tell me|tell me|do you know)\b.+"
+    r"|^.*\b(?:weather|forecast|temperature|news|score|scores|stock price|exchange rate)\b.*$"
+)
+# "what is playing", "what episode is this", "who sings this": about the screen, the LLM answers.
+_ABOUT_THE_SCREEN = re.compile(
+    r"\b(?:this|that|these|those|playing|on (?:the )?screen|here|current|now playing|"
+    r"i (?:just )?(?:said|asked|played)|you (?:just )?(?:did|said|played|opened))\b"
+)
+
+
+def _plan_web_question(utterance: str) -> IntentPlan | None:
+    t = normalize(utterance)
+    if len(t.split()) < 3 or not _WEB_QUESTION.match(t) or _ABOUT_THE_SCREEN.search(t):
+        return None
+    query = re.sub(r"^(?:can you )?(?:tell me|do you know)\s+", "", t).strip(" ?.!")
+    return _plan(
+        Intent.NAVIGATE,
+        [ActionStep(op="web_search", args={"query": query})],
+        {"query": query},
+    )
 
 
 _JOINERS = re.compile(r"\s*(?:,\s*(?:and\s+)?(?:then\s+)?|\band then\b|\bthen\b|\band\b)\s*")
