@@ -46,6 +46,12 @@ if (Test-Path -LiteralPath $key) { throw 'An install is already registered on th
 New-Item -ItemType Directory -Force -Path $Work | Out-Null
 $roomBefore = Hash $room
 $configBefore = Hash $config
+if (Get-Process -Name _unins, unins000 -ErrorAction SilentlyContinue) {
+    throw 'An uninstaller is still running (maybe waiting on a dialog). Answer No / close it first: a Yes deletes your settings.'
+}
+# Safety net: copy the real settings aside, and put back anything that is missing afterwards.
+$backup = Join-Path $Work 'settings-backup'
+if (Test-Path -LiteralPath $data) { Copy-Item -LiteralPath $data -Destination $backup -Recurse -Force }
 $marker = Join-Path $data 'upgrade-test.marker'
 New-Item -ItemType Directory -Force -Path $data | Out-Null
 Set-Content -LiteralPath $marker -Value 'must survive the update'
@@ -106,6 +112,11 @@ catch { $results['SCRIPT ERROR'] = "FAIL $($_.Exception.Message)" }
 finally {
     Get-Process -Name CouchJarvis, _unins -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $backup) {
+        New-Item -ItemType Directory -Force -Path $data | Out-Null
+        Get-ChildItem -LiteralPath $backup -Force | Where-Object { -not (Test-Path -LiteralPath (Join-Path $data $_.Name)) } |
+            ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $data -Recurse -Force; Write-Host "restored $($_.Name)" }
+    }
     if ($configBefore -eq 'absent') { Remove-Item -LiteralPath $config -Force -ErrorAction SilentlyContinue }
 }
 $results.GetEnumerator() | ForEach-Object { '{0,-46} {1}' -f $_.Key, $_.Value }
