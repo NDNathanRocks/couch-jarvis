@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Armrest privacy policy</title>
+<style>
+:root { color-scheme: dark; --bg: #0b0d12; --text: #e8eaf0; --muted: #9aa3b5; --line: #252b38;
+        --accent: #0ea5e9; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) { color-scheme: light; --bg: #ffffff; --text: #111318;
+        --muted: #4b5262; --line: #dde1ea; --accent: #0369a1; }
+}
+body { margin: 0; background: var(--bg); color: var(--text);
+       font: 16px/1.6 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 46rem; margin: 0 auto; padding: 2rem 16px 4rem; }
+h1 { font-size: 1.8rem; line-height: 1.2; } h2 { font-size: 1.2rem; margin-top: 2rem; }
+a { color: var(--accent); } code { font-size: .9em; }
+blockquote { margin: 1rem 0; padding: .5rem 1rem; border-left: 3px solid var(--accent);
+             color: var(--muted); }
+.table { overflow-x: auto; } table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+th, td { text-align: left; vertical-align: top; padding: .5rem;
+         border-bottom: 1px solid var(--line); }
+nav { font-size: .9rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+<nav><a href="/">Armrest</a> · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a> · <a href="/licenses.html">Licences</a></nav>
+<h1>Armrest privacy policy</h1>
+<p>Last updated: [DATE OF PUBLICATION]</p>
+<blockquote>Draft for the publisher to review before publishing. It describes how the app works as built; it is not legal advice. Replace every [BRACKETED] item.</blockquote>
+<p>Armrest lets your phones control the Windows PC connected to your TV. It is built to keep your data on your own devices: there are no accounts, no advertising and no selling or sharing of personal data.</p>
+<h2>Who we are</h2>
+<p>Armrest is published by [PUBLISHER NAME], [CITY, COUNTRY]. Contact: [SUPPORT EMAIL].</p>
+<h2>What stays on your PC</h2>
+<ul><li>Your settings (<code>config.env</code>), including any API keys you add yourself.</li><li>This TV's pairing identity, the list of paired phones and their roles (owner or guest).</li><li>Saved pages, spoken-reply preferences and the last few commands (so "do that again" works).</li><li>Logs (a few megabytes; the oldest lines are overwritten) and performance records (kept for 14 days).</li><li>Your sign-ins to streaming sites, inside the app's own Microsoft Edge profile.</li></ul>
+<p>Voice commands are turned into text on your PC. Screenshots of the TV (used when the app has to find a button on the screen) are processed on your PC. Nothing in this list leaves your PC unless a section below says so.</p>
+<h2>What stays on your phone</h2>
+<p>The phone's pairing token for each TV, your favourite buttons, the TV names you choose and recent commands, in your browser's storage. "Forget this phone" in the app's settings removes them.</p>
+<h2>The cloud relay</h2>
+<p>So that a phone can reach your TV from anywhere, messages pass through a relay we run on Amazon Web Services (United States, Ohio region). The relay:</p>
+<ul><li>passes commands, the TV's status (for example the title playing) and voice audio between your phones and your PC. It does not store them;</li><li>stores this TV's random room ID and scrambled (hashed) versions of its pairing secret and PC key. These are deleted 400 days after the PC last connected;</li><li>stores each phone's random ID, the device name the phone reports (such as "iPhone") and when it was last seen. These are deleted 200 days after the phone was last seen;</li><li>keeps the network connection records for at most 3 hours, and short-lived records used to stop a command from running twice for 15 minutes;</li><li>uses your IP address to limit abuse (too many connections or new rooms). It is kept for at most one hour;</li><li>writes technical logs without message contents, kept for 3 days.</li></ul>
+<p><strong>Delete my cloud data:</strong> in the Armrest window on the PC, Help &gt; Delete my cloud data removes this TV's room and its phones from the relay at once. Uninstalling the app and not using it again lets everything expire as above.</p>
+<h2>Services you choose to use</h2>
+<p>These are off unless you turn them on or add your own key. When they are on, the data described is sent to that company and handled under its own privacy policy:</p>
+<div class="table"><table><tr><th>Service</th><th>When</th><th>What is sent</th></tr><tr><td>Google Gemini</td><td>you add a Gemini key</td><td>the text of commands, and screenshots of the TV when the app has to find something on the screen</td></tr><tr><td>Groq</td><td>you add a Groq key</td><td>voice recordings, to turn them into text</td></tr><tr><td>ElevenLabs</td><td>you add an ElevenLabs key</td><td>the text of spoken replies</td></tr><tr><td>Sentry (crash reports)</td><td>you turn on crash reports</td><td>the error and where in the app it happened, the app version and Windows version. Names, addresses, IP, keys and what you watch are removed first</td></tr><tr><td>GitHub</td><td>direct download only, unless you turn it off</td><td>a daily check for a newer version (no personal data)</td></tr><tr><td>Microsoft Store</td><td>Store version</td><td>your purchase and trial status, handled by Microsoft</td></tr></table></div>
+<p>The streaming sites you open (YouTube, Netflix and others) see what any web browser shows them. Your use of them is covered by their terms and privacy policies.</p>
+<h2>The phone app website</h2>
+<p>The phone app is a web page hosted by Cloudflare. Cloudflare processes your IP address and basic request details to deliver it. We do not use cookies, analytics or trackers.</p>
+<h2>Children</h2>
+<p>Armrest is not directed at children under 13 and does not knowingly collect their personal information.</p>
+<h2>Your rights</h2>
+<p>You can see and delete everything stored on your PC and phone yourself (above), and remove your cloud data at any time. For questions or requests, including requests under privacy laws such as PIPEDA, GDPR or CCPA, contact [SUPPORT EMAIL].</p>
+<h2>Changes</h2>
+<p>If this policy changes, the new version is published at this address with a new date.</p>
+</main>
+</body>
+</html>

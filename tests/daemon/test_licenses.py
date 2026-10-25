@@ -46,3 +46,34 @@ def test_gpl_helpers_are_excluded_from_builds() -> None:
 
 def test_the_shipped_python_packages_pass() -> None:
     assert licenses.problems(licenses.python_packages()) == []
+
+
+def test_the_published_legal_pages_match_the_docs() -> None:
+    """web-remote/public/privacy.html and terms.html are generated from docs/ (the Store links them)."""
+    import subprocess
+    import sys
+
+    root = Path(__file__).resolve().parents[2]
+    run = subprocess.run(
+        [sys.executable, str(root / "scripts" / "legal_pages.py"), "--check"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert run.returncode == 0, run.stdout
+
+
+def test_the_privacy_policy_names_every_outside_service() -> None:
+    root = Path(__file__).resolve().parents[2]
+    policy = (root / "docs" / "PRIVACY.md").read_text(encoding="utf-8")
+    for service in (
+        "Gemini",
+        "Groq",
+        "ElevenLabs",
+        "Sentry",
+        "GitHub",
+        "Microsoft Store",
+        "Cloudflare",
+        "Amazon Web Services",
+    ):
+        assert service in policy, service

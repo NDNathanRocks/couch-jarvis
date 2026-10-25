@@ -1,0 +1,11 @@
+Armrest
+Copyright (c) 2026 [PUBLISHER NAME]. All rights reserved.
+
+This software and its source code are proprietary. No licence is granted to copy, modify, publish, distribute,
+sublicense or sell copies of it, except:
+
+- end users of the published app, under the Armrest terms of use (docs/TERMS.md, also at
+  https://armrest-app.pages.dev/terms.html), and
+- where a third-party component is used under its own licence (see THIRD_PARTY_NOTICES.txt in every build).
+
+Draft: review before publishing (plan.md 13.5). If the repository stays public, this notice still applies.

@@ -1,3 +1,4 @@
+import { LICENCES_URL, PRIVACY_URL, SUPPORT_URL, TERMS_URL } from "../brand";
 import { useEffect, useRef, useState } from "react";
 import type { Tv } from "../utils/tvs";
 import type { VoicePrefs } from "../protocol";
@@ -289,6 +290,20 @@ export function SettingsSheet({
         >
           {tvs.length > 1 ? "Forget this TV" : "Forget this phone"}
         </button>
+        <nav aria-label="About" className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-zinc-500">
+          {(
+            [
+              ["Privacy", PRIVACY_URL],
+              ["Terms", TERMS_URL],
+              ["Licences", LICENCES_URL],
+              ["Support", SUPPORT_URL],
+            ] as const
+          ).map(([label, href]) => (
+            <a key={label} href={href} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center underline underline-offset-2">
+              {label}
+            </a>
+          ))}
+        </nav>
       </div>
     </div>
   );

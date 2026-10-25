@@ -16,7 +16,8 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,png,svg,json}"],
         navigateFallback: "/index.html",
         // never cache realtime traffic or the daemon API
-        navigateFallbackDenylist: [/^\/api\//, /^\/events/, /^\/ws/],
+        // ...and the legal pages are real pages, never the app (the Store links to them)
+        navigateFallbackDenylist: [/^\/api\//, /^\/events/, /^\/ws/, /^\/(privacy|terms|licenses|get|support)\.html$/],
       },
     }),
   ],
