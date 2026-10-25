@@ -27,7 +27,8 @@ from voice.tts import VOICES, TtsEngine
 
 log = logging.getLogger(__name__)
 
-STYLE_LABELS = {"jarvis": "Jarvis", "friendly": "Friendly", "brief": "Brief"}
+# The stored id stays "jarvis" (saved preferences, the wire contract); people see "Butler".
+STYLE_LABELS = {"jarvis": "Butler", "friendly": "Friendly", "brief": "Brief"}
 
 
 def pref_message(args: dict[str, str | int | float | bool]) -> str:

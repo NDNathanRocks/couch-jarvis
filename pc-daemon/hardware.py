@@ -8,7 +8,9 @@ from functools import lru_cache
 from pathlib import Path
 
 GPU_SPEECH_MODEL, CPU_SPEECH_MODEL = "large-v3-turbo", "small"
-GPU_TEXT_MODEL, CPU_TEXT_MODEL = "qwen2.5:7b", "qwen2.5:3b"
+# Both are licensed for commercial use (Apache-2.0 and MIT). qwen2.5:3b is NOT (Qwen Research
+# licence): never make it a default. phi4-mini beat qwen2.5:1.5b on the router prompt on a CPU.
+GPU_TEXT_MODEL, CPU_TEXT_MODEL = "qwen2.5:7b", "phi4-mini"
 
 
 @lru_cache(maxsize=1)

@@ -49,10 +49,10 @@ class VoiceSpec:
 
 VOICES: dict[str, VoiceSpec] = {
     "british_male": VoiceSpec(
-        "Jarvis (British, male)", "en-GB-RyanNeural", "JBFqnCBsd6RMkjVDRZzb", "Male", "en-GB"
+        "Sterling (British, male)", "en-GB-RyanNeural", "JBFqnCBsd6RMkjVDRZzb", "Male", "en-GB"
     ),
     "british_female": VoiceSpec(
-        "Friday (British, female)", "en-GB-SoniaNeural", "Xb7hH8MSUJpSbSDYk0k2", "Female", "en-GB"
+        "Aurora (British, female)", "en-GB-SoniaNeural", "Xb7hH8MSUJpSbSDYk0k2", "Female", "en-GB"
     ),
     "us_male": VoiceSpec(
         "Chill (American, male)", "en-US-GuyNeural", "nPczCjzI2devNBz1zQrb", "Male", "en-US"

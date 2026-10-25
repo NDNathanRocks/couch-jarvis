@@ -90,7 +90,7 @@ def test_models_fit_the_hardware(monkeypatch: pytest.MonkeyPatch) -> None:
     assert hardware.speech_model("auto", "auto") == "small"
     assert hardware.speech_model("auto", "cuda") == "large-v3-turbo"
     assert hardware.speech_model("base", "cpu") == "base"  # an explicit choice wins
-    assert hardware.text_model("auto") == "qwen2.5:3b"
+    assert hardware.text_model("auto") == "phi4-mini"
     monkeypatch.setattr(hardware, "has_nvidia_gpu", lambda: True)
     assert hardware.speech_model("auto", "auto") == "large-v3-turbo"
     assert hardware.text_model("auto") == "qwen2.5:7b"

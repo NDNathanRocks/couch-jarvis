@@ -37,7 +37,9 @@ def test_the_build_never_bundles_an_env_file() -> None:
     assert ".env" not in re.sub(r"defaults\.env", "", SPEC)  # only installer/defaults.env
     assert "config.env" not in SPEC
     data_lines = [ln for ln in SPEC.splitlines() if "datas.append" in ln]
-    assert len(data_lines) == 2  # the phone app build and the (public) defaults, nothing else
+    # the phone app build, the (public) defaults and build_info.json (channel + version), nothing else
+    assert len(data_lines) == 3
+    assert any("BUILD_INFO" in ln for ln in data_lines)
 
 
 def test_the_build_script_scans_the_output_for_the_builders_own_keys() -> None:

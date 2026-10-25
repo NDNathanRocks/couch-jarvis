@@ -78,7 +78,7 @@ class Settings(BaseSettings):
     # auto: Gemini when a key is set (fast, free tier), else local Ollama; the other is the fallback
     router_provider: Literal["auto", "ollama", "gemini"] = "auto"
     ollama_url: str = "http://127.0.0.1:11434"
-    ollama_text_model: str = "auto"  # auto: qwen2.5:7b with an NVIDIA GPU, qwen2.5:3b without
+    ollama_text_model: str = "auto"  # auto: qwen2.5:7b with an NVIDIA GPU, phi4-mini without
     ollama_vlm_model: str = "qwen2.5vl:7b"
     gemini_api_key: SecretStr | None = None
 

@@ -23,6 +23,10 @@
 .PARAMETER SkipWeb
     Reuse the existing web-remote\dist instead of rebuilding it.
 
+.PARAMETER Channel
+    direct (default: the downloadable installer) or store (the input of installer\build_msix.ps1). Written to
+    installer\build_info.json and bundled; pc-daemon\build_info.py reads it. Source checkouts are "dev".
+
 .EXAMPLE
     .\installer\build.ps1
 #>
@@ -32,7 +36,8 @@ param(
     [string]$RelayUrl,
     [string]$PwaUrl,
     [string]$Version,
-    [switch]$SkipWeb
+    [switch]$SkipWeb,
+    [ValidateSet('direct', 'store')][string]$Channel = 'direct'
 )
 
 Set-StrictMode -Version Latest
@@ -101,6 +106,13 @@ $defaults = @(
     '# CJ_REMOTE_INPUT=true        false = phones cannot move the mouse or type'
 )
 Set-Content -LiteralPath (Join-Path $PSScriptRoot 'defaults.env') -Value $defaults -Encoding utf8
+$buildInfo = @{ channel = $Channel; version = $Version } | ConvertTo-Json -Compress
+[IO.File]::WriteAllText((Join-Path $PSScriptRoot 'build_info.json'), $buildInfo, [Text.UTF8Encoding]::new($false))
+Write-Host "==> channel $Channel"
+
+Write-Host '==> licence check and third-party notices'
+& $python (Join-Path $repo 'scripts\licenses.py') --write (Join-Path $PSScriptRoot 'THIRD_PARTY_NOTICES.txt')
+if ($LASTEXITCODE -ne 0) { throw 'A dependency has a licence this paid app may not ship (see above).' }
 
 Write-Host '==> installing build tools'
 uv pip install -r (Join-Path $repo 'requirements-build.txt') --python $python
@@ -136,8 +148,18 @@ function Assert-NoSecrets {
     Write-Host '==> secret scan: no API key or settings file in the build'
 }
 
+function Assert-NotShipped {
+    # Packages scripts\licenses.py promises are left out (licence terms): fail if PyInstaller kept one.
+    param([string]$Dir)
+    $found = Get-ChildItem -LiteralPath (Join-Path $Dir '_internal') -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^(edge_tts|pymsgbox|mouseinfo)([-.]|$)' }
+    if ($found) { throw "Excluded package(s) ended up in the build: $($found.Name -join ', ')" }
+}
+
 $app = Join-Path $dist 'CouchJarvis'
 Assert-NoSecrets $app
+Assert-NotShipped $app
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'THIRD_PARTY_NOTICES.txt') -Destination $app -Force
 $size = (Get-ChildItem -LiteralPath $app -Recurse -File | Measure-Object Length -Sum).Sum / 1MB
 Write-Host ('==> built {0} ({1:N0} MB)' -f $app, $size)
 

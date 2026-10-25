@@ -24,6 +24,7 @@ from agent.graph import AgentDeps, AgentRunner
 from agent.memory import ConversationMemory
 from bookmarks import BookmarkStore
 from browser_prefs import BrowserPrefs
+from build_info import allows_hobby_services, shows_update_notice
 from cloud_relay_client import CloudRelayClient
 from command_queue import CommandRequest
 from config import Settings, get_settings, init_dpi_awareness, resource_root
@@ -109,7 +110,8 @@ async def prepare_brain(settings: Settings) -> None:
 
 
 def build_voice(settings: Settings, *, on_change: Callable[[VoiceState], None]) -> VoiceService:
-    """Spoken replies: ElevenLabs if a key is set, else free Edge neural voices, else Windows."""
+    """Spoken replies: ElevenLabs if a key is set, else (source builds only) Edge neural voices,
+    else Windows."""
     from voice.player import MciPlayer
     from voice.tts import (
         EdgeProvider,
@@ -130,7 +132,9 @@ def build_voice(settings: Settings, *, on_change: Callable[[VoiceState], None]) 
                 monthly_chars=settings.elevenlabs_monthly_chars,
             )
         )
-    providers += [EdgeProvider(), WindowsProvider()]
+    if allows_hobby_services():  # edge-tts is not licensed for a product we sell
+        providers.append(EdgeProvider())
+    providers.append(WindowsProvider())
     engine = TtsEngine(providers, settings.voice_cache_dir)
     return VoiceService(
         VoicePrefsStore(settings.voice_file), engine, MciPlayer(), on_change=on_change
@@ -298,7 +302,7 @@ async def amain(args: argparse.Namespace) -> None:
     background: list[asyncio.Task[None]] = []
     if not args.dry_run:  # start/preload the local model now, not during your first command
         background.append(asyncio.create_task(prepare_brain(settings), name="brain-warm-up"))
-    if settings.update_check and not args.dry_run:
+    if settings.update_check and shows_update_notice() and not args.dry_run:
         service = rt.service
 
         def on_update(found: str | None) -> None:

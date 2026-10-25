@@ -7,7 +7,7 @@
     understood by a language model. Without a cloud key it runs locally through Ollama. This script:
       1. installs Ollama (per-user, no administrator rights) when it is missing,
       2. starts it,
-      3. downloads qwen2.5:7b on a PC with an NVIDIA GPU, or the smaller qwen2.5:3b on a plain CPU,
+      3. downloads qwen2.5:7b on a PC with an NVIDIA GPU, or the smaller phi4-mini on a plain CPU,
       4. with a GPU, also downloads qwen2.5vl:7b, which finds buttons by looking at the screen.
     Re-running it is safe: finished downloads are skipped.
 
@@ -61,7 +61,7 @@ function Close-Window {
 
 try {
     $gpu = Test-NvidiaGpu
-    $textModel = if ($gpu) { 'qwen2.5:7b' } else { 'qwen2.5:3b' }
+    $textModel = if ($gpu) { 'qwen2.5:7b' } else { 'phi4-mini' }
     Write-Host "This PC has $(if ($gpu) { 'an NVIDIA GPU' } else { 'no NVIDIA GPU' }): using $textModel."
 
     $ollama = Find-Ollama

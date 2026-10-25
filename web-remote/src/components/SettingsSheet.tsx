@@ -13,14 +13,14 @@ type Voice = VoicePrefs["voice"];
  * one feature and the TV (not this phone) remembers the answer.
  */
 export const STYLES: readonly { id: Style; label: string; sample: string }[] = [
-  { id: "jarvis", label: "Jarvis", sample: "“Now playing The Weeknd on YouTube Music.”" },
+  { id: "jarvis", label: "Butler", sample: "“Now playing The Weeknd on YouTube Music.”" },
   { id: "friendly", label: "Friendly", sample: "“You got it! Playing The Weeknd.”" },
   { id: "brief", label: "Brief", sample: "“Playing The Weeknd.”" },
 ];
 
 export const VOICES: readonly { id: Voice; label: string; hint: string; say: string }[] = [
-  { id: "british_male", label: "Jarvis", hint: "British, male", say: "use the british male voice" },
-  { id: "british_female", label: "Friday", hint: "British, female", say: "use the british female voice" },
+  { id: "british_male", label: "Sterling", hint: "British, male", say: "use the british male voice" },
+  { id: "british_female", label: "Aurora", hint: "British, female", say: "use the british female voice" },
   { id: "us_male", label: "Chill", hint: "American, male", say: "use the american male voice" },
   { id: "us_female", label: "Aria", hint: "American, female", say: "use the american female voice" },
 ];
@@ -159,16 +159,17 @@ export function SettingsSheet({ voice, adblock, micMode, version, disabled, onCo
           <div className="flex items-center gap-3 rounded-2xl bg-surface p-4 ring-1 ring-line">
             <div className="min-w-0 flex-1">
               <h3 id="web-h" className="text-[15px] font-semibold">
-                Block ads &amp; popups
+                Pop-up protection
               </h3>
               <p className="mt-0.5 text-xs text-muted">
                 Closes tabs that other websites open on their own. Links you pick from search results always open.
               </p>
             </div>
             <Switch
-              label="Block ads and popups"
+              label="Pop-up protection"
               checked={adblock}
               disabled={disabled}
+              // the older wording: every PC version understands it
               onChange={(on) => onCommand(on ? "turn on ad blocking" : "turn off ad blocking")}
             />
           </div>

@@ -1,7 +1,8 @@
 # plan.md — CouchJarvis / AegisRemote Implementation Plan
 
 > Originally the Phase 1 (Architect) plan. Phases 2-3 are done; sections 1-7 are the original design, kept as the
-> architecture reference. **Section 8 lists deviations; section 9 is the current state and roadmap (v0.2.0).**
+> architecture reference. **Section 8 lists deviations; sections 9-11 are the shipped versions (to 0.3.0); section 12
+> holds the binding release rules; section 13 is the v1.0.0 Microsoft Store plan.**
 
 ## 0. Context
 
@@ -493,7 +494,7 @@ clean machine: the installer's Gemini-key page, the "Set up AI brain" download, 
 headed Edge (headless tests cover the logic; `Browser.setWindowBounds` needs a real window).
 
 
-## 11. v0.3.0 plan: modern remote UI, sliders, favourites, in-place updates (Phase 1, awaiting approval)
+## 11. v0.3.0 plan: modern remote UI, sliders, favourites, in-place updates (built, see 11.7)
 
 Requests: (1) the installer detects an existing install (v0.2.0 onwards) and updates it, now and for every future release;
 (2) Remote page: after the transport buttons add a user-editable favourites grid (2 rows x 4 = 8 buttons, picked from a
@@ -615,3 +616,114 @@ Bugs the upgrade test found (both fixed, both guarded by `test_release_rules.py`
 
 Not verified on real hardware: sliders and favourites on a physical phone (touch feel, haptics), the TV pill fade on the TV,
 and `Browser.setWindowBounds` (v0.2.1 fullscreen fix) on the TV's headed Edge.
+
+---
+
+## 13. v1.0.0 plan: a paid Microsoft Store product (Phase 1, awaiting approval)
+
+Request: make the app good enough to sell in the Microsoft Store; production and business ready, with fresh ideas.
+Decisions already made by the user (2026-10-24): **paid app with a free trial** handled by the Store; **rename** (no
+"Jarvis"); **Store (MSIX) plus the direct-download installer**; **keep "Skip ad", drop the ad blocker** (it becomes
+pop-up protection). Version **1.0.0** = first Store release. The wire protocol stays backward compatible (rule 5), so this
+is a product milestone, not a breaking change.
+
+### 13.1 Findings: what stops a sale today
+Product and UX
+- **No PC user interface.** Settings are lines in `config.env` opened in Notepad; revoking a phone needs `curl`; the
+  brain, Edge and relay status are only in log files. Store reviewers and buyers expect a real settings window.
+- **Tray "Quit" does not quit**: `app_entry.run_supervisor` restarts the daemon whatever its exit code, 2 s later.
+- **First run is bare**: no welcome, no "sign in to your streaming sites in the TV browser", no test that it all works.
+- **The AI brain needs a key the buyer must fetch** (Gemini) or a multi-GB download; on a CPU-only PC it is slow.
+- A visitor who opens the phone page without a QR only sees "scan the QR"; nothing says how to get the PC app.
+- English only; no accessibility pass beyond touch-target sizes and reduced motion.
+- No "who may do what": every paired phone is equal (touchpad, keys, reset QR, delete saved pages).
+
+Legal and licensing (each one can block a paid listing)
+- **"Jarvis" and the voice names "Jarvis"/"Friday" are Marvel trademarks.**
+- **No `LICENSE`, EULA, privacy policy, terms or third-party notices.** The Store requires a privacy policy URL for an
+  app that uses the internet. PySide6 (LGPL) and other bundled packages need notices.
+- **The source is in a public GitHub repo** with no licence: anyone can build the paid app for free.
+- **The CPU default model `qwen2.5:3b` is under the Qwen Research licence (non-commercial)**; 7B is Apache-2.0.
+  Recommending or auto-downloading it from a paid product is not allowed. (Verify every model licence again at build time.)
+- **`edge-tts` uses Microsoft's undocumented Read Aloud service**: fine for a hobby, not for a commercial product.
+- **Vercel Hobby (the phone app's host) is for non-commercial use only.**
+- The ad blocker conflicts with YouTube's terms (decided: removed).
+
+Cloud relay at scale (today it is sized for one household)
+- **Stage throttle is 20 req/s with burst 40 for everyone together**: a few hundred customers would throttle each other.
+- **The PC forwards every event to the relay even when no phone is connected** (state patches every 10 s while a video
+  plays). Each one costs an API Gateway message, a Lambda call and DynamoDB reads, so idle TVs cost money.
+- Anyone can register unlimited rooms (trust on first use, no rate limit), and rooms never expire (no TTL).
+- No alarms, no staging stack, a 1 USD budget, and the relay URL is the raw `execute-api` hostname, so moving region or
+  account would strand every installed copy.
+- No way to delete your data from the cloud (privacy laws expect one).
+
+Engineering
+- Telemetry writes one file per day (50 MB cap each) and never deletes old days.
+- No crash reporting: a crash on a buyer's PC is invisible to you.
+- No release channels: one build does everything, including the GitHub update notice that a Store app must not show.
+- Data files have no schema version for later migrations.
+
+### 13.2 Cost and price model (estimates, to check on the staging stack in 5D)
+Per PC that is online 24/7 with a phone in use ~2 h/day, after the 5D savings: API Gateway connection minutes about
+0.01 USD/month, messages about 0.03 USD/month, Lambda and DynamoDB about 0.02-0.05 USD/month: **roughly 0.05-0.10 USD per
+active PC per month**, most of it inside the free tier until a few hundred users. 1,000 active PCs ≈ 50-100 USD/month;
+10,000 ≈ 500-1,000 USD/month. The Store keeps 15% of app sales. A one-time price of 4.99-7.99 USD therefore pays for
+roughly 4-6 years of relay per buyer; a later optional subscription (for example a hosted AI brain, 13.8) is the
+long-term revenue lever. Your fixed costs: Partner Center account (check the current fee), a domain (~15 USD/year),
+code signing for the direct download (~10 USD/month with Azure Artifact Signing, optional), hosting (0-20 USD/month, 5E).
+
+### 13.3 Milestones and gates
+| Milestone | Change | Gate |
+|---|---|---|
+| 5A MSIX spike (first, it is the biggest risk) | Package today's PyInstaller build as an MSIX (`makeappx`, test-signed) and prove, inside the package: Edge starts with the TV profile and CDP on 9222, the Qt overlay and tray show, the LAN port accepts phones (firewall rule extension), start at sign-in (`StartupTask`), data in `%APPDATA%` survives an update. Record what package virtualization changes | a written go/no-go in this section; stop and ask if a blocker appears |
+| 5B Brand and channels | New name everywhere the user sees it (window titles, tray, TV overlay, phone, installer, docs, icons via `make_icons.py`); internal ids, `AppId`, data folders and `CJ_` settings stay, so installs keep working. `build_info.py` bakes the channel: `store`, `direct`, `dev`. Store channel: no GitHub update check, licence from the Store, no script that downloads and runs an installer | tests per channel, `test_release_rules` |
+| 5C Licence-safe defaults | CPU model -> a commercially licensed one (candidates: `qwen2.5:1.5b`, `phi4-mini`, `llama3.2:3b`; chosen by a speed/accuracy check on this PC); `edge-tts` removed from the store/direct builds (Windows neural/OneCore voices offline, ElevenLabs with the buyer's own key), kept only in `dev`; ad blocker -> "Pop-up protection" (closes tabs a site opens by itself, nothing else); voice names and the "Jarvis" style relabelled (stored ids unchanged); `scripts/licenses.py` builds `THIRD_PARTY_NOTICES.txt` from pip and npm metadata and fails on GPL/AGPL/non-commercial licences | pytest, a licence-scan gate in `build.ps1` |
+| 5D Relay for real customers | PC sends events to the relay **only while a phone is online** (presence), polls slower with no phone; stage throttle raised (parameter, e.g. 1000/2000) plus per-IP limits on `$connect` and room registration (DynamoDB counters with TTL); room TTL refreshed by the PC; new `room.delete` (PC -> relay: removes room, devices, connections) for "delete my cloud data" and uninstall-with-delete; CloudWatch alarms (Lambda errors/throttles, API 5xx, DynamoDB throttles) to email; budget parameter with a forecast alert; optional reserved-concurrency ceiling; a `staging` stack; a custom domain for the relay (`relay.<domain>`, regional cert in us-east-2) so the URL can move later; a load script (500 simulated rooms) measuring messages and cost | `tests/infra` (moto), `sam validate --lint`, load-test numbers recorded in 13.2 |
+| 5E Phone app hosting | Move off Vercel Hobby to your own domain: **Cloudflare Pages (free, commercial use allowed)** or Vercel Pro (20 USD/month) — your pick at approval. The old Vercel URL stays up as a forwarder that hands the pairing to the new origin in the URL fragment (never sent to a server), so paired phones and home-screen icons keep working; the daemon maps the old `CJ_PWA_BASE_URL` to the new one in the QR without rewriting `config.env` | vitest for the handoff, e2e: old URL -> new URL keeps pairing |
+| 5F Licensing | `licensing.py` with three sources: **Store** (`Windows.Services.Store` via `winrt`: active / trial / days left, purchase dialog on the TV), **Key** for the direct download (an Ed25519-signed key checked offline; sold through a merchant of record such as Paddle or Lemon Squeezy, which handles sales tax), **Dev** (always active). Room state gains `license {status, days_left}` (old phones ignore it). Trial expired: the TV and phones show "Trial ended" with a Buy button; tapping Buy on a phone opens the Store purchase dialog on the TV. Existing GitHub users (0.x) get a free key | pytest with fake Store/keys, vitest, manual Store sandbox test |
+| 5G PC Control Center | A Qt window (Start menu, tray "Open", second launch): **Welcome wizard** (name the TV, pick the screen, open the TV browser to sign in to Netflix/YouTube etc., choose the brain: local download with a progress bar or paste a Gemini key with a Test button, pair the first phone, a test command); **Settings** (every `config.env` option as a control with validation, saved atomically, restarts the daemon itself); **Phones** (list, rename, owner/guest, remove: replaces `curl`); **Status** (relay, Edge, brain, speech, licence, with "fix it" buttons); **Help** (copy a diagnostics bundle with secrets removed, open support, privacy, licences, version). Tray: Open, Pause phone control, Quit (really quits: supervisor honours exit codes 0 = stop, 3 = restart now). "Try the remote on this PC" opens the phone app in a desktop browser, paired over loopback (also for Store reviewers) | pytest-qt flows, offscreen screenshot review |
+| 5H Phone app for buyers | **Owner and guest roles** (PC-enforced: guests get media, volume, favourites and voice; not touchpad/keys, QR reset, settings or deleting saved pages; optional guest passes that expire after 24 h); **Apps** row (one tap: Netflix, YouTube, Prime Video, Disney+, Spotify, Twitch, Plex, Crunchyroll, editable); **several TVs** on one phone ("Living room", "Bedroom") with a switcher; a landing page for visitors without a QR (what it is, get it from the Store); trial/expired banners; in-app Privacy, Terms, Licences; **English and French** (all strings through one `t()`), accessibility pass (labels, focus order, contrast AA, 200% text) | vitest, e2e at 320/375/430/landscape, axe-core in e2e, tsc, eslint |
+| 5I Reliability and support | Opt-in crash reports (off by default, asked in the wizard; Sentry free tier with PII scrubbing, or none if you prefer); telemetry keeps 14 days; atomic writes and a `schema_version` in every data file with tested migrations from 0.3.0 data; "Delete my cloud data" button; more fast-path phrases so common commands never need the AI (fewer "brain" support tickets) | pytest, upgrade test from 0.2.0 and 0.3.0 data |
+| 5J Packaging and release | `installer/msix/` (manifest, assets) and `build_msix.ps1` from the 5A spike; the Inno installer becomes the **direct** channel (signed if you buy signing); the Store app detects an Inno install on first run and offers to remove it, keeping all data; Windows App Certification Kit run; upgrade tests: Inno 0.2.0/0.3.0 -> Inno 1.0.0, Inno -> Store MSIX, MSIX -> MSIX | WACK pass, `test_installer_upgrade.ps1` + a new MSIX test in Windows Sandbox |
+| 5K Business documents and Store kit | `LICENSE` (proprietary EULA), `docs/PRIVACY.md` and `docs/TERMS.md` (also served by the phone site), `THIRD_PARTY_NOTICES.txt` in every build, Store listing text, feature list, keywords, age-rating answers, certification notes for reviewers, a screenshot script (TV overlay, Control Center, phone at 3 sizes), a support page and email, a status line in the docs. Legal texts are drafts for you to review (I am not a lawyer) | docs reviewed by you |
+| 5L Phase 3 Critic | Full gate (`pytest -m ""`, vitest, lint, types, audits, licence scan, secret scan), WACK, staging relay load test, both upgrade tests, review of every screen at phone and TV size | all green, findings fixed |
+
+### 13.4 Contract changes (all additive)
+- `RoomState.license: {status: "active"|"trial"|"expired", days_left: int|null}` (absent = active, for older daemons).
+- `Device.role: "owner"|"guest"` (absent = owner); the PC enforces it, the relay is unchanged.
+- PC -> relay `room.delete` (new type: the relay must be redeployed **before** a daemon that sends it; an old relay
+  answers `forbidden_type`, which the daemon reports as "update needed").
+- `QuickAction` gains `buy` (opens the Store purchase dialog on the TV; the outcome comes back as a normal `cmd.result`).
+  The phone hides it for daemons older than 1.0.0 (`daemon_version`).
+
+### 13.5 What you need to do (I cannot do these for you)
+- Pick the name (13.6) and do a trademark search (USPTO / CIPO) before we commit to it.
+- Create the Partner Center developer account, reserve the app name, set the price and the trial length.
+- Buy the domain; choose Cloudflare Pages or Vercel Pro (5E); optionally buy code signing for the direct download.
+- Decide whether to make the GitHub repo private (recommended for a paid app) and where direct downloads live.
+- If you want direct-download sales: a Paddle / Lemon Squeezy account (5F); otherwise the direct build is free for
+  existing users only.
+- Review the legal drafts, and give a support email address.
+
+### 13.6 Name candidates (all unchecked; a trademark search decides)
+**SofaPilot**, **CouchPilot**, **LoungeDeck**, **TVPilot**. Voice labels become **Butler** (style) and **Sterling /
+Aurora / Chill / Aria** (voices).
+
+### 13.7 Risks
+- **MSIX virtualization** may change how Edge, the TV profile or the LAN port behave inside the package: the 5A spike
+  decides before anything else is built. Fallback: submit the signed Inno installer to the Store as a Win32 app (needs
+  a code-signing certificate and loses Store-managed trials, so licensing would use keys only).
+- **Store review** of an app that drives a browser and the mouse: the certification notes and "try it on this PC" mode
+  exist for that; a first rejection is still likely and normal.
+- **Streaming sites** (Netflix, Disney+) can block automated browsers or change their pages; the app keeps saying what
+  it cannot do, and the listing must not promise those sites.
+- **A smaller CPU model** understands less: fast-path coverage (5I) and the Gemini option compensate.
+- **Relay costs grow with users**: 5D's savings, alarms and the cost table keep this visible.
+- Scope is large (about 12 milestones). Each milestone ends green and committed; nothing is pushed, tagged or deployed
+  without asking.
+
+### 13.8 Out of scope for 1.0.0 (ideas for later)
+A hosted AI brain as an optional subscription (no keys, works on any PC), native phone apps (Play Store / App Store
+wrappers), a TV-side voice wake word, Android TV / macOS PCs, shared favourites between phones, a web dashboard for your
+customers' licences.

@@ -63,7 +63,7 @@ else the app needs an AI model ("the brain"). Without one you will hear *"My bra
   into the installer's "AI brain" page, or add `CJ_GEMINI_API_KEY=...` to your settings file. Nothing to download.
 - *Local, private, works offline:* tick **Download the local AI brain now** on the last page of the installer, or run
   **Set up AI brain** from the Start menu any time. It installs [Ollama](https://ollama.com) and downloads `qwen2.5:7b`
-  (NVIDIA GPU) or the smaller `qwen2.5:3b` (no GPU), plus `qwen2.5vl:7b` for finding buttons on screen when there is a GPU.
+  (NVIDIA GPU) or the smaller `phi4-mini` (no GPU), plus `qwen2.5vl:7b` for finding buttons on screen when there is a GPU.
   Without a GPU, local answers take several seconds: a Gemini key is much faster.
 - With both, the key is used first and the local model is the fallback. Couch Jarvis starts Ollama and loads the model for you at startup.
 
@@ -107,7 +107,7 @@ Tap **Log** at the top of the phone app first: it shows what the PC heard and wh
 | **"Recording was incomplete"** | Update both the PC app and the cloud relay to the latest version |
 | Voice says it couldn't hear you | The Log shows `heard:`. Allow the mic in the phone browser. First use downloads the model, so wait. Try `CJ_STT_DEVICE=cpu` or a Groq key |
 | **"My brain is not set up"** / **"missing its model"** | Run **Set up AI brain** from the Start menu, or add a Gemini key (see *Free-form commands* above) |
-| **"My brain took too long"** | The local model is slow on a CPU. Add a Gemini key, or use a smaller model: `CJ_OLLAMA_TEXT_MODEL=qwen2.5:1.5b` |
+| **"My brain took too long"** | The local model is slow on a CPU. Add a Gemini key, or use a smaller model: `CJ_OLLAMA_TEXT_MODEL=qwen2.5:1.5b` (faster, understands less) |
 | It misunderstands a command | The Log shows what it heard. Free-form commands need the AI brain (above) |
 | Fullscreen doesn't work | Tap it twice (ad pages swallow the first click). The Log shows what failed. If Edge's tab strip still shows, use **Touchpad & keys -> F11** or say "press F11" |
 | Edge doesn't open / commands do nothing | Close every Edge window and restart Couch Jarvis; it owns the TV browser on debug port 9222 |

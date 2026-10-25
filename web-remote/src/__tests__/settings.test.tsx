@@ -39,7 +39,7 @@ describe("voice reply settings", () => {
     expect(screen.getByText(/Speaking with Microsoft neural voices/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Brief" }));
-    fireEvent.click(screen.getByRole("button", { name: /Friday/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Aurora/ }));
     fireEvent.click(screen.getByRole("switch", { name: "Speak after button taps" }));
     fireEvent.click(screen.getByRole("button", { name: "Hear it" }));
     fireEvent.click(screen.getByRole("switch", { name: "Voice replies" }));
@@ -55,7 +55,7 @@ describe("voice reply settings", () => {
   it("is on by default before the TV has said anything, and hides the details when off", async () => {
     await openSettings();
     expect(screen.getByRole("switch", { name: "Voice replies" })).toBeChecked();
-    expect(screen.getByRole("button", { name: "Jarvis" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Butler" })).toHaveAttribute("aria-pressed", "true");
     // the TV turns it off (e.g. someone said "stop talking"): every phone follows
     await act(async () =>
       FakeSocket.last.receive(incoming("state.patch", { rev: 2, voice: { enabled: false, style: "jarvis", voice: "british_male", buttons: false, engine: "none" } })),
@@ -104,13 +104,13 @@ describe("suggestions", () => {
 describe("ad blocking setting", () => {
   it("shows the PC's choice and flips it with an ordinary command", async () => {
     const sock = await openSettings();
-    const toggle = screen.getByRole("switch", { name: "Block ads and popups" });
+    const toggle = screen.getByRole("switch", { name: "Pop-up protection" });
     expect(toggle).toBeChecked(); // on until the PC says otherwise
     fireEvent.click(toggle);
     expect(texts(sock)).toEqual(["turn off ad blocking"]);
     await act(async () => sock.receive(incoming("state.patch", { browser: { adblock: false }, rev: 2 })));
-    expect(screen.getByRole("switch", { name: "Block ads and popups" })).not.toBeChecked();
-    fireEvent.click(screen.getByRole("switch", { name: "Block ads and popups" }));
+    expect(screen.getByRole("switch", { name: "Pop-up protection" })).not.toBeChecked();
+    fireEvent.click(screen.getByRole("switch", { name: "Pop-up protection" }));
     expect(texts(sock)).toEqual(["turn off ad blocking", "turn on ad blocking"]);
   });
 });

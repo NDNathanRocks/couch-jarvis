@@ -221,7 +221,7 @@ def success_message(plan: IntentPlan) -> str:
                 "toggle": "QR code toggled",
             }.get(str(step.args.get("action")), "Done")
         if step.op == "browser_pref":
-            return "Ad blocking on" if step.args.get("adblock") else "Ad blocking off"
+            return "Pop-up protection on" if step.args.get("adblock") else "Pop-up protection off"
     several = written_message(plan)
     if several is not None:
         return several

@@ -50,7 +50,7 @@ commands are matched instantly; anything else goes to the **AI brain**: a free G
 | "new tab" / "close this tab" / "next tab" / "previous tab" | Tabs |
 | "go back" / "go forward" / "reload" / "scroll down" | Page navigation |
 | "press F11" / "hit escape" / "press control L" / "press alt left" | Presses that key or chord on the PC (F1-F12, arrows, Enter, letters, with Ctrl/Alt/Shift). Some chords such as Alt+F4 are refused |
-| "turn off ad blocking" / "block ads" | The same switch as the phone Settings. Pop-ups are handled per page type |
+| "turn off pop-up protection" / "block pop-ups" | The same switch as the phone Settings: closes tabs a site opens by itself and undoes redirects (it does not block ads). "Ad blocking" still works as a phrase |
 
 **Timers, pairing and saved pages**
 
@@ -153,7 +153,7 @@ run from source overrides it. Restart the app after changing anything. The usefu
 | `CJ_STT_MODEL` | `auto` | Whisper model. `auto` = `large-v3-turbo` with an NVIDIA GPU, `small` without; set `base` on a very weak PC |
 | `CJ_GROQ_API_KEY` | none | Free cloud speech-to-text, used if local voice fails |
 | `CJ_ROUTER_PROVIDER` | `auto` | `auto` = Gemini when `CJ_GEMINI_API_KEY` is set, else local Ollama (the other is the fallback); or force `ollama` / `gemini` |
-| `CJ_OLLAMA_TEXT_MODEL` / `CJ_OLLAMA_VLM_MODEL` | `auto` / `qwen2.5vl:7b` | Local models. `auto` = `qwen2.5:7b` with an NVIDIA GPU, `qwen2.5:3b` without. **Set up AI brain** (Start menu) downloads them |
+| `CJ_OLLAMA_TEXT_MODEL` / `CJ_OLLAMA_VLM_MODEL` | `auto` / `qwen2.5vl:7b` | Local models. `auto` = `qwen2.5:7b` with an NVIDIA GPU, `phi4-mini` without. **Set up AI brain** (Start menu) downloads them |
 | `CJ_GEMINI_API_KEY` | none | Free Gemini key for understanding commands / finding buttons on screen |
 | `CJ_SUBTITLE_LANG` | `en` | Language "turn on subtitles" picks when you don't name one (`en`, `es`, `fr`, `de`...) |
 | `CJ_ELEVENLABS_API_KEY` | none | Optional. Spoken replies use ElevenLabs first (capped at `CJ_ELEVENLABS_MONTHLY_CHARS`, default 9000), then free Microsoft neural voices, then offline Windows voices. Turn replies on/off and pick the style/voice in the phone's Settings |

@@ -276,7 +276,9 @@ def _plan_site(t: str) -> IntentPlan | None:
     return None
 
 
+# Sterling / Aurora are the names the phone shows; the older Jarvis / Friday still work when spoken.
 _VOICE_NAMES = {
+    "sterling": "british_male", "aurora": "british_female",
     "jarvis": "british_male", "british male": "british_male", "british": "british_male",
     "butler": "british_male", "friday": "british_female", "british female": "british_female",
     "chill": "us_male", "american male": "us_male", "us male": "us_male",
@@ -297,8 +299,14 @@ _AD = r"(?:ads?|ad ?block(?:ing|er)?|popups?|pop[- ]ups?|popup blocker|ad blocke
 
 
 def _plan_browser_prefs(t: str) -> IntentPlan | None:
-    """ "turn off ad blocking" / "block ads" / "allow popups": the same switch the phone has."""
-    blocker = r"(?:ad ?block(?:ing|er)?|pop[- ]?up blocker|pop[- ]?up blocking)"
+    """ "turn off pop-up protection" / "block pop-ups" / "allow popups": the phone's switch.
+
+    The switch only closes tabs a site opens by itself and undoes redirects; it never blocks
+    ads. The older "ad blocking" wording still works for people used to it.
+    """
+    blocker = (
+        r"(?:ad ?block(?:ing|er)?|pop[- ]?up blocker|pop[- ]?up blocking|pop[- ]?up protection)"
+    )
     allow = r"(?:allow|let|stop blocking) (?:all )?(?:ads?|pop[- ]?ups?)(?: through)?"
     if re.fullmatch(rf"(?:turn off|switch off|disable|stop|deactivate) (?:the )?{blocker}", t) or (
         re.fullmatch(allow, t)
@@ -374,7 +382,9 @@ def _plan_voice(t: str) -> IntentPlan | None:
         rf"(?:change|set|switch)(?: the| your)? voice(?: to)?(?: the)? ({names})", t
     )
     if m and (
-        m.group(1) in ("jarvis", "friday", "chill", "aria") or " " in m.group(1) or "voice" in t
+        m.group(1) in ("sterling", "aurora", "jarvis", "friday", "chill", "aria")
+        or " " in m.group(1)
+        or "voice" in t
     ):
         return _voice(voice=_VOICE_NAMES[m.group(1)])
     return None

@@ -81,7 +81,7 @@ def test_prefs_persist_and_default_to_blocking(tmp_path: Path) -> None:
     seen: list[bool] = []
     prefs = BrowserPrefs(path, on_change=lambda s: seen.append(s.adblock))
     assert prefs.adblock is True
-    assert prefs.apply({"adblock": False}) == "Ad blocking off"
+    assert prefs.apply({"adblock": False}) == "Pop-up protection off"
     assert BrowserPrefs(path).adblock is False and seen == [False]
     path.write_text("junk", encoding="utf-8")
     assert BrowserPrefs(path).adblock is True
@@ -95,6 +95,8 @@ def test_prefs_persist_and_default_to_blocking(tmp_path: Path) -> None:
         ("allow popups", False),
         ("turn on ad blocking", True),
         ("block ads", True),
+        ("turn off pop-up protection", False),
+        ("turn on the popup protection", True),
     ],
 )
 def test_spoken_switch(said: str, adblock: bool) -> None:
@@ -110,7 +112,7 @@ async def test_the_agent_flips_the_switch() -> None:
         command_id="c", idempotency_key="k", device_id="d", kind="text", text="turn off ad blocking"
     )
     result = await env.runner().run(req)
-    assert result.ok and result.message == "Ad blocking off"
+    assert result.ok and result.message == "Pop-up protection off"
     assert env.deps.prefs.adblock is False
 
 

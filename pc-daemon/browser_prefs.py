@@ -17,7 +17,11 @@ log = logging.getLogger(__name__)
 
 
 class BrowserPrefs:
-    """``browser.json``: a missing or damaged file means the defaults (ad blocking on)."""
+    """``browser.json``: a missing or damaged file means the defaults (pop-up protection on).
+
+    The stored field is still called ``adblock`` (the wire contract), but it never blocked ads:
+    it closes tabs a site opens by itself and undoes redirects.
+    """
 
     def __init__(
         self, path: Path | None = None, on_change: Callable[[BrowserState], None] | None = None
@@ -36,7 +40,7 @@ class BrowserPrefs:
             self.state = self.state.model_copy(update={"adblock": bool(args["adblock"])})
             self._save()
             self._on_change(self.state)
-            return "Ad blocking on" if self.state.adblock else "Ad blocking off"
+            return "Pop-up protection on" if self.state.adblock else "Pop-up protection off"
         return "Done"
 
     def _load(self) -> BrowserState:

@@ -4,11 +4,15 @@
 # Playwright's Node driver is bundled (collect_all) but NOT its browsers: the app drives the
 # Microsoft Edge that is already on the PC over CDP.
 
+import json
 import os
 
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))
+BUILD_INFO = os.path.join(SPECPATH, "build_info.json")  # written by build.ps1 (-Channel)
+with open(BUILD_INFO, encoding="utf-8") as f:
+    CHANNEL = json.load(f)["channel"]
 
 datas, binaries, hiddenimports = [], [], ["main"]
 for package in ("faster_whisper", "ctranslate2", "playwright", "segno", "mss", "pyautogui"):
@@ -17,7 +21,7 @@ for package in ("faster_whisper", "ctranslate2", "playwright", "segno", "mss", "
     binaries += b
     hiddenimports += h
 hiddenimports += collect_submodules("langgraph") + collect_submodules("uvicorn")
-hiddenimports += ["edge_tts", "websockets.asyncio.server", "pycaw.pycaw", "comtypes.client", "qasync"]
+hiddenimports += ["websockets.asyncio.server", "pycaw.pycaw", "comtypes.client", "qasync"]
 
 web_dist = os.path.join(ROOT, "web-remote", "dist")
 if os.path.isdir(web_dist):
@@ -25,6 +29,7 @@ if os.path.isdir(web_dist):
 defaults = os.path.join(SPECPATH, "defaults.env")
 if os.path.isfile(defaults):
     datas.append((defaults, "installer"))
+datas.append((BUILD_INFO, "installer"))
 
 # The TV overlay only needs QtWidgets/QtGui/QtCore: leave the big optional Qt modules out.
 excludes = [
@@ -40,6 +45,11 @@ excludes = [
     "PySide6.QtDesigner", "PySide6.QtHelp", "PySide6.QtLocation", "PySide6.QtRemoteObjects",
     "PySide6.QtScxml", "PySide6.QtSpatialAudio", "PySide6.QtStateMachine",
     "PySide6.QtTextToSpeech", "PySide6.QtVirtualKeyboard",
+    # edge-tts's terms do not cover a product we sell: never ship it (build_info.allows_hobby_services)
+    "edge_tts",
+    # GPLv3 helpers pyautogui imports optionally (message boxes, a mouse-position app). It works
+    # without them and we use neither; a closed product must not ship GPL code (scripts/licenses.py).
+    "pymsgbox", "mouseinfo",
 ]  # fmt: skip
 
 a = Analysis(

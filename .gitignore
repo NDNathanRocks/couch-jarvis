@@ -17,6 +17,8 @@ tests/e2e/.shots/
 installer/dist/
 installer/build/
 installer/defaults.env
+installer/build_info.json
+installer/THIRD_PARTY_NOTICES.txt
 
 # keep the plan and release rules in the repo even though a global ignore may hide plan.md
 !plan.md
