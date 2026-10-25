@@ -302,3 +302,66 @@ def test_parse_roundtrip_of_published_events(svc: CommandService) -> None:
     svc.state.update(muted=True)
     for e in svc.bus.replay_since(0):
         parse_message(e.data)  # everything the bus emits is a valid contract message
+
+
+def slider(action: str, **args: Any) -> Any:
+    payload = {"command_id": "s1", "idempotency_key": "sk1", "action": action, "args": args}
+    return msg(CmdButton, payload)
+
+
+async def test_volume_slider_applies_at_once_without_a_reply_or_a_queued_command(
+    svc: CommandService, env: AgentEnv
+) -> None:
+    assert await svc.handle_envelope(slider("volume_set", level=37), "d1") == []
+    assert env.os.volume == 37 and svc.state.state.volume == 37
+    assert "cmd.ack" not in types(svc) and "cmd.result" not in types(svc)
+
+
+async def test_timeline_slider_seeks_to_an_absolute_time(
+    svc: CommandService, env: AgentEnv
+) -> None:
+    assert await svc.handle_envelope(slider("seek_to", position_s=125.5), "d1") == []
+    assert "seek_to:125.5" in env.browser.calls
+
+
+async def test_seeking_with_nothing_to_seek_in_says_so(svc: CommandService, env: AgentEnv) -> None:
+    env.browser.can_seek = False
+    replies = await svc.handle_envelope(slider("seek_to", position_s=5), "d1")
+    assert [r.payload.code for r in replies if isinstance(r, ErrorMsg)] == ["seek_failed"]
+
+
+async def test_a_drag_is_rate_limited_per_phone(svc: CommandService) -> None:
+    codes: list[str] = []
+    for level in range(100):  # far faster than a thumb can move
+        for r in await svc.handle_envelope(slider("volume_set", level=level % 100), "d1"):
+            codes.append(r.payload.code)
+    assert "rate_limited" in codes
+    assert await svc.handle_envelope(slider("volume_set", level=10), "other-phone") == []
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"action": "volume_set", "args": {}},
+        {"action": "volume_set", "args": {"level": 101}},
+        {"action": "volume_set", "args": {"level": -1}},
+        {"action": "volume_set", "args": {"level": True}},
+        {"action": "volume_set", "args": {"level": 5, "extra": "x"}},
+        {"action": "seek_to", "args": {"position_s": -3}},
+        {"action": "seek_to", "args": {"position_s": "10"}},
+        {"action": "seek_to", "args": {"level": 10}},
+    ],
+)
+def test_slider_values_are_validated_by_the_contract(payload: dict[str, Any]) -> None:
+    from pydantic import ValidationError
+
+    from contracts import CmdButtonPayload
+
+    with pytest.raises(ValidationError):
+        CmdButtonPayload(command_id="c", idempotency_key="k", **payload)
+
+
+async def test_room_state_advertises_the_daemon_version(svc: CommandService) -> None:
+    from version import __version__
+
+    assert svc.state.state.daemon_version == __version__

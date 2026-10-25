@@ -612,6 +612,8 @@ def plan_button(
 ) -> IntentPlan:
     """Map a Quick Deck button to its single-step plan."""
     del args  # reserved for parameterized buttons
+    if action in ("volume_set", "seek_to"):
+        raise ValueError(f"{action} is a slider: the service applies it directly")
     table: dict[str, IntentPlan] = {
         "play_pause": _media("play_pause"),
         "next": _media("next"),

@@ -26,6 +26,10 @@ export interface RoomSnapshot {
   browser: { adblock: boolean };
   /** Pages saved on the PC with "Save this page". */
   bookmarks: Bookmark[];
+  /** The PC app version (empty for a PC older than 0.3.0, which does not report it). */
+  daemon_version: string;
+  /** A newer released version, when the PC's daily check found one. */
+  update_available: string | null;
   rev: number;
 }
 
@@ -111,6 +115,8 @@ export const emptyRoom: RoomSnapshot = {
   voice: { enabled: true, style: "jarvis", voice: "british_male", buttons: false, engine: "none" },
   browser: { adblock: true },
   bookmarks: [],
+  daemon_version: "",
+  update_available: null,
   rev: 0,
 };
 

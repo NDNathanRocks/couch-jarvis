@@ -10,7 +10,7 @@ import os
 import time
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 
 PROTOCOL_VERSION = 1  # keep in sync with _EnvelopeBase.v
 MAX_AUDIO_CHUNK_B64 = 24 * 1024
@@ -39,6 +39,8 @@ QuickAction = Literal[
     "scroll_up",
     "scroll_down",
     "subtitles",
+    "volume_set",  # args: level 0-100 (the slider; applied at once, never queued)
+    "seek_to",  # args: position_s >= 0 (the timeline slider; applied at once)
 ]
 
 PointerAction = Literal[
@@ -124,6 +126,8 @@ class RoomState(_Model):
     queue_depth: int = 0
     driver: str | None = None
     devices: list[DevicePresence] = Field(default_factory=list)
+    daemon_version: str = ""  # the PC app version: the phone hides controls an older PC lacks
+    update_available: str | None = None  # newer released version, if the daily check found one
     remote_input: bool = True  # touchpad/keyboard allowed (CJ_REMOTE_INPUT on the PC)
     voice: VoiceState = Field(default_factory=VoiceState)
     browser: BrowserState = Field(default_factory=BrowserState)
@@ -154,6 +158,23 @@ class CmdButtonPayload(_Model):
     idempotency_key: str
     action: QuickAction
     args: dict[str, str | int | float | bool] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _slider_args(self) -> CmdButtonPayload:
+        """The two slider actions carry one number each; nothing else rides along."""
+        key = {"volume_set": "level", "seek_to": "position_s"}.get(self.action)
+        if key is None:
+            return self
+        value = self.args.get(key)
+        top = 100 if key == "level" else 86400 * 2
+        if (
+            set(self.args) != {key}
+            or isinstance(value, bool)
+            or not isinstance(value, int | float)
+            or not 0 <= value <= top
+        ):
+            raise ValueError(f"{self.action} needs only {key} between 0 and {top}")
+        return self
 
 
 class CmdTextPayload(_Model):

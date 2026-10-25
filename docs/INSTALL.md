@@ -84,8 +84,14 @@ Logs are in `%LOCALAPPDATA%\CouchJarvis\logs`. They never contain pairing links 
 
 ## Updating and uninstalling
 
-- **Update:** run the new installer over the old one. Your settings, paired phones and TV browser sign-ins are kept.
-  If the update adds features that need the cloud relay (such as the touchpad), the person who runs the relay must update it too.
+- **Update:** run the new installer. It finds the copy you already have (any version from 0.2.0 on), tells you
+  "Couch Jarvis X is installed. This will update it to Y", closes the running app, installs over it in the same folder and
+  starts it again. Your settings, paired phones, room keys and TV browser sign-ins are never touched, and you are not asked
+  for the Gemini key again. Installing an older version over a newer one asks first.
+- **Update notice:** once a day Couch Jarvis asks GitHub whether a newer release exists and shows "Couch Jarvis X is out" on
+  the phone. It only tells you; nothing is downloaded or run for you. Turn it off with `CJ_UPDATE_CHECK=false`.
+- **Phone app problems after an update?** Settings -> **Reset app cache** reloads the newest page without un-pairing.
+  If the update adds features that need the cloud relay, the person who runs the relay must update it too.
 - **Uninstall:** Windows Settings -> Apps -> Couch Jarvis -> Uninstall. It asks whether to also delete your settings, paired
   phones and the TV browser profile.
 
@@ -128,7 +134,7 @@ For whoever publishes Couch Jarvis (you, not the people installing it).
 powershell -ExecutionPolicy Bypass -File .\installer\build.ps1
 # or, to choose the endpoints and version explicitly:
 powershell -ExecutionPolicy Bypass -File .\installer\build.ps1 -RelayUrl wss://xxxx.execute-api.us-east-2.amazonaws.com/prod `
-    -PwaUrl https://your-app.vercel.app -Version 0.2.0
+    -PwaUrl https://your-app.vercel.app
 ```
 
 It builds the phone app, writes the defaults, freezes the daemon with PyInstaller (a few minutes) and writes to

@@ -82,7 +82,9 @@ def test_button_mashing_never_freezes_the_page_and_reports_rate_limits(
 ) -> None:
     page = phone()
     pair(page, daemon)
-    button = page.get_by_role("button", name="Volume up")
+    button = page.get_by_role(
+        "button", name="Mute", exact=True
+    ).first  # the volume bar's speaker button
     t0 = time.perf_counter()
     for _ in range(40):
         button.click(no_wait_after=True)

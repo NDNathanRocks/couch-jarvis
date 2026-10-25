@@ -619,7 +619,9 @@
             "prev_tab",
             "scroll_up",
             "scroll_down",
-            "subtitles"
+            "subtitles",
+            "volume_set",
+            "seek_to"
           ],
           "title": "Action",
           "type": "string"
@@ -1901,6 +1903,11 @@
         "browser": {
           "$ref": "#/$defs/BrowserState"
         },
+        "daemon_version": {
+          "default": "",
+          "title": "Daemon Version",
+          "type": "string"
+        },
         "devices": {
           "items": {
             "$ref": "#/$defs/DevicePresence"
@@ -1971,6 +1978,18 @@
           },
           "title": "Timers",
           "type": "array"
+        },
+        "update_available": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Update Available"
         },
         "voice": {
           "$ref": "#/$defs/VoiceState"

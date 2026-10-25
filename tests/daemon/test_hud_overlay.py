@@ -92,8 +92,8 @@ def test_toasts_and_status_are_painted(qapp: QApplication) -> None:
     top_center = shown.pixelColor(960, 60)
     assert top_center.alpha() > 200 and top_center.green() > top_center.red()  # green "ok" toast
     assert blank.pixelColor(960, 60).alpha() == 0
-    status_pill = shown.pixelColor(60, 55)
-    assert status_pill.alpha() > 150  # the dark status pill, top-left
+    status_pill = shown.pixelColor(60, 37)
+    assert status_pill.alpha() > 150  # the small dark status pill, top-left
 
 
 def test_qr_disappears_once_a_friend_is_paired_and_the_linger_ends(qapp: QApplication) -> None:
@@ -137,3 +137,16 @@ def test_tray_icon_builds_and_its_actions_call_through() -> None:
     tray._toggle_action.trigger()
     tray._quit_action.trigger()
     assert calls == ["toggle", "quit"]
+
+
+def test_the_status_pill_fades_away_when_nothing_happens_and_returns_on_activity(
+    qapp: QApplication,
+) -> None:
+    clock = [1000.0]
+    vm = HudViewModel(cloud_url=lambda: URL, lan_url=lambda: None, clock=lambda: clock[0])
+    overlay = TvOverlay(vm)
+    assert render(overlay).pixelColor(60, 37).alpha() > 150  # shown at first
+    clock[0] += 60  # a quiet minute: the movie is not covered by a badge
+    assert render(overlay).pixelColor(60, 37).alpha() == 0
+    vm.touch()
+    assert render(overlay).pixelColor(60, 37).alpha() > 150

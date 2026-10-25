@@ -43,6 +43,10 @@ class HudFrame:
     status: str
     tone: Tone
     progress: str | None
+    status_opacity: float = 1.0  # 0..1: the status pill fades out when nothing is happening
+
+
+BADGE_FADE_S = 2.0
 
 
 def format_remaining(seconds: float) -> str:
@@ -63,6 +67,7 @@ class HudViewModel:
         max_toasts: int = 3,
         qr_linger_s: float = 10.0,
         qr_requested_s: float = 90.0,
+        badge_hide_s: float = 10.0,
     ) -> None:
         self._cloud_url = cloud_url
         self._lan_url = lan_url
@@ -71,6 +76,9 @@ class HudViewModel:
         self._max = max_toasts
         self._linger = qr_linger_s
         self._requested = qr_requested_s
+        self._badge_hide_s = badge_hide_s  # 0 = the status pill never fades
+        self._active_at = clock()
+        self._last_status = ""
         self._toasts: list[ToastItem] = []
         self._qr_until = 0.0
         self._pinned = False  # "show the QR" stays up until it is hidden or a friend connects
@@ -84,6 +92,10 @@ class HudViewModel:
         self._seen_state = False
 
     # ------------------------------------------------------------------ inputs
+
+    def touch(self) -> None:
+        """A phone did something: bring the status pill back for another while."""
+        self._active_at = self._clock()
 
     def request_qr(self, seconds: float | None = None) -> None:
         """Show the pairing QR for a while (e.g. a friend asked to join)."""
@@ -121,6 +133,8 @@ class HudViewModel:
         self._toasts = self._toasts[-self._max :]
 
     def handle_event(self, event_type: str, payload: dict[str, Any]) -> None:
+        if event_type in ("cmd.ack", "cmd.result", "agent.progress", "error"):
+            self.touch()
         if event_type == "state.snapshot":
             self._apply_state(payload, announce=self._seen_state)
             self._seen_state = True
@@ -197,7 +211,27 @@ class HudViewModel:
         else:
             status, tone = "Waiting for a phone", "warn"
         progress = next(reversed(self._progress.values()), None) if self._progress else None
-        return HudFrame(self._qr_card(now), tuple(self._toasts), timers, status, tone, progress)
+        if (
+            self._last_status and status != self._last_status
+        ):  # a phone joined or left, or mode changed
+            self._active_at = now
+        self._last_status = status
+        return HudFrame(
+            self._qr_card(now),
+            tuple(self._toasts),
+            timers,
+            status,
+            tone,
+            progress,
+            1.0 if progress else self._badge_opacity(now),
+        )
+
+    def _badge_opacity(self, now: float) -> float:
+        """Fully visible while things happen, gone after ``badge_hide_s`` of quiet (2 s fade)."""
+        if self._badge_hide_s <= 0:
+            return 1.0
+        quiet = now - self._active_at - self._badge_hide_s
+        return 1.0 if quiet <= 0 else max(0.0, 1.0 - quiet / BADGE_FADE_S)
 
 
 _PROGRESS = {

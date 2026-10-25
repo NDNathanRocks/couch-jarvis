@@ -18,7 +18,7 @@
     https://... where the phone app is hosted. Default: CJ_PWA_BASE_URL from the repo .env.
 
 .PARAMETER Version
-    Version stamped into the installer.
+    Version stamped into the installer. Default: __version__ in pc-daemon\version.py (the one source).
 
 .PARAMETER SkipWeb
     Reuse the existing web-remote\dist instead of rebuilding it.
@@ -31,7 +31,7 @@
 param(
     [string]$RelayUrl,
     [string]$PwaUrl,
-    [string]$Version = '0.1.0',
+    [string]$Version,
     [switch]$SkipWeb
 )
 
@@ -39,6 +39,13 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repo = Split-Path -Parent $PSScriptRoot
+if (-not $Version) {
+    $versionSource = Get-Content -LiteralPath (Join-Path $repo 'pc-daemon\version.py') -Raw
+    if ($versionSource -notmatch '__version__\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"') {
+        throw 'pc-daemon\version.py has no __version__ = "X.Y.Z" line.'
+    }
+    $Version = $Matches[1]
+}
 $python = Join-Path $repo '.venv\Scripts\python.exe'
 $dist = Join-Path $PSScriptRoot 'dist'
 if (-not (Test-Path -LiteralPath $python)) {
@@ -109,7 +116,7 @@ function Assert-NoSecrets {
     # in the app, or if any settings file was bundled. Users add their own keys after installing.
     param([string]$Dir)
     $bundled = Get-ChildItem -LiteralPath $Dir -Recurse -File -Force |
-        Where-Object { $_.Name -in '.env', 'config.env' -or $_.Name -like '.env.*' }
+        Where-Object { $_.Name -in '.env', 'config.env', 'room.json' -or $_.Name -like '.env.*' }
     if ($bundled) { throw "Settings file(s) bundled into the app: $($bundled.FullName -join ', ')" }
     $secrets = @{}
     foreach ($name in 'CJ_GROQ_API_KEY', 'CJ_GEMINI_API_KEY') {

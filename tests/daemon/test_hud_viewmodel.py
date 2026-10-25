@@ -293,3 +293,47 @@ class TestController:
         frame = vm.frame()
         assert [t.text for t in frame.toasts] == ["Playing lofi"] and frame.progress == "Listening…"
         assert json.loads(json.dumps(frame.status))  # plain string, safe to log
+
+
+class TestStatusBadgeFades:
+    def test_visible_at_first_then_gone_after_ten_quiet_seconds(self) -> None:
+        vm, clock = make()
+        assert vm.frame().status_opacity == 1.0
+        clock.now += 9.9
+        assert vm.frame().status_opacity == 1.0
+        clock.now += 1.1  # 11 s of quiet: halfway through the 2 s fade
+        assert 0 < vm.frame().status_opacity < 1
+        clock.now += 5
+        assert vm.frame().status_opacity == 0.0
+
+    def test_any_phone_activity_brings_it_back(self) -> None:
+        vm, clock = make()
+        clock.now += 30
+        assert vm.frame().status_opacity == 0.0
+        vm.touch()
+        assert vm.frame().status_opacity == 1.0
+
+    def test_commands_and_progress_wake_it(self) -> None:
+        vm, clock = make()
+        clock.now += 30
+        vm.frame()
+        vm.handle_event("cmd.ack", {"command_id": "c1"})
+        assert vm.frame().status_opacity == 1.0
+        clock.now += 30
+        vm.handle_event(
+            "agent.progress", {"command_id": "c2", "node": "intent_router", "status": "start"}
+        )
+        assert vm.frame().status_opacity == 1.0  # shown while the assistant is working
+
+    def test_a_phone_joining_or_leaving_shows_it_again(self) -> None:
+        vm, clock = make()
+        clock.now += 30
+        assert vm.frame().status_opacity == 0.0
+        device = {"device_id": "d1", "name": "Pixel", "online": True}
+        vm.handle_event("state.patch", {"devices": [device]})
+        assert vm.frame().status_opacity == 1.0
+
+    def test_zero_means_always_on(self) -> None:
+        vm, clock = make(badge_hide_s=0)
+        clock.now += 3600
+        assert vm.frame().status_opacity == 1.0

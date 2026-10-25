@@ -1,6 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { VoicePrefs } from "../protocol";
 import type { MicMode } from "../hooks/useVoice";
+import { resetAppCache } from "../utils/resetCache";
+import { Icon } from "./Icon";
 
 type Style = VoicePrefs["style"];
 type Voice = VoicePrefs["voice"];
@@ -34,6 +36,8 @@ interface Props {
   voice: VoicePrefs;
   adblock: boolean;
   micMode: MicMode;
+  /** The connected PC app's version, shown for support. */
+  version?: string;
   disabled: boolean;
   /** Send a command to the TV (the same words you could say). */
   onCommand: (text: string) => void;
@@ -42,7 +46,7 @@ interface Props {
   onClose: () => void;
 }
 
-export function SettingsSheet({ voice, adblock, micMode, disabled, onCommand, onMicMode, onUnpair, onClose }: Props) {
+export function SettingsSheet({ voice, adblock, micMode, version, disabled, onCommand, onMicMode, onUnpair, onClose }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     closeRef.current?.focus();
@@ -233,6 +237,14 @@ export function SettingsSheet({ voice, adblock, micMode, disabled, onCommand, on
           </div>
         </section>
 
+        <section className="mt-6" aria-label="App">
+          <h3 className="mb-2 text-sm font-medium text-zinc-300">App</h3>
+          <ResetCache />
+          <p className="mt-1.5 px-1 text-xs text-muted">
+            {version ? `PC app ${version}. ` : ""}Reloads the newest version of this page. You stay paired and keep your favourites.
+          </p>
+        </section>
+
         <button
           type="button"
           onClick={onUnpair}
@@ -242,6 +254,39 @@ export function SettingsSheet({ voice, adblock, micMode, disabled, onCommand, on
         </button>
       </div>
     </div>
+  );
+}
+
+function ResetCache() {
+  const [state, setState] = useState<"idle" | "confirm" | "working">("idle");
+  if (state === "confirm") {
+    return (
+      <div className="flex gap-2" role="group" aria-label="Confirm reset">
+        <button
+          type="button"
+          onClick={() => {
+            setState("working");
+            void resetAppCache();
+          }}
+          className="press min-h-11 flex-1 rounded-xl bg-accent text-sm font-semibold text-ink"
+        >
+          Yes, reset and reload
+        </button>
+        <button type="button" onClick={() => setState("idle")} className="press min-h-11 flex-1 rounded-xl bg-surface text-sm text-zinc-300 ring-1 ring-line">
+          Cancel
+        </button>
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      disabled={state === "working"}
+      onClick={() => setState("confirm")}
+      className="press flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-surface text-sm text-zinc-100 ring-1 ring-line disabled:opacity-50"
+    >
+      <Icon name="refresh" size={16} /> {state === "working" ? "Reloading…" : "Reset app cache"}
+    </button>
   );
 }
 

@@ -88,6 +88,7 @@ class Settings(BaseSettings):
     # Let paired phones drive the cursor/keyboard (touchpad). Pair only people you would trust
     # at your keyboard; set false to keep phones to media/browser commands.
     remote_input: bool = True
+    update_check: bool = True  # once a day, ask GitHub if a newer release exists (notice only)
 
     # Spoken replies ("Now playing X on YouTube Music"). Preferences are changed from the phone and
     # saved per TV. ElevenLabs is optional (its free plan is ~10k credits a month); without a key
@@ -104,6 +105,7 @@ class Settings(BaseSettings):
     telemetry_dir: Path = _local_app_dir() / "telemetry"
     room_file: Path = _roaming_app_dir() / "room.json"
     hud_screen_index: int = 0
+    hud_badge_hide_s: float = 10.0  # the TV status pill fades after this much quiet; 0 = always on
     log_level: str = "INFO"
 
     @property

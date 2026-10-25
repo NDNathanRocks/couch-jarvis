@@ -55,6 +55,7 @@ from remote_input import key_combo_allowed, sanitize_typed_text
 from stt_engine import STTEngine, STTError
 from telemetry import Telemetry
 from timers import TimerService
+from version import __version__
 
 log = logging.getLogger(__name__)
 
@@ -176,14 +177,16 @@ class CommandService:
         self._audio: dict[tuple[str, str], _AudioBuffer] = {}  # (device_id, command_id)
         self._limiter = TokenBucket(rate=4.0, burst=12.0)
         self._input_limiter = TokenBucket(rate=60.0, burst=150.0)  # touchpad is chatty by design
+        self._slider_limiter = TokenBucket(rate=12.0, burst=30.0)  # a drag sends many values
         self._input_lock = asyncio.Lock()
         self.remote_input_enabled = remote_input
-        self.state.update(remote_input=remote_input)
+        self.state.update(remote_input=remote_input, daemon_version=__version__)
         self._stt_slots = asyncio.Semaphore(MAX_CONCURRENT_STT)
         self._devices: dict[str, DevicePresence] = {}
         self._cloud_devices: list[DevicePresence] = []
         self.revoked: set[str] = set()
         self.on_revoke: Callable[[str], None] = lambda _device_id: None
+        self.on_activity: Callable[[], None] = lambda: None  # any phone message (HUD wake-up)
         self.on_qr_toggle: Callable[[], bool] | None = None  # set when a TV overlay exists
         self._bg: set[asyncio.Task[None]] = set()
         self._poller: asyncio.Task[None] | None = None
@@ -278,10 +281,13 @@ class CommandService:
             return [self._error("forbidden_type", f"{msg.type} is not accepted from phones")]
         if msg.type == "ping":
             return [envelope(Pong, self.room_id, {}, reply_to=msg.id)]
+        self.on_activity()
         if msg.type == "state.sync":
             return [self.state.snapshot_message()]
         if isinstance(msg, CmdButton):
             button = msg.payload
+            if button.action in ("volume_set", "seek_to"):
+                return await self._handle_slider(button.action, button.args, device_id)
             self.submit(
                 CommandRequest(
                     command_id=button.command_id,
@@ -310,6 +316,25 @@ class CommandService:
             return self._audio_chunk(msg, device_id)
         elif isinstance(msg, AudioEnd):
             return self._audio_end(msg, device_id)
+        return []
+
+    async def _handle_slider(
+        self, action: str, args: dict[str, str | int | float | bool], device_id: str
+    ) -> list[Message]:
+        """The volume and timeline sliders: applied at once, not queued behind the agent, with no
+        spoken or written reply (a drag would otherwise announce every step)."""
+        if not self._slider_limiter.allow(device_id):
+            return [self._error("rate_limited", "Slow down", retryable=True)]
+        if action == "volume_set":
+            level = round(float(args["level"]))
+            result = await self._os.set_volume(level)
+            if result.ok:
+                self.state.update(volume=level, muted=False)
+            return []
+        result = await self._browser.seek_to(float(args["position_s"]))
+        if not result.ok:
+            return [self._error("seek_failed", "There is nothing here to seek in")]
+        await self.refresh_state()
         return []
 
     async def _handle_input(

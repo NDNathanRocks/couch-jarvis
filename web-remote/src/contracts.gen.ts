@@ -78,7 +78,9 @@ export type Action =
   | "prev_tab"
   | "scroll_up"
   | "scroll_down"
-  | "subtitles";
+  | "subtitles"
+  | "volume_set"
+  | "seek_to";
 export type CommandId = string;
 export type IdempotencyKey = string;
 export type ReplyTo3 = string | null;
@@ -224,6 +226,7 @@ export type Url = string;
  */
 export type Bookmarks = Bookmark[];
 export type Adblock = boolean;
+export type DaemonVersion = string;
 export type DeviceId1 = string;
 export type LastSeen = number;
 export type Name = string;
@@ -247,6 +250,7 @@ export type EndsAt = number;
 export type Label1 = string;
 export type TimerId = string;
 export type Timers = TimerInfo[];
+export type UpdateAvailable = string | null;
 export type Buttons = boolean;
 export type Enabled = boolean;
 export type Engine = "elevenlabs" | "edge" | "windows" | "none";
@@ -577,6 +581,7 @@ export interface StateSnapshot {
 export interface RoomState {
   bookmarks?: Bookmarks;
   browser?: BrowserState;
+  daemon_version?: DaemonVersion;
   devices?: Devices;
   driver?: Driver;
   mode?: Mode;
@@ -587,6 +592,7 @@ export interface RoomState {
   remote_input?: RemoteInput;
   rev?: Rev;
   timers?: Timers;
+  update_available?: UpdateAvailable;
   voice?: VoiceState;
   volume?: Volume;
 }

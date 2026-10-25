@@ -71,17 +71,26 @@ page and picks one. It stays on the current site unless you say *search*, *YouTu
 
 ### Press buttons (Remote tab)
 
-- **Quick deck:** previous, play/pause, next, back/forward 10 s, fullscreen, **subtitles**, volume down/mute/up, skip ad,
-  close tab, screen off, and a red **Stop** that pauses everything immediately (it jumps the queue).
-- **Browser row:** back page, forward page, reload, new tab, tab left/right, scroll up/down.
-- **Pair a friend:** shows the QR on the TV.
-- **Now playing** card, **timers** with live countdowns, and a **Connected friends** list.
+From top to bottom the Remote tab has:
 
-### Use it as a touchpad and keyboard (Touchpad & keys tab)
+- **Now playing** with a **seek slider**: drag the bar to jump to any point of a video or song (the time shows while you
+  drag). Live streams show a plain bar.
+- **Transport:** previous, play/pause, next, back/forward 10 s.
+- **Volume slider:** drag anywhere on the bar like the iPhone Control Centre; tap the speaker to mute.
+- **Favourites:** two rows of four buttons that are yours. Tap **Edit** (or long-press one), tap a slot, and pick from the
+  library: playback, volume, fullscreen, subtitles, skip ad, screen off, pair QR, browser buttons (back, forward, reload,
+  new tab, tabs, scroll), keys (**F1-F12**, Esc, Space, Enter) and spoken-style commands. Each phone keeps its own list.
+  Defaults: Fullscreen, Subtitles, Mute, Skip ad, Back, New tab, Stop, Screen off. **Stop** pauses everything at once
+  (it jumps the queue).
+- **Touchpad:** right under the favourites (see below), then **timers** with live countdowns and **Connected friends**.
+
+A PC running an older Couch Jarvis than the phone app shows plain volume buttons and a progress bar instead of the sliders.
+
+### Use it as a touchpad and keyboard (Remote tab and Keys tab)
 
 - **Touchpad:** drag to move the cursor, tap to click, two-finger tap to right-click, two-finger drag to scroll,
   press-and-hold then drag to select or drag things. There are also Left / Double / Right click and Scroll buttons.
-- **Keyboard:** tap the box to bring up your phone's keyboard and type straight onto the TV (Enter and Backspace work).
+- **Keyboard (Keys tab):** tap the box to bring up your phone's keyboard and type straight onto the TV (Enter and Backspace work).
 - **Keys:** arrows, Esc, Tab, Enter, Backspace, Delete, Space, Home/End, PgUp/PgDn, and a row of **F1-F12**.
   **Ctrl / Alt / Shift** latch for the next key, so **Alt then ←** is "Back".
 - **One-tap shortcuts:** Back (Alt+←), Forward, Reload, New tab, Close tab, Next/Prev tab, Address bar, Zoom in/out/reset,
@@ -150,6 +159,8 @@ run from source overrides it. Restart the app after changing anything. The usefu
 | `CJ_ELEVENLABS_API_KEY` | none | Optional. Spoken replies use ElevenLabs first (capped at `CJ_ELEVENLABS_MONTHLY_CHARS`, default 9000), then free Microsoft neural voices, then offline Windows voices. Turn replies on/off and pick the style/voice in the phone's Settings |
 | `CJ_REMOTE_INPUT` | `true` | Let paired phones move the cursor and type |
 | `CJ_HUD_SCREEN_INDEX` | `0` | Which monitor shows the QR overlay (the TV) |
+| `CJ_HUD_BADGE_HIDE_S` | `10` | The small status pill on the TV fades out after this many quiet seconds and returns on any phone activity (`0` = always shown) |
+| `CJ_UPDATE_CHECK` | `true` | Once a day, ask GitHub if a newer release exists and show a notice (nothing is downloaded or run, nothing is sent) |
 | `CJ_EDGE_PATH` | auto | Path to `msedge.exe` if it isn't found |
 | `CJ_LOG_LEVEL` | `INFO` | `DEBUG` for more detail |
 

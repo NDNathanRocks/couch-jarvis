@@ -951,6 +951,21 @@ class EdgeCDP:
 
         return await self._guard(run)
 
+    async def seek_to(self, position_s: float) -> ActionResult:
+        """Jump to an absolute time (the timeline slider). Clamped to the media's own length."""
+
+        async def run(page: Any) -> ActionResult:
+            ok = await _first_in_frames(
+                page,
+                "(t) => { const v = document.querySelector('video, audio'); if (!v) return false;"
+                " const end = Number.isFinite(v.duration) ? v.duration : t;"
+                " v.currentTime = Math.max(0, Math.min(t, end)); return true; }",
+                position_s,
+            )
+            return ActionResult(bool(ok), "dom", None if ok else "no media element")
+
+        return await self._guard(run)
+
     async def close_tab(self) -> ActionResult:
         async def run(page: Any) -> ActionResult:
             await page.close()

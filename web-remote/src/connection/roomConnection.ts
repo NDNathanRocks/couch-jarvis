@@ -294,6 +294,19 @@ export class RoomConnection {
     return true;
   }
 
+  /**
+   * A slider value (volume level, seek position). Applied by the PC at once with no reply, so it
+   * is not tracked as a command; only a refusal (rate limit, nothing to seek in) comes back.
+   */
+  sendSlider(action: "volume_set" | "seek_to", value: number): boolean {
+    const args: Record<string, number> =
+      action === "volume_set" ? { level: Math.round(Math.max(0, Math.min(100, value))) } : { position_s: Math.max(0, Math.round(value * 10) / 10) };
+    const id = this.send("cmd.button", { command_id: uuid(), idempotency_key: uuid(), action, args });
+    if (!id) return this.notConnected();
+    this.opts.dispatch({ type: "sent", messageId: id });
+    return true;
+  }
+
   sendText(text: string): boolean {
     const trimmed = text.trim().slice(0, 500);
     if (!trimmed) return false;

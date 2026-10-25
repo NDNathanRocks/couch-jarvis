@@ -22,15 +22,15 @@ export function TouchPad({ onPointer, disabled }: Props) {
   const click = (action: PointerAction) => () => onPointer({ action });
   const scroll = (notches: number) => () => onPointer({ scroll: notches });
   const button =
-    "flex min-h-12 flex-1 items-center justify-center rounded-2xl bg-zinc-800 text-sm font-medium text-zinc-100 ring-1 ring-zinc-700 active:bg-zinc-700 disabled:opacity-40";
+    "press glass-btn min-h-12 flex-1 !rounded-2xl text-sm font-medium";
 
   return (
-    <section aria-label="Touchpad" className="space-y-3">
+    <section aria-label="Touchpad" className="space-y-2.5">
       <div
         role="application"
         aria-label="Touchpad area: drag to move the cursor, tap to click, two fingers to scroll"
         data-testid="touchpad"
-        className={`relative h-[42vh] min-h-56 touch-none select-none rounded-3xl bg-zinc-900 ring-1 ring-zinc-700 ${disabled ? "opacity-40" : ""}`}
+        className={`glass relative h-56 touch-none select-none rounded-[28px] ${disabled ? "opacity-40" : ""}`}
         onPointerDown={(e) => {
           if (disabled) return;
           e.currentTarget.setPointerCapture?.(e.pointerId);

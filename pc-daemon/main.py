@@ -298,6 +298,15 @@ async def amain(args: argparse.Namespace) -> None:
     background: list[asyncio.Task[None]] = []
     if not args.dry_run:  # start/preload the local model now, not during your first command
         background.append(asyncio.create_task(prepare_brain(settings), name="brain-warm-up"))
+    if settings.update_check and not args.dry_run:
+        service = rt.service
+
+        def on_update(found: str | None) -> None:
+            service.state.update(update_available=found)
+
+        from update_check import run_update_check
+
+        background.append(asyncio.create_task(run_update_check(on_update), name="update-check"))
     if rt.stt is not None:  # load the speech model now, not during your first voice command
         background.append(asyncio.create_task(rt.stt.warm_up(), name="stt-warm-up"))
     if args.hud and rt.room_store is not None:
@@ -358,7 +367,7 @@ def start_hud(rt: Runtime, settings: Settings, host: str, port: int) -> asyncio.
         scheme = "https" if settings.lan_tls_enabled else "http"
         return store.identity.pairing_url(f"{scheme}://{ip}:{port}") if ip else None
 
-    vm = HudViewModel(cloud_url=cloud_url, lan_url=lan_url)
+    vm = HudViewModel(cloud_url=cloud_url, lan_url=lan_url, badge_hide_s=settings.hud_badge_hide_s)
     overlay = TvOverlay(vm, settings.hud_screen_index)
     overlay.show()
 
@@ -387,6 +396,7 @@ def start_hud(rt: Runtime, settings: Settings, host: str, port: int) -> asyncio.
         return ActionResult(True, "os")
 
     rt.service.on_qr_toggle = toggle_qr
+    rt.service.on_activity = vm.touch
     if rt.deps is not None:
         rt.deps.qr_action = qr_action
 

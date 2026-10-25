@@ -51,3 +51,9 @@ def test_the_build_script_scans_the_output_for_the_builders_own_keys() -> None:
 
 def test_the_installer_can_open_the_settings_file_for_the_user() -> None:
     assert "--open-settings" in ISS  # a Start-menu entry: where users paste their own keys
+
+
+def test_no_room_identity_is_ever_bundled() -> None:
+    """room.json (room id, secret, PC key) is created on the user's PC at first run."""
+    assert "room.json" not in SPEC and "room.json" not in ISS.replace("{app}", "")
+    assert "room.json" in BUILD  # Assert-NoSecrets refuses a build that contains one

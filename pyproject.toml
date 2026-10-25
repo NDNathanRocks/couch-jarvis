@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = ["web-remote", ".aws-sam"]
+extend-exclude = ["web-remote", ".aws-sam", "*.md"]
 src = ["pc-daemon", "infra/lambdas", "tests"]
 
 [tool.ruff.lint]

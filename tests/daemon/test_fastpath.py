@@ -85,10 +85,19 @@ def test_normalize() -> None:
     assert normalize("  Hey Jarvis, please Pause!!  ") == "pause"
 
 
-@pytest.mark.parametrize("action", get_args(QuickAction))
+SLIDERS = ("volume_set", "seek_to")  # applied directly by the service, never planned
+
+
+@pytest.mark.parametrize("action", [a for a in get_args(QuickAction) if a not in SLIDERS])
 def test_every_quick_action_has_a_plan(action: str) -> None:
     plan = plan_button(action)  # type: ignore[arg-type]
     assert plan.source == "fastpath" and len(plan.steps) == 1
+
+
+@pytest.mark.parametrize("action", SLIDERS)
+def test_slider_actions_are_not_agent_plans(action: str) -> None:
+    with pytest.raises(ValueError, match="slider"):
+        plan_button(action)  # type: ignore[arg-type]
 
 
 def test_panic_is_an_idempotent_pause_not_a_toggle() -> None:

@@ -39,6 +39,7 @@ class FakeBrowser:
         self.search_ok = True
         self.playing_after_search = True
         self.park_spot: tuple[int, int] | None = (960, 800)
+        self.can_seek = True  # a media element exists on the page
         self.fail_verify_times = 0  # number of play commands that do not take effect
 
     def _log(self, name: str) -> None:
@@ -151,6 +152,13 @@ class FakeBrowser:
 
     async def seek(self, delta_s: int) -> ActionResult:
         self._log(f"seek:{delta_s}")
+        return ActionResult(True, "dom")
+
+    async def seek_to(self, position_s: float) -> ActionResult:
+        self._log(f"seek_to:{position_s:g}")
+        if not self.can_seek:
+            return ActionResult(False, "dom", "no media element", "no_media")
+        self.snap = self.snap.model_copy(update={"position_s": position_s})
         return ActionResult(True, "dom")
 
     async def browser_action(self, action: str) -> ActionResult:

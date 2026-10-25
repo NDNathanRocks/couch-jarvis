@@ -43,3 +43,20 @@ def test_pairing_url_and_hashes(tmp_path: Path) -> None:
     assert qs["secret"] == [ident.room_secret]
     assert ident.room_secret_hash == sha256_hex(ident.room_secret)
     assert len(ident.pc_key_hash) == 64
+
+
+def test_every_install_gets_its_own_keys(tmp_path: Path) -> None:
+    """Two PCs must never share a room: that would let one household control the other's."""
+    made = [RoomStore(tmp_path / f"pc{i}" / "room.json").load_or_create() for i in range(50)]
+    for field in ("room_id", "room_secret", "pc_key"):
+        values = [getattr(identity, field) for identity in made]
+        assert len(set(values)) == len(values), field
+    assert all(len(i.room_secret) >= 32 and len(i.pc_key) >= 43 for i in made)  # 192 / 256 bit
+
+
+def test_the_keys_come_from_the_pc_not_from_the_install_folder(tmp_path: Path) -> None:
+    """A copied install (or the portable zip) carries no identity: a new folder gets new keys."""
+    first = RoomStore(tmp_path / "a" / "room.json").load_or_create()
+    again = RoomStore(tmp_path / "a" / "room.json").load_or_create()
+    other = RoomStore(tmp_path / "b" / "room.json").load_or_create()
+    assert again.room_id == first.room_id and other.room_id != first.room_id

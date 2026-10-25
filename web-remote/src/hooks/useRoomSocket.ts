@@ -26,6 +26,7 @@ export interface RoomSocketOptions {
 
 export interface RoomActions {
   sendButton(action: QuickAction): boolean;
+  sendSlider(action: "volume_set" | "seek_to", value: number): boolean;
   sendText(text: string): boolean;
   sendAudio(recording: Recording): boolean;
   sendPointer(p: { dx?: number; dy?: number; scroll?: number; action?: PointerAction }): boolean;
@@ -91,6 +92,7 @@ export function useRoomSocket(options: RoomSocketOptions): { view: RoomView; act
   const actions = useMemo<RoomActions>(
     () => ({
       sendButton: (a) => connection.current?.sendButton(a) ?? false,
+      sendSlider: (a, v) => connection.current?.sendSlider(a, v) ?? false,
       sendText: (t) => connection.current?.sendText(t) ?? false,
       sendAudio: (r) => connection.current?.sendAudio(r) ?? false,
       sendPointer: (p) => connection.current?.sendPointer(p) ?? false,

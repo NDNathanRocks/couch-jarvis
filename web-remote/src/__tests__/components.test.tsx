@@ -4,7 +4,7 @@ import { ConnectionBadge, badgeInfo } from "../components/ConnectionBadge";
 import { FriendsBar, initials } from "../components/FriendsBar";
 import { NowPlayingCard, formatClock } from "../components/NowPlayingCard";
 import { QRScanner, readPairParams, stripPairParams } from "../components/QRScanner";
-import { DECK, QuickDeck } from "../components/QuickDeck";
+import { Transport } from "../components/Transport";
 import { TimerList, remainingLabel } from "../components/TimerList";
 import { TOAST_MS, Toasts } from "../components/Toasts";
 import { initialView, roomReducer, type RoomView } from "../state/roomReducer";
@@ -17,22 +17,21 @@ const online = (patch: Partial<RoomView> = {}): RoomView => ({
   ...patch,
 });
 
-describe("QuickDeck", () => {
-  it("renders every action with an accessible name and sends the right one", () => {
+describe("Transport", () => {
+  it("sends the right action for each button", () => {
     const onPress = vi.fn();
-    render(<QuickDeck onPress={onPress} disabled={false} />);
-    for (const button of DECK) fireEvent.click(screen.getByRole("button", { name: button.label }));
-    fireEvent.click(screen.getByRole("button", { name: "Stop everything" }));
-    fireEvent.click(screen.getByRole("button", { name: /Pair a friend/ }));
-    expect(onPress.mock.calls.map((c) => c[0])).toEqual([...DECK.map((b) => b.action), "panic", "show_qr"]);
+    render(<Transport playing={false} disabled={false} onPress={onPress} />);
+    for (const name of ["Back 10s", "Previous", "Play / Pause", "Next", "Forward 10s"]) {
+      fireEvent.click(screen.getByRole("button", { name }));
+    }
+    expect(onPress.mock.calls.map((c) => c[0])).toEqual(["seek_back_10", "prev", "play_pause", "next", "seek_fwd_10"]);
   });
 
   it("is inert while disconnected", () => {
     const onPress = vi.fn();
-    render(<QuickDeck onPress={onPress} disabled />);
+    render(<Transport playing disabled onPress={onPress} />);
     fireEvent.click(screen.getByRole("button", { name: "Play / Pause" }));
     expect(onPress).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Stop everything" })).toBeDisabled();
   });
 });
 
@@ -157,9 +156,10 @@ describe("NowPlayingCard", () => {
   it("shows progress and interpolates between PC reports while playing", () => {
     const playing = { title: "Lofi Girl", source: "youtube" as const, is_playing: true, position_s: 60, duration_s: 600 };
     render(<NowPlayingCard playing={playing} pending={null} />);
-    expect(screen.getByText("1:00 / 10:00")).toBeInTheDocument();
+    expect(screen.getByText("1:00")).toBeInTheDocument();
+    expect(screen.getByText("-9:00")).toBeInTheDocument();
     act(() => void vi.advanceTimersByTime(5000));
-    expect(screen.getByText("1:05 / 10:00")).toBeInTheDocument();
+    expect(screen.getByText("1:05")).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "11");
   });
 
@@ -167,7 +167,8 @@ describe("NowPlayingCard", () => {
     const paused = { title: "Song", source: "ytmusic" as const, is_playing: false, position_s: 10, duration_s: 100 };
     render(<NowPlayingCard playing={paused} pending="Checking..." />);
     act(() => void vi.advanceTimersByTime(5000));
-    expect(screen.getByText("0:10 / 1:40")).toBeInTheDocument();
+    expect(screen.getByText("0:10")).toBeInTheDocument();
+    expect(screen.getByText("-1:30")).toBeInTheDocument();
     expect(screen.getByText("Checking...")).toBeInTheDocument();
     expect(screen.getByText(/YouTube Music · Paused/)).toBeInTheDocument();
   });
@@ -181,6 +182,7 @@ describe("NowPlayingCard", () => {
     expect(formatClock(0)).toBe("0:00");
     expect(formatClock(3599)).toBe("59:59");
     expect(formatClock(-4)).toBe("0:00");
+    expect(formatClock(3725)).toBe("1:02:05");
   });
 });
 

@@ -115,7 +115,10 @@ class TvOverlay(QWidget):
         )
         s = self._scale()
         frame = self._frame
-        self._paint_status(painter, frame, s)
+        if frame.status_opacity > 0:
+            painter.setOpacity(frame.status_opacity)
+            self._paint_status(painter, frame, s)
+            painter.setOpacity(1.0)
         self._paint_toasts(painter, frame.toasts, s)
         self._paint_timers(painter, frame, s)
         if frame.qr is not None:
@@ -129,13 +132,13 @@ class TvOverlay(QWidget):
         return font
 
     def _paint_status(self, p: QPainter, frame: HudFrame, s: float) -> None:
-        p.setFont(self._font(26 * s, bold=True))
+        p.setFont(self._font(16 * s, bold=True))
         metrics = QFontMetrics(p.font())
         text_w = metrics.horizontalAdvance(frame.status)
-        pad, dot = int(18 * s), int(14 * s)
-        h = int(52 * s)
-        x, y = int(36 * s), int(30 * s)
-        w = pad * 2 + dot + int(12 * s) + text_w
+        pad, dot = int(12 * s), int(9 * s)
+        h = int(34 * s)
+        x, y = int(24 * s), int(20 * s)
+        w = pad * 2 + dot + int(8 * s) + text_w
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(PILL_BG)
         p.drawRoundedRect(QRectF(x, y, w, h), h / 2, h / 2)
@@ -143,14 +146,14 @@ class TvOverlay(QWidget):
         p.drawEllipse(QRectF(x + pad, y + (h - dot) / 2, dot, dot))
         p.setPen(WHITE)
         p.drawText(
-            QRect(x + pad + dot + int(12 * s), y, text_w + 4, h),
+            QRect(x + pad + dot + int(8 * s), y, text_w + 4, h),
             Qt.AlignmentFlag.AlignVCenter,
             frame.status,
         )
         if frame.progress:
-            p.setFont(self._font(24 * s))
+            p.setFont(self._font(18 * s))
             p.setPen(QColor(186, 230, 253))
-            p.drawText(x + pad, y + h + int(34 * s), frame.progress)
+            p.drawText(x + pad, y + h + int(26 * s), frame.progress)
 
     def _paint_toasts(self, p: QPainter, toasts: tuple[ToastItem, ...], s: float) -> None:
         p.setFont(self._font(30 * s, bold=True))
