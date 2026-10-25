@@ -25,7 +25,12 @@ from agent.graph import AgentDeps, AgentRunner
 from agent.memory import ConversationMemory
 from bookmarks import BookmarkStore
 from browser_prefs import BrowserPrefs
-from build_info import allows_hobby_services, shows_update_notice
+from build_info import (
+    allows_hobby_services,
+    edge_profile_dir,
+    package_family_name,
+    shows_update_notice,
+)
 from cloud_relay_client import CloudRelayClient
 from command_queue import CommandRequest
 from config import Settings, get_settings, init_dpi_awareness, resource_root
@@ -176,9 +181,13 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
         from executors.os_controller import WindowsOS
         from executors.vision_grounding import MssScreen
 
+        profile = settings.edge_profile_dir
+        if "edge_profile_dir" not in settings.model_fields_set:  # CJ_EDGE_PROFILE_DIR always wins
+            local = Path(os.environ.get("LOCALAPPDATA") or Path.home())
+            profile = edge_profile_dir(profile, package_family_name(), local)
         watchdog = EdgeWatchdog(
             make_http_probe(settings.cdp_url),
-            make_edge_launcher(settings.edge_path, settings.edge_profile_dir, settings.cdp_port),
+            make_edge_launcher(settings.edge_path, profile, settings.cdp_port),
             telemetry=telemetry,
         )
         browser = EdgeCDP(settings.cdp_url, ensure_edge=watchdog.ensure_edge, prefs=prefs)

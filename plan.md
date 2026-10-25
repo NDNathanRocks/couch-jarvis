@@ -619,7 +619,7 @@ and `Browser.setWindowBounds` (v0.2.1 fullscreen fix) on the TV's headed Edge.
 
 ---
 
-## 13. v1.0.0 plan: a paid Microsoft Store product (Phase 1, awaiting approval)
+## 13. v1.0.0 plan: a paid Microsoft Store product (approved 2026-10-24; building, see 13.9)
 
 Request: make the app good enough to sell in the Microsoft Store; production and business ready, with fresh ideas.
 Decisions already made by the user (2026-10-24): **paid app with a free trial** handled by the Store; **rename** (no
@@ -727,3 +727,29 @@ Aurora / Chill / Aria** (voices).
 A hosted AI brain as an optional subscription (no keys, works on any PC), native phone apps (Play Store / App Store
 wrappers), a TV-side voice wake word, Android TV / macOS PCs, shared favourites between phones, a web dashboard for your
 customers' licences.
+
+### 13.9 Status
+| Milestone | State |
+|---|---|
+| 5A MSIX spike | **Go** (2026-10-25, see below) |
+| 5B Brand | waiting for the name; channels done in 5C |
+| 5C Licence-safe defaults | done: `phi4-mini` CPU default (eval on this PC: 8/12 right action, 3.2 s median, vs 6/12 for `qwen2.5:1.5b`), `edge-tts` dev-only, GPLv3 `pymsgbox`/`mouseinfo` excluded, licence gate + notices, pop-up protection, Butler / Sterling / Aurora |
+| 5D Relay | done except the custom relay domain (needs the domain) and the staging deploy + load run (needs your OK) |
+| 5E-5L | not started |
+
+**5A result: go.** A Store-channel build packed with `build_msix.ps1`, test-signed and installed with `Add-AppxPackage`
+(no admin once the test certificate is trusted). Inside the package: the daemon, the supervisor and the TV overlay start;
+speech loads on CUDA; Ollama, the relay and CDP to Edge work; the GitHub update check is off (store channel); the
+`desktop2` firewall rule (TCP 8765, private networks, this exe only) and the `StartupTask` (enabled) install without admin;
+uninstall removes the package, its data folder and its firewall rule.
+What package virtualization changes:
+- Writes to a folder under `%APPDATA%`/`%LOCALAPPDATA%` that **already existed** (an earlier direct install) go to the real
+  folder: a user moving from the direct installer to the Store keeps room, phones, settings and sign-ins. A **new** folder
+  is redirected to the package's private copy and is deleted when the app is uninstalled (normal for Store apps; 5G's
+  uninstall/"delete my data" text must say so).
+- **Edge started from the package split its profile** between the private copy and the real folder (its helper processes
+  run outside the package). Fixed: a packaged app keeps a new TV profile in the package's own folder by its real path
+  (`build_info.edge_profile_dir`), where every Edge process sees the same files (re-tested: one folder, CDP works).
+Still to test in 5J: an MSIX -> MSIX update keeps the data, WACK, and a clean PC (Windows Sandbox).
+Small findings: the 5 s Edge probe logged one line per call (httpx now logs warnings only in the app), and speech checks
+Hugging Face for model updates at every start (5I: go offline once the model is cached).

@@ -26,6 +26,7 @@ FIRST_DELAY_S = 2
 MAX_DELAY_S = 60
 HEALTHY_RUN_S = 60
 QUICK_RESTART_MIN_S = 5
+QUIET_LOGGERS = ("httpx", "httpx2", "httpcore")
 
 _TEMPLATE = (
     "# CouchJarvis settings. Lines starting with # are ignored; restart the app after editing.\n"
@@ -95,6 +96,8 @@ def configure_logging(name: str) -> None:
     root = logging.getLogger()
     root.handlers[:] = [handler]
     root.setLevel(logging.INFO)
+    for chatty in QUIET_LOGGERS:  # one line per HTTP call (the Edge probe runs every 5 s)
+        logging.getLogger(chatty).setLevel(logging.WARNING)
     if sys.stdout is None:
         sys.stdout = open(os.devnull, "w")  # noqa: SIM115 - lives for the process
     if sys.stderr is None:

@@ -53,6 +53,40 @@ def is_packaged() -> bool:
     return bool(code != APPMODEL_ERROR_NO_PACKAGE)
 
 
+@lru_cache(maxsize=1)
+def package_family_name() -> str | None:
+    """The MSIX package family (``Name_publisherhash``), or None outside a package."""
+    if not is_packaged():
+        return None
+    import ctypes
+    from ctypes import wintypes
+
+    length = wintypes.UINT(0)
+    ctypes.windll.kernel32.GetCurrentPackageFamilyName(ctypes.byref(length), None)
+    buf = ctypes.create_unicode_buffer(length.value)
+    if ctypes.windll.kernel32.GetCurrentPackageFamilyName(ctypes.byref(length), buf) != 0:
+        return None
+    return buf.value
+
+
+def edge_profile_dir(default: Path, family: str | None, local_appdata: Path) -> Path:
+    """Where the TV browser keeps its profile.
+
+    Inside an MSIX, Windows redirects a *new* ``%LOCALAPPDATA%\\CouchJarvis`` to the package's
+    private copy, but Edge's helper processes run outside the package and would write half the
+    profile to the real folder (seen in the 5A spike). Naming the package's folder directly gives
+    every Edge process the same files. A profile left by the direct installer (a real folder, so
+    not redirected) keeps being used, so the streaming sign-ins survive a move to the Store app.
+    """
+    if family is None:
+        return default
+    own = local_appdata / "Packages" / family / "LocalCache" / "Local" / "CouchJarvis"
+    own /= "edge-profile"
+    if own.exists() or not default.exists():
+        return own
+    return default
+
+
 def shows_update_notice(ch: Channel | None = None) -> bool:
     """The Store updates Store apps: they must not point people at other downloads."""
     return (ch or channel()) != "store"
