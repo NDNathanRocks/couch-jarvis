@@ -132,6 +132,26 @@ def toggle_running_qr(port: int | None = None) -> bool | None:
         return None
 
 
+def open_running_ui(page: str = "Status", port: int | None = None) -> bool:
+    """Ask the running app (loopback only) to open its Control Center; False if it cannot."""
+    import urllib.parse
+    import urllib.request
+
+    if port is None:
+        from config import get_settings
+
+        port = get_settings().lan_port
+    query = urllib.parse.urlencode({"page": page})
+    req = urllib.request.Request(  # noqa: S310 - fixed http://127.0.0.1 URL
+        f"http://127.0.0.1:{port}/api/ui/open?{query}", method="POST", data=b""
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=3) as resp:  # noqa: S310
+            return bool(resp.status == 200)
+    except (OSError, ValueError):
+        return False
+
+
 def run_worker(argv: list[str]) -> int:
     configure_logging("daemon")
     import main as daemon_main
@@ -143,9 +163,13 @@ def run_supervisor(argv: list[str]) -> int:
     configure_logging("app")
     log = logging.getLogger("couch-jarvis.app")
     if _already_running():
-        # Opening the app again (taskbar, Start menu) flips the pairing QR on the TV.
-        shown = toggle_running_qr()
-        log.info("the app is already running; QR toggled (%s); exiting", shown)
+        # Opening the app again (taskbar, Start menu) opens its window; an app that cannot
+        # (no window, an older version mid-update) flips the pairing QR on the TV instead.
+        if open_running_ui():
+            log.info("the app is already running; opened its window; exiting")
+        else:
+            shown = toggle_running_qr()
+            log.info("the app is already running; QR toggled (%s); exiting", shown)
         return 0
     ensure_user_config(user_config_file(), resource_root() / "installer" / "defaults.env")
 
@@ -174,7 +198,9 @@ def run_supervisor(argv: list[str]) -> int:
 
 
 def open_settings(target: Path, defaults: Path) -> int:
-    """Open the user's settings file in their editor (creating it first), then exit."""
+    """Open the Settings page of the running app, else the settings file in an editor."""
+    if open_running_ui("Settings"):
+        return 0
     ensure_user_config(target, defaults)
     if sys.platform == "win32":
         os.startfile(target)  # noqa: S606 - the user's own settings file

@@ -14,9 +14,11 @@ import os
 import secrets
 import sys
 import tempfile
+import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import uvicorn
 
@@ -39,6 +41,7 @@ from cloud_relay_client import CloudRelayClient
 from command_queue import CommandRequest
 from config import Settings, get_settings, init_dpi_awareness, resource_root
 from contracts import Bookmark, BrowserState, TimerInfo, VoiceState, new_id
+from control.health import Health
 from event_bus import EventBus
 from executors.base import ActionResult, Browser, OSController, Screen
 from executors.fakes import FakeBrowser, FakeOS, FakeScreen
@@ -60,6 +63,9 @@ from timers import TimerService
 from voice import VoicePrefsStore, VoiceService
 from watchdog import EdgeWatchdog, make_edge_launcher, make_http_probe
 
+if TYPE_CHECKING:
+    from control.center import ControlCenter
+
 log = logging.getLogger("couch-jarvis")
 PWA_DIST = resource_root() / "web-remote" / "dist"
 
@@ -76,6 +82,8 @@ class Runtime:
     stt: STTEngine | None = None
     cloud: CloudRelayClient | None = None
     tray: object | None = None
+    health: Health = field(default_factory=Health)  # what the Control Center's Status page shows
+    control: object | None = None  # the Control Center (keeps its windows alive)
 
 
 def build_llms(settings: Settings) -> tuple[TextLLM, VisionLLM]:
@@ -97,16 +105,21 @@ def build_llms(settings: Settings) -> tuple[TextLLM, VisionLLM]:
     return FallbackLLM([cloud, local_text]), FallbackLLM([cloud, local_vlm])
 
 
-async def prepare_brain(settings: Settings) -> None:
+async def prepare_brain(settings: Settings, health: Health | None = None) -> None:
     """Make the local model ready in the background and say plainly if it cannot be."""
     from brain import prepare_ollama
     from hardware import text_model
 
+    health = health or Health()
+    health.gemini_key = settings.gemini_api_key is not None
     try:
         status = await prepare_ollama(settings.ollama_url, text_model(settings.ollama_text_model))
     except Exception:  # a warm-up must never take the daemon down
         log.warning("brain warm-up failed", exc_info=True)
+        health.brain_state, health.brain_detail = "not_running", "The AI did not start."
         return
+    health.brain_state = status.state
+    health.brain_detail = f"Ready ({status.detail})." if status.usable else status.detail
     if status.usable:
         log.info("brain ready: %s", status.detail)
     elif settings.gemini_api_key is not None:
@@ -343,7 +356,9 @@ async def amain(args: argparse.Namespace) -> None:
     if not args.dry_run:
         background.append(start_licensing(rt, settings))
     if not args.dry_run:  # start/preload the local model now, not during your first command
-        background.append(asyncio.create_task(prepare_brain(settings), name="brain-warm-up"))
+        background.append(
+            asyncio.create_task(prepare_brain(settings, rt.health), name="brain-warm-up")
+        )
     if settings.update_check and shows_update_notice() and not args.dry_run:
         service = rt.service
 
@@ -354,7 +369,7 @@ async def amain(args: argparse.Namespace) -> None:
 
         background.append(asyncio.create_task(run_update_check(on_update), name="update-check"))
     if rt.stt is not None:  # load the speech model now, not during your first voice command
-        background.append(asyncio.create_task(rt.stt.warm_up(), name="stt-warm-up"))
+        background.append(asyncio.create_task(warm_speech(rt.stt, rt.health), name="stt-warm-up"))
     if args.hud and rt.room_store is not None:
         background.append(start_hud(rt, settings, host, port))
     if rt.watchdog is not None and not args.no_watchdog:
@@ -413,6 +428,48 @@ async def delete_cloud_data(rt: Runtime) -> str | None:
     return None
 
 
+async def warm_speech(stt: STTEngine, health: Health) -> None:
+    """Load the speech model now (not during the first voice command); the Status page shows it."""
+    health.speech = "loading"
+    await stt.warm_up()  # never raises: a failed load is retried by the first command
+    health.speech = "ready"
+    health.speech_detail = "Ready."
+
+
+def start_control_center(
+    rt: Runtime, settings: Settings, pairing_url: Callable[[], str | None]
+) -> ControlCenter:
+    """The PC window (Start menu, tray, second launch) and the welcome wizard on a fresh install."""
+    from app_entry import app_log_dir
+    from control.backend import RuntimeBackend
+    from control.center import ControlCenter
+    from control.ui_state import UiState
+
+    store = rt.room_store
+    assert store is not None
+    backend = RuntimeBackend(
+        settings=settings,
+        service=rt.service,
+        health=rt.health,
+        probe_browser=make_http_probe(settings.cdp_url),
+        ensure_browser=rt.watchdog.ensure_edge if rt.watchdog is not None else None,
+        cloud=lambda: rt.cloud,  # created after the overlay
+        pairing_url=pairing_url,
+        delete_cloud=lambda: delete_cloud_data(rt),
+        log_dir=app_log_dir(),
+    )
+    center = ControlCenter(backend, UiState(settings.room_file.parent / "ui.json"))
+    rt.control = center
+    rt.service.on_open_ui = center.open
+    try:
+        room_age = time.time() - settings.room_file.stat().st_ctime
+    except OSError:
+        room_age = 0.0
+    # a moment after start: the overlay is up and the relay had a chance to list the phones
+    asyncio.get_running_loop().call_later(3.0, center.welcome_if_needed, room_age)
+    return center
+
+
 def start_hud(rt: Runtime, settings: Settings, host: str, port: int) -> asyncio.Task[None]:
     """Create the TV overlay (needs a running QApplication) and the task that feeds it."""
     from hud.controller import HudController
@@ -468,7 +525,13 @@ def start_hud(rt: Runtime, settings: Settings, host: str, port: int) -> asyncio.
             overlay.refresh()
 
         rt.deps.show_qr = show_qr
-    tray = QrTray(toggle_qr, reset_qr, lambda: lifecycle.request_exit(lifecycle.EXIT_QUIT))
+    center = start_control_center(rt, settings, cloud_url)
+    tray = QrTray(
+        toggle_qr,
+        reset_qr,
+        lambda: lifecycle.request_exit(lifecycle.EXIT_QUIT),
+        open_app=center.open,
+    )
     rt.tray = tray  # keep the tray icon alive for the life of the app
     controller = HudController(rt.service, vm, on_change=overlay.refresh)
     return asyncio.create_task(controller.run(), name="hud")

@@ -99,6 +99,9 @@ def _revokes(event: BusEvent, device_id: str) -> bool:
         return False
 
 
+UI_PAGES = frozenset({"Status", "Phones", "Settings", "Licence", "Help"})
+
+
 def create_app(
     service: CommandService,
     telemetry: Telemetry,
@@ -160,6 +163,16 @@ def create_app(
         if service.on_qr_toggle is None:
             raise HTTPException(status_code=409, detail="no TV overlay")
         return {"shown": service.on_qr_toggle()}
+
+    @app.post("/api/ui/open")
+    async def open_ui(_: Local, page: str = "Status") -> dict[str, object]:
+        """Open the Control Center on this PC (a second launch of the app, Start menu)."""
+        if service.on_open_ui is None:
+            raise HTTPException(status_code=409, detail="no window on this PC")
+        if page not in UI_PAGES:
+            raise HTTPException(status_code=422, detail="unknown page")
+        service.on_open_ui(page)
+        return {"opened": page}
 
     @app.post("/api/cloud/delete")
     async def cloud_delete(_: Local) -> dict[str, object]:

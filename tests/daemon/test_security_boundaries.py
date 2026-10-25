@@ -297,4 +297,6 @@ def test_no_route_leaks_a_dependency_alias_as_a_query_parameter(live_app: object
             for param in spec.get("parameters", []):
                 assert param["name"] not in ("_", "device", "request"), (path, method, param)
                 if param["in"] == "query":
-                    assert param["name"] in ("token",), (path, method, param)
+                    # token: SSE auth; page: which Control Center page to open (a fixed list)
+                    allowed = ("token", "page") if path == "/api/ui/open" else ("token",)
+                    assert param["name"] in allowed, (path, method, param)

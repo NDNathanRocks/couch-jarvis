@@ -200,6 +200,7 @@ class CommandService:
         self.on_revoke: Callable[[str], None] = lambda _device_id: None
         self.on_activity: Callable[[], None] = lambda: None  # any phone message (HUD wake-up)
         self.on_qr_toggle: Callable[[], bool] | None = None  # set when a TV overlay exists
+        self.on_open_ui: Callable[[str], None] | None = None  # opens the PC Control Center
         self._bg: set[asyncio.Task[None]] = set()
         self._poller: asyncio.Task[None] | None = None
 

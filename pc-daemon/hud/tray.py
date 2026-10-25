@@ -35,17 +35,22 @@ class QrTray:
         toggle: Callable[[], bool],
         reset: Callable[[], Awaitable[Any]],
         quit_app: Callable[[], None],
+        open_app: Callable[[], None] | None = None,
     ) -> None:
         self._tray = QSystemTrayIcon(_icon())
         self._tray.setToolTip(f"{APP_NAME} - click to show or hide the QR code")
         menu = QMenu()
+        self._open_action = QAction(f"Open {APP_NAME}...")
+        self._open_action.triggered.connect(lambda: open_app() if open_app else None)
+        self._open_action.setVisible(open_app is not None)
         self._toggle_action = QAction("Show / hide QR code")
         self._toggle_action.triggered.connect(lambda: toggle())
         self._reset_action = QAction("Reset QR code (old ones stop working)")
         self._reset_action.triggered.connect(lambda: _spawn(reset()))
         self._quit_action = QAction("Quit")
         self._quit_action.triggered.connect(lambda: quit_app())
-        for action in (self._toggle_action, self._reset_action, self._quit_action):
+        actions = (self._open_action, self._toggle_action, self._reset_action, self._quit_action)
+        for action in actions:
             menu.addAction(action)
         self._menu = menu  # keep alive
         self._tray.setContextMenu(menu)

@@ -67,12 +67,27 @@ else the app needs an AI model ("the brain"). Without one you will hear *"My bra
   Without a GPU, local answers take several seconds: a Gemini key is much faster.
 - With both, the key is used first and the local model is the fallback. Armrest starts Ollama and loads the model for you at startup.
 
+## The Armrest window
+
+Open **Armrest** from the Start menu (or the tray icon's menu) while it is running to get its window:
+
+- **Status**: the relay, the TV browser, the AI, voice, the licence and phones, each with a fix-it button.
+- **Phones**: every paired phone, with **Remove**, and the QR code to pair a new one.
+- **Settings**: keys, voice, the TV screen, privacy. **Save and restart** applies them.
+- **Licence**: trial days left, **Buy**, and a box for a licence key (direct download).
+- **Help**: support, a diagnostics file to send (nothing private in it), privacy, terms, licences, and
+  **Delete my cloud data**.
+
+A fresh install opens a short welcome wizard: the TV screen, signing in to your streaming sites, the AI, privacy
+and pairing your first phone. Closing the window keeps the app running in the tray.
+
 ## Your settings file
 
 `%APPDATA%\CouchJarvis\config.env` (paste that into the File Explorer address bar). It's a plain text file of `NAME=value`
 lines; lines starting with `#` are ignored. **Restart Armrest after editing**: end `CouchJarvis.exe` in Task Manager, then start it from the Start menu. All settings are listed in the [README](../README.md#settings).
 
-The Start menu has an **Armrest settings** shortcut that opens this file for you.
+The Start menu's **Armrest settings** shortcut opens the Settings page (or this file, if the app is not running).
+The window offers the everyday settings; advanced ones are still edited here.
 
 **API keys are never shipped inside the app.** The installer contains no Groq or Gemini key (the build refuses to finish if
 it finds the builder's keys in it). If you want cloud speech or cloud understanding, get your own free key and add a line
@@ -87,8 +102,8 @@ Logs are in `%LOCALAPPDATA%\CouchJarvis\logs`. They never contain pairing links 
 - **From the Microsoft Store:** the Store runs the free trial and the purchase. When the trial ends, the phone shows
   **Buy**, which opens the Store page on the TV.
 - **From the website (direct download):** the app is free for 14 days from its first start. After that it still pairs
-  phones and shows what is playing, but commands stop until a licence key is added. Put the key you received in your
-  settings file as `CJ_LICENSE_KEY=ARMREST1....` and restart the app (the PC Control Center will have a box for it).
+  phones and shows what is playing, but commands stop until a licence key is added. Paste the key you received in the
+  window's **Licence** page (or put `CJ_LICENSE_KEY=ARMREST1....` in your settings file and restart the app).
   The key is checked on the PC, offline.
 
 ## Updating and uninstalling

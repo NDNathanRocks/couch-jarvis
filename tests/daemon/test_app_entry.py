@@ -74,8 +74,25 @@ def test_open_settings_creates_the_file_then_opens_it(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     opened: list[str] = []
+    monkeypatch.setattr(app_entry, "open_running_ui", lambda page="Status": False)  # not running
     monkeypatch.setattr("sys.platform", "win32")
     monkeypatch.setattr("os.startfile", lambda p: opened.append(str(p)), raising=False)
     target = tmp_path / "config.env"
     assert app_entry.open_settings(target, tmp_path / "missing.env") == 0
     assert target.is_file() and opened == [str(target)]
+
+
+def test_open_settings_opens_the_window_of_a_running_app(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pages: list[str] = []
+    monkeypatch.setattr(
+        app_entry, "open_running_ui", lambda page="Status": pages.append(page) or True
+    )
+    monkeypatch.setattr("os.startfile", lambda p: pytest.fail("no editor"), raising=False)
+    assert app_entry.open_settings(tmp_path / "config.env", tmp_path / "missing.env") == 0
+    assert pages == ["Settings"] and not (tmp_path / "config.env").exists()
+
+
+def test_open_running_ui_is_false_when_nothing_answers() -> None:
+    assert app_entry.open_running_ui("Status", port=1) is False
