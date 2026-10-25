@@ -156,7 +156,7 @@ async def test_gives_up_when_ollama_never_comes_up() -> None:
         client=server.client(),
         finder=lambda: Path("o.exe"),
         starter=lambda exe: None,
-        wait_s=2.0,
-        poll_s=1.0,
+        wait_s=0.2,
+        poll_s=0.05,
     )
     assert status.state == "not_running"

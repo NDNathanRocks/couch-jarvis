@@ -296,7 +296,8 @@ See [docs/INSTALL.md](docs/INSTALL.md#building-the-installer).
 ```powershell
 uv pip install -r requirements-dev.txt
 ruff check . ; ruff format --check . ; mypy pc-daemon
-pytest                                              # unit + e2e + real-Edge integration (e2e runs last)
+pytest                                              # quick: unit tests only (about 40 s)
+pytest -m ""                                        # everything, incl. real-browser e2e and real-Edge tests (release gate, ~3 min)
 python scripts/export_contracts.py --check          # JSON Schema in sync with contracts.py
 cd web-remote ; npm ci ; npm run typecheck ; npm run lint ; npx vitest run ; npm run build
 npm run gen:contracts                               # regenerate src/contracts.gen.ts after changing contracts.py

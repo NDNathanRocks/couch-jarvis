@@ -134,7 +134,7 @@ export function KeyPad({ onKey, onText, disabled }: Props) {
   };
 
   const keyButton =
-    "flex min-h-11 items-center justify-center rounded-xl bg-zinc-800 px-1 text-sm text-zinc-100 ring-1 ring-zinc-700 active:bg-zinc-700 disabled:opacity-40";
+    "press glass-btn min-h-11 !rounded-xl px-1 text-sm";
 
   return (
     <section aria-label="Keyboard" className="space-y-3">
@@ -154,7 +154,7 @@ export function KeyPad({ onKey, onText, disabled }: Props) {
           if (e.data) onText(e.data);
           reset(e.currentTarget);
         }}
-        className="min-h-12 w-full resize-none rounded-2xl bg-zinc-900 px-4 py-3 text-base text-zinc-100 ring-1 ring-zinc-700 placeholder:text-zinc-500 focus:ring-2 focus:ring-indigo-500 disabled:opacity-40"
+        className="glass min-h-12 w-full resize-none rounded-2xl px-4 py-3 text-base text-zinc-100 outline-none placeholder:text-zinc-500 focus:ring-2 focus:ring-accent disabled:opacity-40"
       />
 
       <div role="group" aria-label="Modifiers" className="flex gap-2">
@@ -165,8 +165,8 @@ export function KeyPad({ onKey, onText, disabled }: Props) {
             disabled={disabled}
             aria-pressed={mods.includes(mod)}
             onClick={() => toggle(mod)}
-            className={`flex min-h-11 flex-1 items-center justify-center rounded-xl text-sm ring-1 disabled:opacity-40 ${
-              mods.includes(mod) ? "bg-indigo-600 text-white ring-indigo-400" : "bg-zinc-800 text-zinc-100 ring-zinc-700"
+            className={`press glass-btn min-h-11 flex-1 !rounded-xl text-sm ${
+              mods.includes(mod) ? "!bg-accent !text-ink font-semibold" : ""
             }`}
           >
             {label}
@@ -202,7 +202,7 @@ export function KeyPad({ onKey, onText, disabled }: Props) {
             type="button"
             disabled={disabled}
             onClick={() => press(s.key, s.mods)}
-            className="flex min-h-11 items-center justify-center rounded-xl bg-zinc-800/60 px-1 text-xs text-zinc-200 ring-1 ring-zinc-700 active:bg-zinc-700 disabled:opacity-40"
+            className="press glass-btn min-h-11 !rounded-xl px-1 text-xs"
           >
             {s.label}
           </button>

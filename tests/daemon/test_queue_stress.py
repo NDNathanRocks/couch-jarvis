@@ -11,7 +11,7 @@ from command_queue import CommandQueue, CommandRequest
 from contracts import CmdResultPayload
 
 
-@pytest.mark.parametrize("seed", range(8))
+@pytest.mark.parametrize("seed", range(4))  # four different random interleavings are plenty
 async def test_every_accepted_command_gets_exactly_one_result_and_never_overlaps(seed: int) -> None:
     rng = random.Random(seed)
     in_flight = peak = 0

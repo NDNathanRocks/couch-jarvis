@@ -3,9 +3,10 @@
 /* Design tokens: a deep ground, translucent "glass" surfaces on top of it, one accent. */
 @theme {
   --color-canvas: #0b0c10;
-  --color-surface: #171920;
-  --color-surface-2: #1e212b;
-  --color-line: #2a2e3a;
+  /* translucent, so every older card sits on the glow like the new glass ones */
+  --color-surface: rgb(255 255 255 / 0.06);
+  --color-surface-2: rgb(255 255 255 / 0.11);
+  --color-line: rgb(255 255 255 / 0.09);
   --color-muted: #9aa0ae;
   --color-accent: #8b9bff;
   --color-ink: #0e0f13;

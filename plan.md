@@ -589,7 +589,7 @@ Shared favourites between phones, silent self-update, code signing, a redesign o
    an installed older daemon, and vice versa. Always redeploy Vercel after UI commits.
 6. **Per-install secrets.** Room id/secret/PC key are generated at first run on the user's PC and never shipped. Builds that
    contain a key, `.env`, `config.env` or `room.json` must fail (`Assert-NoSecrets`, `test_installer_secrets`).
-7. **Release checklist**: all suites green (pytest incl. `-m edge`, vitest, ruff, mypy, tsc, eslint, npm/pip audit) -> secret
+7. **Release checklist**: all suites green (`pytest -m ""` = everything incl. real-browser e2e and real-Edge tests, ~3 min; plain `pytest` is the ~45 s quick loop for day-to-day work; vitest, ruff, mypy, tsc, eslint, npm/pip audit) -> secret
    scan of history and build -> build installer + portable zip -> upgrade test -> deploy Vercel -> update README / INSTALL /
    this plan / memory -> ask the user, then push and tag `vX.Y.Z` -> the user publishes the release and attaches the
    installer, the portable zip and their SHA-256 checksums (`gh` is not installed here).
