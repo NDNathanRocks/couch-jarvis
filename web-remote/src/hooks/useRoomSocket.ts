@@ -18,6 +18,7 @@ export interface RoomSocketOptions {
   endpoint: Endpoint;
   pairParams: PairParams | null;
   onPaired?: (pairing: Pairing) => void;
+  onRestored?: (pairing: Pairing) => void;
   onUnpaired?: () => void;
   storage?: PairingStorage;
   createSocket?: (url: string) => SocketLike;
@@ -55,6 +56,7 @@ export function useRoomSocket(options: RoomSocketOptions): { view: RoomView; act
       createSocket: latest.current.createSocket ?? browserSocketFactory,
       deviceName: latest.current.deviceName ?? guessDeviceName(),
       onPaired: (p) => latest.current.onPaired?.(p),
+      onRestored: (p) => latest.current.onRestored?.(p),
       onUnpaired: () => latest.current.onUnpaired?.(),
     });
     connection.current = conn;

@@ -63,6 +63,7 @@ export default function App() {
       setSelf(pairing);
       stripPairParams(); // the room secret has been exchanged for a token: remove it from the URL
     },
+    onRestored: setSelf,
     onUnpaired: () => setSelf(null),
   });
 
@@ -71,7 +72,9 @@ export default function App() {
   const paired = self !== null || (pairParams === null && view.connection !== "idle");
   const progress = Object.values(view.pending).at(-1) ?? null;
   const lastIsError = view.log.at(-1)?.level === "error";
-  const inputAllowed = view.room.remote_input;
+  // A guest phone (set on the PC) gets media, volume and voice: no touchpad, keys or PC settings.
+  const guest = view.room.devices.find((d) => d.device_id === self?.deviceId)?.role === "guest";
+  const inputAllowed = view.room.remote_input && !guest;
   // The phone app and the PC app update separately: only show sliders a PC this old can answer.
   const canSlide = versionAtLeast(view.room.daemon_version, SLIDERS_SINCE);
   const hasApps = versionAtLeast(view.room.daemon_version, APPS_SINCE);
@@ -139,7 +142,11 @@ export default function App() {
   const update = view.room.update_available;
   const licence = view.room.license; // absent: paid, or a PC older than 1.0.0
   const inputOff = (
-    <p className="glass rounded-2xl p-4 text-sm text-zinc-400">Touchpad and keyboard are turned off on the PC (CJ_REMOTE_INPUT=false).</p>
+    <p className="glass rounded-2xl p-4 text-sm text-zinc-400">
+      {guest
+        ? "This phone is a guest: the touchpad and keyboard are for the TV owner's phones."
+        : "Touchpad and keyboard are turned off on the PC (CJ_REMOTE_INPUT=false)."}
+    </p>
   );
 
   return (

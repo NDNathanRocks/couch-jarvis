@@ -41,6 +41,8 @@ export interface ConnectionOptions {
   createSocket: (url: string) => SocketLike;
   deviceName: string;
   onPaired?: (pairing: Pairing) => void;
+  /** A saved pairing is being used (the app was reopened): who this phone is. */
+  onRestored?: (pairing: Pairing) => void;
   onUnpaired?: () => void;
   rng?: () => number;
   now?: () => number;
@@ -86,7 +88,10 @@ export class RoomConnection {
     const saved = params ? null : await this.opts.storage.load();
     if (gen !== this.generation) return; // stopped (or restarted by StrictMode) while loading
     if (params) this.mode = { kind: "pair", roomId: params.roomId, secret: params.secret };
-    else if (saved) this.mode = { kind: "token", pairing: saved };
+    else if (saved) {
+      this.mode = { kind: "token", pairing: saved };
+      this.opts.onRestored?.(saved);
+    }
     else {
       this.mode = { kind: "none" };
       this.opts.dispatch({ type: "connection", connection: "idle", at: this.now() });

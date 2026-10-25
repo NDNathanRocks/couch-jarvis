@@ -401,6 +401,26 @@ describe("the remote page", () => {
     expect(sock.sent.at(-1)).toMatchObject({ type: "cmd.text", payload: { text: "open netflix" } });
   });
 
+  it("a guest phone gets no touchpad or keyboard, and is told why", async () => {
+    render(<App />);
+    await waitFor(() => expect(FakeSocket.instances.length).toBe(1));
+    const sock = FakeSocket.last;
+    await act(async () => sock.open());
+    await act(async () => {
+      sock.receive(incoming("pair.granted", { device_id: "dev-7", device_token: "t", expires_at: 2_000_000_000 }));
+    });
+    const me = { device_id: "dev-7", name: "Me", online: true, last_seen: 1 };
+    await act(async () => {
+      sock.receive(incoming("state.snapshot", { pc_online: true, rev: 1, daemon_version: "1.0.0", devices: [me] }));
+    });
+    expect(await screen.findByRole("region", { name: "Touchpad" })).toBeInTheDocument();
+    await act(async () => {
+      sock.receive(incoming("state.patch", { rev: 2, devices: [{ ...me, role: "guest" }] }));
+    });
+    expect(screen.queryByRole("region", { name: "Touchpad" })).not.toBeInTheDocument();
+    expect(screen.getByText(/This phone is a guest/)).toBeInTheDocument();
+  });
+
   it("shows no licence banner for a PC that sends none (paid, or older than 1.0.0)", async () => {
     render(<App />);
     await waitFor(() => expect(FakeSocket.instances.length).toBe(1));

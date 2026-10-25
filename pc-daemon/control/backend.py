@@ -80,6 +80,9 @@ class RuntimeBackend:
     def revoke(self, device_id: str) -> None:
         self._service.revoke_device(device_id)
 
+    def set_guest(self, device_id: str, guest: bool) -> None:
+        self._service.set_role(device_id, "guest" if guest else "owner")
+
     # ------------------------------------------------------------------ licence
 
     def licence(self) -> Licence:

@@ -76,6 +76,7 @@ def _clear(layout: QVBoxLayout) -> None:
         item = layout.takeAt(0)
         widget = item.widget() if item is not None else None
         if widget is not None:
+            widget.setParent(None)  # gone at once, not when Qt gets round to deleting it
             widget.deleteLater()
 
 
@@ -186,7 +187,9 @@ class ControlWindow(QWidget):
 
     def _phones_page(self) -> QWidget:
         page, layout = _page(
-            "Phones", "Every phone that scanned this TV's QR code. Remove one to cut it off."
+            "Phones",
+            "Every phone that scanned this TV's QR code. A guest gets media, volume and voice; "
+            "Remove cuts a phone off.",
         )
         self._phones_box = QVBoxLayout()
         layout.addLayout(self._phones_box)
@@ -228,6 +231,15 @@ class ControlWindow(QWidget):
                 else "Not seen yet"
             )
             line.addWidget(_label(seen, "muted", wrap=False))
+            guest = QCheckBox("Guest")
+            guest.setToolTip(
+                "Guests get media, volume and voice: no touchpad, keyboard or settings."
+            )
+            guest.setChecked(device.role == "guest")
+            guest.toggled.connect(
+                lambda on, d=device.device_id: self.backend.set_guest(d, bool(on))
+            )
+            line.addWidget(guest)
             remove = _button("Remove", "danger")
             remove.clicked.connect(
                 lambda _=False, d=device.device_id, n=device.name: self.remove_phone(d, n)

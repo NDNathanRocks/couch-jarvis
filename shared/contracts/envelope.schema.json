@@ -897,6 +897,15 @@
         "online": {
           "title": "Online",
           "type": "boolean"
+        },
+        "role": {
+          "default": "owner",
+          "enum": [
+            "owner",
+            "guest"
+          ],
+          "title": "Role",
+          "type": "string"
         }
       },
       "required": [

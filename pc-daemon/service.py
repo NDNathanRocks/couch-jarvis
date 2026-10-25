@@ -52,6 +52,7 @@ from contracts import (
 from event_bus import EventBus
 from executors.base import Browser, OSController
 from remote_input import key_combo_allowed, sanitize_typed_text
+from roles import Role, RoleStore
 from stt_engine import STTEngine, STTError
 from telemetry import Telemetry
 from timers import TimerService
@@ -192,6 +193,7 @@ class CommandService:
         self._input_lock = asyncio.Lock()
         self.remote_input_enabled = remote_input
         self.licence: LicenceGate | None = None  # set by main; None = always licensed (tests)
+        self.roles = RoleStore(None)  # owner/guest phones; main gives it a file
         self.state.update(remote_input=remote_input, daemon_version=__version__)
         self._stt_slots = asyncio.Semaphore(MAX_CONCURRENT_STT)
         self._devices: dict[str, DevicePresence] = {}
@@ -239,9 +241,15 @@ class CommandService:
 
     # ------------------------------------------------------------------ devices
 
+    def set_role(self, device_id: str, role: Role) -> None:
+        """Make a phone an owner or a guest (Control Center); every phone sees it at once."""
+        if self.roles.set_role(device_id, role):
+            self._push_devices()
+
     def revoke_device(self, device_id: str) -> None:
         """Cut a phone off everywhere: LAN sockets, offline tokens and (via the bus) the relay."""
         self.revoked.add(device_id)
+        self.roles.forget(device_id)
         self.on_revoke(device_id)
         self._devices.pop(device_id, None)
         self._cloud_devices = [d for d in self._cloud_devices if d.device_id != device_id]
@@ -269,8 +277,11 @@ class CommandService:
     def _push_devices(self) -> None:
         lan_ids = {d.device_id for d in self._cloud_devices}
         merged = [
-            *self._cloud_devices,
-            *(d for d in self._devices.values() if d.device_id not in lan_ids),
+            d.model_copy(update={"role": self.roles.role(d.device_id)})
+            for d in (
+                *self._cloud_devices,
+                *(d for d in self._devices.values() if d.device_id not in lan_ids),
+            )
         ]
         was_watched = self.phones_online
         self.state.update(devices=merged)
@@ -365,6 +376,8 @@ class CommandService:
         """Touchpad / keyboard: applied immediately (never queued behind the agent)."""
         if not self.remote_input_enabled:
             return [self._error("input_disabled", "Remote input is turned off on this PC")]
+        if self.roles.role(device_id) == "guest":
+            return [self._error("guest", "Guests can't use the touchpad or keyboard.")]
         if not self._input_limiter.allow(device_id):
             return [self._error("rate_limited", "Slow down", retryable=True)]
         os_ctl = self._os

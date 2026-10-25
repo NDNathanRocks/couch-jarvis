@@ -228,6 +228,7 @@ class FakeBackend:
         self.config_path = tmp_path / "config.env"
         self.restarted = 0
         self.revoked: list[str] = []
+        self.guests: dict[str, bool] = {}
         self.opened: list[str] = []
         self.lic = Licence("trial", "trial", 5)
         self.phones = [
@@ -249,6 +250,9 @@ class FakeBackend:
 
     def revoke(self, device_id: str) -> None:
         self.revoked.append(device_id)
+
+    def set_guest(self, device_id: str, guest: bool) -> None:
+        self.guests[device_id] = guest
 
     def licence(self) -> Licence:
         return self.lic
@@ -334,6 +338,12 @@ def test_phones_page_lists_and_removes_phones(qapp, tmp_path: Path) -> None:  # 
     window.open_page("Phones")
     texts = [w.text() for w in window.findChildren(QLabel)]
     assert "Jane's iPhone" in texts and "Connected now" in texts and "Last seen 2 h ago" in texts
+    from PySide6.QtWidgets import QCheckBox
+
+    guest_boxes = [c for c in window.findChildren(QCheckBox) if c.text() == "Guest"]
+    assert len(guest_boxes) == 2 and not guest_boxes[0].isChecked()
+    guest_boxes[0].setChecked(True)
+    assert backend.guests == {"d1": True}  # Jane's iPhone (online, listed first)
     window.remove_phone("d2", "Sam's Pixel", confirm=False)
     assert backend.revoked == ["d2"]
     window.hide()

@@ -234,6 +234,7 @@ export type DeviceId1 = string;
 export type LastSeen = number;
 export type Name = string;
 export type Online = boolean;
+export type Role = "owner" | "guest";
 export type Devices = DevicePresence[];
 export type Driver = string | null;
 export type DaysLeft = number | null;
@@ -635,6 +636,7 @@ export interface DevicePresence {
   last_seen: LastSeen;
   name: Name;
   online: Online;
+  role?: Role;
 }
 /**
  * Shown while the app is not fully licensed (absent = paid, or a PC older than 1.0.0).

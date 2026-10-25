@@ -87,6 +87,7 @@ class DevicePresence(_Model):
     name: str
     online: bool
     last_seen: float
+    role: Literal["owner", "guest"] = "owner"  # PC 1.0.0+; guests have no touchpad/keys/settings
 
 
 ReplyStyle = Literal["jarvis", "friendly", "brief"]

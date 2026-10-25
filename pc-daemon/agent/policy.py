@@ -40,6 +40,22 @@ MEDIA_HOSTS: frozenset[str] = frozenset(
 )  # fmt: skip
 
 
+# What a guest phone may not do (roles.py): drive the keyboard, reset the pairing QR, change the
+# PC's own settings, or delete saved pages. Media, volume, search and opening sites stay open.
+GUEST_BLOCKED_OPS = frozenset({"press_key", "type", "qr_control", "browser_pref", "voice_pref"})
+GUEST_REFUSAL = "Guests can't do that. Ask the person who owns this TV."
+
+
+def guest_refusal(ops_and_args: list[tuple[str, dict[str, object]]]) -> str | None:
+    """Why a guest's plan is refused, or None when every step is allowed."""
+    for op, args in ops_and_args:
+        if op in GUEST_BLOCKED_OPS:
+            return GUEST_REFUSAL
+        if op == "bookmark" and args.get("action") == "remove":
+            return GUEST_REFUSAL
+    return None
+
+
 def normalize_keys(keys: str) -> str:
     return "+".join(part.strip().lower() for part in keys.split("+") if part.strip())
 

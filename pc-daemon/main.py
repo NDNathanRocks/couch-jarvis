@@ -56,6 +56,7 @@ from licensing import Licence, LicenceFile, LicenceManager
 from llm.base import TextLLM, VisionLLM
 from llm.fake import DryRunRouter
 from local_api import create_app
+from roles import RoleStore
 from room import RoomStore
 from service import CommandService
 from stt_engine import STTEngine, build_stt_engine
@@ -269,6 +270,9 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
         remote_input=settings.remote_input,
     )
     service_ref.append(service)
+    if not dry_run:
+        service.roles = RoleStore(settings.room_file.parent / "roles.json")
+    deps.is_guest = lambda device_id: service.roles.role(device_id) == "guest"
     service.state.update(voice=deps.voice.state, browser=prefs.state, bookmarks=bookmarks.items())
     return Runtime(service, telemetry, watchdog, room_id, room_store, bus, deps, stt)
 

@@ -23,6 +23,7 @@ from pydantic import ValidationError
 from agent.fastpath import plan_button, plan_text
 from agent.memory import ConversationMemory
 from agent.policy import (
+    guest_refusal,
     key_allowed,
     normalize_keys,
     on_media_site,
@@ -189,6 +190,7 @@ class AgentDeps:
     qr_action: Callable[[str], Awaitable[ActionResult]] | None = None
     progress: ProgressFn = lambda *_: None
     verify_delays_s: tuple[float, ...] = (0.0, 0.4, 0.8)
+    is_guest: Callable[[str], bool] = lambda _device_id: False  # set by main (roles.py)
 
 
 def extract_json(text: str) -> str:
@@ -646,6 +648,11 @@ def build_graph(deps: AgentDeps) -> Any:
     async def dom_executor(state: AgentState, span: Span) -> dict[str, Any]:
         assert state.plan is not None
         steps = state.plan.steps
+        if state.cursor == 0 and deps.is_guest(state.issued_by):
+            refusal = guest_refusal([(s.op, dict(s.args)) for s in steps])
+            if refusal is not None:
+                span.set_attribute("cj.guest_refused", True)
+                return {"status": "failed", "final_message": refusal}
         outcomes = list(state.outcomes)
         cursor, tier_used = state.cursor, state.tier_used
         while cursor < len(steps):
