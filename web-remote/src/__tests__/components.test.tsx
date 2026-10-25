@@ -65,7 +65,8 @@ describe("QRScanner", () => {
 
   it("shows the right guidance for each pairing state", () => {
     const { rerender, container } = render(<QRScanner connection="idle" hasPairParams={false} paired={false} />);
-    expect(screen.getByText(/point it at the QR code/i)).toBeInTheDocument();
+    expect(screen.getByText(/Scan the code/)).toBeInTheDocument(); // the landing page for visitors
+    expect(screen.getByRole("link", { name: /Get Armrest for Windows/ })).toHaveAttribute("href", expect.stringContaining("/get"));
     rerender(<QRScanner connection="connecting" hasPairParams paired={false} />);
     expect(screen.getByText(/Pairing with your TV/)).toBeInTheDocument();
     rerender(<QRScanner connection="unreachable" hasPairParams={false} paired />);

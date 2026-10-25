@@ -1,3 +1,4 @@
+import { APP_NAME, GET_URL, PRIVACY_URL, TAGLINE, TERMS_URL } from "../brand";
 import type { PairParams } from "../connection/roomConnection";
 import type { Connection } from "../state/roomReducer";
 
@@ -58,12 +59,48 @@ export function QRScanner({ connection, hasPairParams, paired }: Props) {
       </section>
     );
   }
+  return <Landing />;
+}
+
+/** A visitor with no pairing and no QR link: say what this is and how to start. */
+function Landing() {
+  const steps = [
+    { title: `Get ${APP_NAME} on the PC`, text: "The Windows PC that is plugged into your TV." },
+    { title: "Open it", text: "A QR code appears on the TV." },
+    { title: "Scan the code", text: "With this phone's camera. You only do this once." },
+  ];
   return (
-    <section className="rounded-2xl border border-zinc-700 bg-zinc-900 p-6 text-center">
-      <h2 className="text-lg font-semibold">Pair this phone</h2>
+    <section className="glass rise rounded-3xl p-6" aria-labelledby="landing-title">
+      <h2 id="landing-title" className="text-2xl font-bold tracking-tight">
+        {TAGLINE}.
+      </h2>
       <p className="mt-2 text-sm text-zinc-300">
-        Open your camera and point it at the QR code on the TV. It opens this page and pairs
-        automatically. You only do this once.
+        Your phone becomes the remote for the PC on your TV: voice, buttons, a touchpad and a keyboard. No accounts and no
+        Wi-Fi setup. Friends can scan the same code and get their own remote.
+      </p>
+      <ol className="mt-5 space-y-3">
+        {steps.map((s, i) => (
+          <li key={s.title} className="flex gap-3">
+            <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-accent font-semibold text-zinc-950">
+              {i + 1}
+            </span>
+            <span>
+              <span className="block font-semibold">{s.title}</span>
+              <span className="block text-sm text-zinc-400">{s.text}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <a
+        href={GET_URL}
+        className="press mt-6 flex min-h-12 items-center justify-center rounded-full bg-accent font-semibold text-zinc-950"
+      >
+        Get {APP_NAME} for Windows
+      </a>
+      <p className="mt-4 text-center text-xs text-zinc-500">
+        <a href={PRIVACY_URL} className="underline underline-offset-2">Privacy</a>
+        {" · "}
+        <a href={TERMS_URL} className="underline underline-offset-2">Terms</a>
       </p>
     </section>
   );

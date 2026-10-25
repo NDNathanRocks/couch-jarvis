@@ -10,6 +10,7 @@ import { NowPlayingCard } from "./components/NowPlayingCard";
 import { QRScanner, readPairParams, stripPairParams } from "./components/QRScanner";
 import { SettingsSheet } from "./components/SettingsSheet";
 import { APP_NAME } from "./brand";
+import { AppsRow } from "./components/AppsRow";
 import { BookmarkList } from "./components/BookmarkList";
 import { QuestionCard } from "./components/QuestionCard";
 import { Suggestions } from "./components/Suggestions";
@@ -26,7 +27,7 @@ import { loadFavorites, saveFavorites, type Fav } from "./utils/favorites";
 import { tap } from "./utils/haptics";
 import { loadRecents, rememberCommand } from "./utils/recents";
 import type { Pairing } from "./utils/storage";
-import { SLIDERS_SINCE, versionAtLeast } from "./utils/version";
+import { APPS_SINCE, SLIDERS_SINCE, versionAtLeast } from "./utils/version";
 
 type Tab = "remote" | "saved" | "keys";
 const TABS: readonly { id: Tab; label: string; aria?: string }[] = [
@@ -73,6 +74,7 @@ export default function App() {
   const inputAllowed = view.room.remote_input;
   // The phone app and the PC app update separately: only show sliders a PC this old can answer.
   const canSlide = versionAtLeast(view.room.daemon_version, SLIDERS_SINCE);
+  const hasApps = versionAtLeast(view.room.daemon_version, APPS_SINCE);
   const voice = useVoice({
     mode: micMode,
     disabled: !connected,
@@ -282,6 +284,7 @@ export default function App() {
                     ))}
                   </div>
                 )}
+                {hasApps && <AppsRow disabled={!connected} onOpen={sendCommand} />}
                 <Favorites slots={favorites} connected={connected} keysAllowed={inputAllowed} onSend={sendFavorite} onChange={changeFavorites} />
                 {inputAllowed ? <TouchPad disabled={!connected} onPointer={(e) => actions.sendPointer(e)} /> : inputOff}
                 <TimerList timers={view.room.timers} />

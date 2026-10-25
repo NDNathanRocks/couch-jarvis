@@ -110,13 +110,13 @@ describe("returning phone", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     fireEvent.click(screen.getByRole("button", { name: "Forget this phone" }));
-    expect(await screen.findByText(/Pair this phone/)).toBeInTheDocument();
+    expect(await screen.findByText(/Scan the code/)).toBeInTheDocument();
     expect(localStorage.getItem("cj.pairing")).toBeNull();
   });
 
   it("with no saved pairing and no QR it explains how to pair", async () => {
     render(<App />);
-    expect(await screen.findByText(/Pair this phone/)).toBeInTheDocument();
+    expect(await screen.findByText(/Scan the code/)).toBeInTheDocument();
     expect(FakeSocket.instances).toHaveLength(0);
   });
 

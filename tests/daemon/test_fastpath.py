@@ -151,3 +151,22 @@ def test_every_open_shortcut_is_a_site_the_policy_allows() -> None:
     from agent.policy import url_allowed
 
     assert all(url_allowed(u) for u in _OPEN_URLS.values())
+
+
+def test_every_app_on_the_phone_opens_without_the_ai() -> None:
+    """The phone's Apps row (web-remote/src/components/AppsRow.tsx) sends these exact phrases."""
+    import re as _re
+    from pathlib import Path
+
+    from agent.policy import url_allowed
+
+    source = (
+        Path(__file__).resolve().parents[2] / "web-remote/src/components/AppsRow.tsx"
+    ).read_text(encoding="utf-8")
+    commands = _re.findall(r'command: "([^"]+)"', source)
+    assert len(commands) >= 8
+    for command in commands:
+        plan = plan_text(command)
+        assert plan is not None, command
+        step = plan.steps[-1]
+        assert step.op == "navigate" and url_allowed(str(step.args["url"])), command

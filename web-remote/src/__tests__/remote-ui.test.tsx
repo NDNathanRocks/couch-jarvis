@@ -381,6 +381,26 @@ describe("the remote page", () => {
     expect(screen.queryByRole("button", { name: "Buy" })).not.toBeInTheDocument();
   });
 
+  it("offers the Apps row to a 1.0.0 PC only, and a tap opens the site on the TV", async () => {
+    render(<App />);
+    await waitFor(() => expect(FakeSocket.instances.length).toBe(1));
+    const sock = FakeSocket.last;
+    await act(async () => sock.open());
+    await act(async () => {
+      sock.receive(incoming("pair.granted", { device_id: "dev-7", device_token: "t", expires_at: 2_000_000_000 }));
+    });
+    await act(async () => {
+      sock.receive(incoming("state.snapshot", { pc_online: true, rev: 1, daemon_version: "0.3.0" }));
+    });
+    await screen.findByRole("tablist");
+    expect(screen.queryByRole("button", { name: "Open Netflix" })).not.toBeInTheDocument();
+    await act(async () => {
+      sock.receive(incoming("state.patch", { rev: 2, daemon_version: "1.0.0" }));
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Open Netflix" }));
+    expect(sock.sent.at(-1)).toMatchObject({ type: "cmd.text", payload: { text: "open netflix" } });
+  });
+
   it("shows no licence banner for a PC that sends none (paid, or older than 1.0.0)", async () => {
     render(<App />);
     await waitFor(() => expect(FakeSocket.instances.length).toBe(1));
