@@ -26,7 +26,8 @@ import { resolveEndpoint } from "./utils/config";
 import { loadFavorites, saveFavorites, type Fav } from "./utils/favorites";
 import { tap } from "./utils/haptics";
 import { loadRecents, rememberCommand } from "./utils/recents";
-import type { Pairing } from "./utils/storage";
+import { browserPairingStorage, type Pairing } from "./utils/storage";
+import { forgetTv, loadTvs, rememberTv, renameTv, type Tv } from "./utils/tvs";
 import { APPS_SINCE, SLIDERS_SINCE, versionAtLeast } from "./utils/version";
 
 type Tab = "remote" | "saved" | "keys";
@@ -55,15 +56,20 @@ export default function App() {
   const [micMode, setMicMode] = useState<MicMode>(loadMicMode);
   const [favorites, setFavorites] = useState<(string | null)[]>(loadFavorites);
   const [dismissedUpdate, setDismissedUpdate] = useState<string | null>(null);
+  const [tvs, setTvs] = useState<Tv[]>(loadTvs);
 
   const { view, actions } = useRoomSocket({
     endpoint,
     pairParams,
     onPaired: (pairing) => {
       setSelf(pairing);
+      setTvs(rememberTv(pairing)); // another TV's QR adds it; the others are kept
       stripPairParams(); // the room secret has been exchanged for a token: remove it from the URL
     },
-    onRestored: setSelf,
+    onRestored: (pairing) => {
+      setSelf(pairing);
+      setTvs(rememberTv(pairing));
+    },
     onUnpaired: () => setSelf(null),
   });
 
@@ -102,6 +108,25 @@ export default function App() {
     if (send.kind === "action") actions.sendButton(send.action);
     else if (send.kind === "key") actions.sendKey(send.key, send.mods);
     else actions.sendText(send.text);
+  };
+  // Another TV: make it the active pairing and start again (the connection only knows one).
+  const switchTv = async (roomId: string) => {
+    const target = tvs.find((t) => t.pairing.roomId === roomId);
+    if (!target || roomId === self?.roomId) return;
+    await browserPairingStorage.save(target.pairing);
+    window.location.reload();
+  };
+  // Forget only this TV; with others left, switch to one of them instead of unpairing.
+  const forgetThisTv = async () => {
+    const rest = self ? forgetTv(self.roomId) : tvs;
+    setTvs(rest);
+    const next = rest[0];
+    if (next) {
+      await browserPairingStorage.save(next.pairing);
+      window.location.reload();
+    } else {
+      await actions.unpair();
+    }
   };
   const changeFavorites = (next: (string | null)[]) => {
     setFavorites(next);
@@ -154,6 +179,22 @@ export default function App() {
       <header className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <h1 className="whitespace-nowrap bg-gradient-to-r from-white to-accent bg-clip-text text-xl font-bold tracking-tight text-transparent">{APP_NAME}</h1>
         <div className="flex items-center gap-2">
+          {paired && tvs.length > 1 && (
+            <label className="glass-btn flex min-h-11 items-center rounded-full px-3 text-xs">
+              <span className="sr-only">TV</span>
+              <select
+                value={self?.roomId ?? ""}
+                onChange={(e) => void switchTv(e.target.value)}
+                className="max-w-28 bg-transparent font-semibold outline-none"
+              >
+                {tvs.map((t) => (
+                  <option key={t.pairing.roomId} value={t.pairing.roomId}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {paired && (
             <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" className="press glass-btn min-h-11 min-w-11">
               <Icon name="gear" size={18} />
@@ -321,8 +362,11 @@ export default function App() {
           onMicMode={chooseMic}
           onUnpair={() => {
             setSettingsOpen(false);
-            void actions.unpair();
+            void forgetThisTv();
           }}
+          tvs={tvs}
+          currentRoom={self?.roomId ?? null}
+          onRenameTv={(roomId, label) => setTvs(renameTv(roomId, label))}
           onClose={() => setSettingsOpen(false)}
         />
       )}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { Tv } from "../utils/tvs";
 import type { VoicePrefs } from "../protocol";
 import type { MicMode } from "../hooks/useVoice";
 import { resetAppCache } from "../utils/resetCache";
@@ -44,9 +45,26 @@ interface Props {
   onMicMode: (mode: MicMode) => void;
   onUnpair: () => void;
   onClose: () => void;
+  /** Every TV this phone paired with (rename here; scan another TV's QR to add one). */
+  tvs?: Tv[];
+  currentRoom?: string | null;
+  onRenameTv?: (roomId: string, label: string) => void;
 }
 
-export function SettingsSheet({ voice, adblock, micMode, version, disabled, onCommand, onMicMode, onUnpair, onClose }: Props) {
+export function SettingsSheet({
+  voice,
+  adblock,
+  micMode,
+  version,
+  disabled,
+  onCommand,
+  onMicMode,
+  onUnpair,
+  onClose,
+  tvs = [],
+  currentRoom = null,
+  onRenameTv,
+}: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     closeRef.current?.focus();
@@ -246,12 +264,30 @@ export function SettingsSheet({ voice, adblock, micMode, version, disabled, onCo
           </p>
         </section>
 
+        <section aria-label="Your TVs" className="mt-6">
+          <h3 className="text-sm font-semibold text-zinc-300">Your TVs</h3>
+          <ul className="mt-2 space-y-2">
+            {tvs.map((t) => (
+              <li key={t.pairing.roomId} className="flex items-center gap-2">
+                <input
+                  aria-label={`Name of ${t.label}`}
+                  defaultValue={t.label}
+                  maxLength={32}
+                  onBlur={(e) => onRenameTv?.(t.pairing.roomId, e.target.value)}
+                  className="glass min-h-11 flex-1 rounded-xl px-3 text-sm"
+                />
+                {t.pairing.roomId === currentRoom && <span className="text-xs text-accent">This one</span>}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-zinc-500">To add another TV, scan the QR code on it with this phone's camera.</p>
+        </section>
         <button
           type="button"
           onClick={onUnpair}
           className="mt-6 min-h-11 w-full rounded-full text-sm text-zinc-500 underline underline-offset-2"
         >
-          Forget this phone
+          {tvs.length > 1 ? "Forget this TV" : "Forget this phone"}
         </button>
       </div>
     </div>
