@@ -13,6 +13,7 @@ from botocore.exceptions import ClientError
 CONNECTION_TTL_S = 3 * 3600
 DEVICE_TTL_S = 200 * 24 * 3600
 IDEMPOTENCY_TTL_S = 15 * 60
+ROOM_TTL_S = 400 * 24 * 3600  # a PC that has not connected for 400 days: its room is removed
 
 
 @dataclass(frozen=True)
@@ -80,6 +81,7 @@ class Store:
                     "pc_key_hash": pc_key_hash,
                     "room_secret_hash": room_secret_hash,
                     "created_at": int(self._clock()),
+                    "ttl": int(self._clock()) + ROOM_TTL_S,
                 },
                 ConditionExpression="attribute_not_exists(room_id)",
             )
@@ -97,15 +99,52 @@ class Store:
         )
 
     def swap_pc_connection(self, room_id: str, connection_id: str) -> str | None:
-        """Make connection_id the room's PC; returns the previous PC connection id, if any."""
+        """Make connection_id the room's PC; returns the previous PC connection id, if any.
+
+        Also pushes the room's expiry out: a room lives as long as its PC keeps connecting.
+        """
         old = self._rooms.update_item(
             Key={"room_id": room_id},
-            UpdateExpression="SET pc_connection_id = :c",
-            ExpressionAttributeValues={":c": connection_id},
+            UpdateExpression="SET pc_connection_id = :c, #t = :t",
+            ExpressionAttributeNames={"#t": "ttl"},
+            ExpressionAttributeValues={
+                ":c": connection_id,
+                ":t": int(self._clock()) + ROOM_TTL_S,
+            },
             ReturnValues="UPDATED_OLD",
         )
         prev = old.get("Attributes", {}).get("pc_connection_id")
         return str(prev) if prev else None
+
+    def delete_room(self, room_id: str) -> list[str]:
+        """Forget a room and every phone record of it. Returns its live connection ids."""
+        with self._devices.batch_writer() as batch:
+            for device in self.list_devices(room_id):
+                batch.delete_item(Key={"room_id": room_id, "device_id": device["device_id"]})
+        live = [str(c["connection_id"]) for c in self.list_connections(room_id)]
+        with self._connections.batch_writer() as batch:
+            for conn_id in live:
+                batch.delete_item(Key={"connection_id": conn_id})
+        self._rooms.delete_item(Key={"room_id": room_id})
+        return live
+
+    # ------------------------------------------------------------------ rate limits
+
+    def bump_counter(self, key: str, window_s: int) -> int:
+        """Count one event in the current fixed window for ``key``; returns the count so far.
+
+        Rows live in the idempotency table (same shape: pk + ttl) and expire with the window.
+        """
+        now = int(self._clock())
+        window = now - now % window_s
+        resp = self._idem.update_item(
+            Key={"pk": f"rate#{key}#{window}"},
+            UpdateExpression="ADD n :one SET #t = if_not_exists(#t, :t)",
+            ExpressionAttributeNames={"#t": "ttl"},
+            ExpressionAttributeValues={":one": 1, ":t": window + 2 * window_s},
+            ReturnValues="UPDATED_NEW",
+        )
+        return int(resp["Attributes"]["n"])
 
     def clear_pc_connection(self, room_id: str, connection_id: str) -> None:
         try:

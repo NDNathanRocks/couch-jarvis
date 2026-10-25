@@ -17,16 +17,26 @@ Parameters:
   BudgetEmail:
     Type: String
     Default: ""
-    Description: Optional. If set, a 1 USD/month AWS Budget alarm emails this address at 80% actual spend.
+    Description: Optional. If set, budget and health alarms email this address.
+  MonthlyBudgetUsd:
+    Type: Number
+    Default: 25
+    Description: Monthly budget. Emails at 80% of actual spend and when the month's forecast passes 100%.
   ThrottleRatePerSecond:
     Type: Number
-    Default: 20
+    Default: 500
+    Description: Messages per second for ALL customers together (each PC/phone also has its own limits).
   ThrottleBurst:
     Type: Number
-    Default: 40
+    Default: 1000
+  ReservedConcurrency:
+    Type: Number
+    Default: 0
+    Description: Optional cost ceiling on the message router (0 = no reservation). Needs spare account concurrency.
 
 Conditions:
   HasBudgetEmail: !Not [!Equals [!Ref BudgetEmail, ""]]
+  HasReservedConcurrency: !Not [!Equals [!Ref ReservedConcurrency, 0]]
 
 Globals:
   Function:
@@ -58,6 +68,12 @@ Resources:
           KeyType: HASH
       SSESpecification:
         SSEEnabled: true
+      # A room whose PC has not connected for 400 days is removed (the PC refreshes it on connect).
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
 
   ConnectionsTable:
     Type: AWS::DynamoDB::Table
@@ -99,7 +115,10 @@ Resources:
       TimeToLiveSpecification:
         AttributeName: ttl
         Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
 
+  # Idempotency keys, and the per-IP rate-limit counters ("rate#..." keys); both expire by TTL.
   IdempotencyTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -223,6 +242,7 @@ Resources:
         - DynamoDBReadPolicy: { TableName: !Ref ConnectionsTable }
         - DynamoDBCrudPolicy: { TableName: !Ref DevicesTable }
         - DynamoDBCrudPolicy: { TableName: !Ref ConfigTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref IdempotencyTable } # per-IP rate-limit counters
         - Statement:
             - Effect: Allow
               Action: dynamodb:Query
@@ -255,6 +275,7 @@ Resources:
     Properties:
       Handler: relay_router.handler
       Description: WebSocket $default - pairing, command relay (phone to PC) and fan-out (PC to phones)
+      ReservedConcurrentExecutions: !If [HasReservedConcurrency, !Ref ReservedConcurrency, !Ref AWS::NoValue]
       LoggingConfig:
         LogGroup: !Ref RouterLogGroup
       Policies:
@@ -295,7 +316,7 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${RelayApi}/*/$default"
 
-  # ------------------------------------------------------------------ Cost guard (optional)
+  # ------------------------------------------------------------------ Cost guard and health alarms (optional)
   CostBudget:
     Type: AWS::Budgets::Budget
     Condition: HasBudgetEmail
@@ -305,7 +326,7 @@ Resources:
         BudgetType: COST
         TimeUnit: MONTHLY
         BudgetLimit:
-          Amount: 1
+          Amount: !Ref MonthlyBudgetUsd
           Unit: USD
       NotificationsWithSubscribers:
         - Notification:
@@ -316,6 +337,89 @@ Resources:
           Subscribers:
             - SubscriptionType: EMAIL
               Address: !Ref BudgetEmail
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetEmail
+
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Condition: HasBudgetEmail
+    Properties:
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref BudgetEmail
+
+  # Customers notice a broken relay before you do: these email you first.
+  RouterErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasBudgetEmail
+    Properties:
+      AlarmDescription: The message router is failing (Lambda errors)
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{ Name: FunctionName, Value: !Ref RouterFunction }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 20
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  ConnectErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasBudgetEmail
+    Properties:
+      AlarmDescription: Connections are failing (Lambda errors in $connect)
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{ Name: FunctionName, Value: !Ref ConnectFunction }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 20
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  RouterThrottlesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasBudgetEmail
+    Properties:
+      AlarmDescription: The message router is being throttled (raise concurrency or ReservedConcurrency)
+      Namespace: AWS/Lambda
+      MetricName: Throttles
+      Dimensions: [{ Name: FunctionName, Value: !Ref RouterFunction }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  ApiServerErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasBudgetEmail
+    Properties:
+      AlarmDescription: API Gateway is returning server errors to customers
+      Namespace: AWS/ApiGateway
+      MetricName: IntegrationError
+      Dimensions:
+        - { Name: ApiId, Value: !Ref RelayApi }
+        - { Name: Stage, Value: !Ref StageName }
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 20
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
 
 Outputs:
   WebSocketUrl:

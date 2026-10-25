@@ -10,7 +10,7 @@ import contextlib
 import json
 import logging
 import re
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -53,6 +53,8 @@ SSE_HEADERS = {
 TokenVerifier = Callable[[str], str | None]
 # (room_secret, device_name) -> granted token, or None when the secret is wrong.
 PairingFn = Callable[[str, str], PairGrantedPayload | None]
+# "Delete my cloud data": None when done, else the reason it could not be.
+DeleteCloudFn = Callable[[], Awaitable[str | None]]
 MAX_PAIR_FAILURES = 5
 
 
@@ -107,6 +109,7 @@ def create_app(
     allowed_origins: list[str] | None = None,
     keepalive_s: float = 15.0,
     static_dir: Path | None = None,
+    delete_cloud: DeleteCloudFn | None = None,
 ) -> FastAPI:
     app = FastAPI(title="CouchJarvis daemon", docs_url=None, redoc_url=None)
     if allowed_origins:
@@ -157,6 +160,16 @@ def create_app(
         if service.on_qr_toggle is None:
             raise HTTPException(status_code=409, detail="no TV overlay")
         return {"shown": service.on_qr_toggle()}
+
+    @app.post("/api/cloud/delete")
+    async def cloud_delete(_: Local) -> dict[str, object]:
+        """Forget this TV in the cloud and start over with a new room (all phones re-pair)."""
+        if delete_cloud is None:
+            raise HTTPException(status_code=409, detail="not available")
+        problem = await delete_cloud()
+        if problem is not None:
+            raise HTTPException(status_code=502, detail=problem)
+        return {"deleted": True}
 
     @app.get("/api/metrics")
     async def metrics(_: DeviceId) -> dict[str, object]:

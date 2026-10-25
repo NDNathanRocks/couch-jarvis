@@ -16,4 +16,17 @@ region = "us-east-2"
 capabilities = "CAPABILITY_IAM"
 confirm_changeset = true
 resolve_s3 = true
-# Optional: parameter_overrides = "BudgetEmail=you@example.com"
+# Optional: parameter_overrides = "BudgetEmail=you@example.com MonthlyBudgetUsd=25"
+
+# A separate copy for testing relay changes (and scripts/relay_load.py) before customers get them:
+#   sam deploy --config-env staging
+[staging.global.parameters]
+stack_name = "couch-jarvis-staging"
+region = "us-east-2"
+
+[staging.deploy.parameters]
+region = "us-east-2"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+resolve_s3 = true
+parameter_overrides = "StageName=staging MonthlyBudgetUsd=5 ThrottleRatePerSecond=200 ThrottleBurst=400"

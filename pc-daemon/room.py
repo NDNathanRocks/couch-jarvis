@@ -100,6 +100,13 @@ class RoomStore:
             self._write(self._identity)
         return self._identity
 
+    def start_over(self) -> RoomIdentity:
+        """A brand-new room (id, secret, PC key): every phone must pair again. Used after the
+        relay has forgotten the old room ("delete my cloud data")."""
+        self._identity = None
+        self._path.unlink(missing_ok=True)
+        return self.load_or_create()
+
     def rotate_secret(self) -> RoomIdentity:
         """Issue a new room_secret (invalidates the old QR) while keeping room_id and pc_key."""
         current = self.identity

@@ -20,6 +20,7 @@ from pathlib import Path
 
 import uvicorn
 
+import lifecycle
 from agent.graph import AgentDeps, AgentRunner
 from agent.memory import ConversationMemory
 from bookmarks import BookmarkStore
@@ -286,6 +287,7 @@ async def amain(args: argparse.Namespace) -> None:
             f"http://127.0.0.1:{port}",
         ],
         static_dir=PWA_DIST,
+        delete_cloud=(lambda: delete_cloud_data(rt)) if rt.room_store is not None else None,
     )
     config = uvicorn.Config(
         app,
@@ -298,6 +300,10 @@ async def amain(args: argparse.Namespace) -> None:
     )
     server = uvicorn.Server(config)
 
+    def stop_server() -> None:
+        server.should_exit = True  # serve() returns, and the finally below shuts down cleanly
+
+    lifecycle.set_stopper(stop_server)
     await rt.service.start()
     background: list[asyncio.Task[None]] = []
     if not args.dry_run:  # start/preload the local model now, not during your first command
@@ -352,10 +358,27 @@ async def amain(args: argparse.Namespace) -> None:
         await rt.service.stop()
 
 
+async def delete_cloud_data(rt: Runtime) -> str | None:
+    """The relay forgets this room and its phones; then this PC starts over with a new room.
+
+    Nothing local changes unless the relay confirmed (else the old room would linger there).
+    Returns None when done, or why it was not done.
+    """
+    assert rt.room_store is not None
+    if rt.cloud is not None:
+        if rt.cloud.status != "up":
+            return "The cloud is not reachable right now. Try again when the PC is online."
+        if not await rt.cloud.delete_room():
+            return "The cloud did not confirm. Nothing was deleted; try again later."
+    rt.room_store.start_over()
+    log.warning("cloud data deleted; restarting with a new room (phones must pair again)")
+    # answer the request first, then restart with the new identity
+    asyncio.get_running_loop().call_later(0.5, lifecycle.request_exit, lifecycle.EXIT_RESTART)
+    return None
+
+
 def start_hud(rt: Runtime, settings: Settings, host: str, port: int) -> asyncio.Task[None]:
     """Create the TV overlay (needs a running QApplication) and the task that feeds it."""
-    from PySide6.QtWidgets import QApplication
-
     from hud.controller import HudController
     from hud.tray import QrTray
     from hud.tv_overlay import TvOverlay
@@ -409,7 +432,7 @@ def start_hud(rt: Runtime, settings: Settings, host: str, port: int) -> asyncio.
             overlay.refresh()
 
         rt.deps.show_qr = show_qr
-    tray = QrTray(toggle_qr, reset_qr, lambda: QApplication.quit())
+    tray = QrTray(toggle_qr, reset_qr, lambda: lifecycle.request_exit(lifecycle.EXIT_QUIT))
     rt.tray = tray  # keep the tray icon alive for the life of the app
     controller = HudController(rt.service, vm, on_change=overlay.refresh)
     return asyncio.create_task(controller.run(), name="hud")
@@ -448,7 +471,7 @@ def main(argv: list[str] | None = None) -> int:
             run_with_qt(args)
         else:
             asyncio.run(amain(args))
-    return 0
+    return lifecycle.exit_code()  # EXIT_QUIT / EXIT_RESTART tell the supervisor what to do
 
 
 if __name__ == "__main__":

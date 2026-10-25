@@ -404,6 +404,20 @@ class RoomKey(_EnvelopeBase):
     payload: RoomKeyPayload
 
 
+class RoomDelete(_EnvelopeBase):
+    """PC -> relay: forget this room (its phones and records). "Delete my cloud data"."""
+
+    type: Literal["room.delete"] = "room.delete"
+    payload: Empty = Field(default_factory=Empty)
+
+
+class RoomDeleted(_EnvelopeBase):
+    """Relay -> PC: the room and every phone record of it are gone."""
+
+    type: Literal["room.deleted"] = "room.deleted"
+    payload: Empty = Field(default_factory=Empty)
+
+
 class Ping(_EnvelopeBase):
     type: Literal["ping"] = "ping"
     payload: Empty = Field(default_factory=Empty)
@@ -439,6 +453,8 @@ Message = Annotated[
     | StateSync
     | Presence
     | RoomKey
+    | RoomDelete
+    | RoomDeleted
     | DeviceRevoke
     | Ping
     | Pong

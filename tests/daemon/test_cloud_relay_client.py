@@ -21,6 +21,7 @@ from contracts import (
     CmdText,
     ErrorMsg,
     Presence,
+    RoomDeleted,
     RoomKey,
     StateSync,
     dump_message,
@@ -62,6 +63,7 @@ class FakeRelay:
     received: list[dict[str, Any]] = field(default_factory=list)
     reject_with: int | None = None
     room_key: str = "relay-issued-room-key"
+    confirm_delete: bool = True
 
     async def handler(self, ws: ServerConnection) -> None:
         self.connections.append(ws)
@@ -72,6 +74,9 @@ class FakeRelay:
                 if msg["type"] == "state.sync":  # PC hello -> key + presence, like relay_router
                     key = envelope(RoomKey, msg["room_id"], {"key": self.room_key, "key_id": "k1"})
                     await ws.send(dump_message(key))
+                elif msg["type"] == "room.delete" and self.confirm_delete:
+                    done = envelope(RoomDeleted, msg["room_id"], {}, reply_to=msg["id"])
+                    await ws.send(dump_message(done))
         except ConnectionClosed:
             pass  # the PC dropped mid-reply (e.g. the test cancelled it)
         finally:
@@ -410,6 +415,50 @@ async def test_owner_revocation_is_forwarded_to_the_relay(rig: Rig, relay: FakeR
     await until(lambda: "device.revoke" in relay.types())
     sent = next(m for m in relay.received if m["type"] == "device.revoke")
     assert sent["payload"] == {"device_id": "dev-gone"}
+
+
+def _presence(room_id: str, *, online: bool) -> Any:
+    device = {"device_id": "dev-1", "name": "Ann", "online": online, "last_seen": 1.0}
+    return envelope(Presence, room_id, {"devices": [device], "pc_online": True}, from_="relay")
+
+
+async def test_nothing_is_broadcast_while_no_phone_is_online(rig: Rig, relay: FakeRelay) -> None:
+    """The relay is paid per message: an idle TV must not stream state to nobody."""
+    room = rig.store.identity.room_id
+    await until(lambda: "state.snapshot" in relay.types())
+    await relay.push(_presence(room, online=False))
+    await until(lambda: rig.client.phones_online is False)
+    before = len(relay.received)
+    rig.service.state.update(volume=17)
+    rig.service.state.update(volume=18)
+    await asyncio.sleep(0.2)
+    assert relay.types()[before:] == []
+    rig.service.revoke_device("dev-gone")  # the relay itself acts on this: always sent
+    await until(lambda: "device.revoke" in relay.types())
+
+    await relay.push(_presence(room, online=True))  # a phone arrives: updates flow again
+    await until(lambda: rig.client.phones_online is True)
+    rig.service.state.update(volume=40)
+    await until(lambda: any(m["payload"].get("volume") == 40 for m in relay.received[before:]))
+
+
+async def test_delete_room_waits_for_the_relays_confirmation(rig: Rig, relay: FakeRelay) -> None:
+    await until(lambda: "state.snapshot" in relay.types())
+    assert await rig.client.delete_room() is True
+    assert "room.delete" in relay.types()
+    relay.confirm_delete = False  # an older relay never answers: report it, do not hang
+    assert await rig.client.delete_room(timeout_s=0.2) is False
+
+
+async def test_a_phone_message_counts_as_a_phone_online(rig: Rig, relay: FakeRelay) -> None:
+    room = rig.store.identity.room_id
+    await until(lambda: "state.snapshot" in relay.types())
+    await relay.push(_presence(room, online=False))
+    await until(lambda: rig.client.phones_online is False)
+    cmd = {"command_id": "c1", "idempotency_key": "k1", "action": "next"}
+    await relay.push(envelope(CmdButton, room, cmd, from_="dev-1"))  # presence arrived late
+    await until(lambda: "cmd.result" in relay.types())
+    assert rig.client.phones_online is True
 
 
 # --------------------------------------------------------------------------- phone message types

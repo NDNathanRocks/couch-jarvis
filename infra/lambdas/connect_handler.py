@@ -20,10 +20,20 @@ from common.runtime import get_gateway, get_store
 
 log = logging.getLogger(__name__)
 
+# Per source IP. Generous for a household behind one router (several phones reconnecting at
+# once), tight for a script. New rooms are rare: one per install.
+CONNECTS_PER_MINUTE = 60
+NEW_ROOMS_PER_HOUR = 5
+
 
 def _reject(status: int, reason: str) -> dict[str, Any]:
     log.info("connect rejected: %s", reason)
     return {"statusCode": status, "body": reason}
+
+
+def _source_ip(event: dict[str, Any]) -> str | None:
+    ip = (event.get("requestContext") or {}).get("identity", {}).get("sourceIp")
+    return str(ip) if ip else None
 
 
 def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
@@ -36,6 +46,9 @@ def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
 
     store = get_store()
     role = query.get("role", "phone")
+    ip = _source_ip(event)
+    if ip is not None and store.bump_counter(f"ip#{ip}", 60) > CONNECTS_PER_MINUTE:
+        return _reject(429, "too many connections")
 
     if role == "pc":
         bearer = headers.get("authorization", "")
@@ -45,6 +58,9 @@ def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
             return _reject(401, "missing pc credentials")
         pc_key_hash = auth.sha256_hex(pc_key)
         room = store.get_room(room_id)
+        new_room = room is None and ip is not None
+        if new_room and store.bump_counter(f"newroom#{ip}", 3600) > NEW_ROOMS_PER_HOUR:
+            return _reject(429, "too many new rooms")
         if room is None and not store.register_room(room_id, pc_key_hash, secret_hash):
             room = store.get_room(room_id)  # lost the registration race
         elif room is None:

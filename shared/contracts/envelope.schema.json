@@ -1812,6 +1812,120 @@
       "title": "PresencePayload",
       "type": "object"
     },
+    "RoomDelete": {
+      "additionalProperties": false,
+      "description": "PC -> relay: forget this room (its phones and records). \"Delete my cloud data\".",
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/Empty"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "room.delete",
+          "default": "room.delete",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from"
+      ],
+      "title": "RoomDelete",
+      "type": "object"
+    },
+    "RoomDeleted": {
+      "additionalProperties": false,
+      "description": "Relay -> PC: the room and every phone record of it are gone.",
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/Empty"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To"
+        },
+        "room_id": {
+          "title": "Room Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        },
+        "type": {
+          "const": "room.deleted",
+          "default": "room.deleted",
+          "title": "Type",
+          "type": "string"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "ts",
+        "room_id",
+        "from"
+      ],
+      "title": "RoomDeleted",
+      "type": "object"
+    },
     "RoomKey": {
       "additionalProperties": false,
       "properties": {
@@ -2302,6 +2416,8 @@
       "ping": "#/$defs/Ping",
       "pong": "#/$defs/Pong",
       "presence": "#/$defs/Presence",
+      "room.delete": "#/$defs/RoomDelete",
+      "room.deleted": "#/$defs/RoomDeleted",
       "room.key": "#/$defs/RoomKey",
       "state.patch": "#/$defs/StatePatch",
       "state.snapshot": "#/$defs/StateSnapshot",
@@ -2366,6 +2482,12 @@
     },
     {
       "$ref": "#/$defs/RoomKey"
+    },
+    {
+      "$ref": "#/$defs/RoomDelete"
+    },
+    {
+      "$ref": "#/$defs/RoomDeleted"
     },
     {
       "$ref": "#/$defs/DeviceRevoke"

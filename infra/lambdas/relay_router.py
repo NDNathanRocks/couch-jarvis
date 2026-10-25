@@ -85,6 +85,8 @@ def _from_pc(store: Store, gw: Gateway, conn_id: str, room_id: str, msg: dict[st
         gw.send(conn_id, presence_message(store, room_id))
     elif kind == "device.revoke":
         _revoke(store, gw, conn_id, room_id, msg)
+    elif kind == "room.delete":
+        _delete_room(store, gw, conn_id, room_id, msg)
     elif kind == "ping":
         gw.send(conn_id, build("pong", room_id, {}, msg["id"]))
     elif kind != "pong":
@@ -111,6 +113,22 @@ def _revoke(store: Store, gw: Gateway, conn_id: str, room_id: str, msg: dict[str
         if conn.get("device_id") == device_id:
             gw.close(str(conn["connection_id"]))
     broadcast_presence(store, gw, room_id)
+
+
+def _delete_room(
+    store: Store, gw: Gateway, conn_id: str, room_id: str, msg: dict[str, Any]
+) -> None:
+    """Owner action ("delete my cloud data"): remove the room, its phones and connections.
+
+    The PC is told first (its own record goes too), then every phone is disconnected; a phone
+    that reconnects is refused as an unknown room and asks to pair again.
+    """
+    live = store.delete_room(room_id)
+    gw.send(conn_id, build("room.deleted", room_id, {}, msg["id"]))
+    for other in live:
+        if other != conn_id:
+            gw.close(other)
+    log.info("room deleted on request")
 
 
 # -------------------------------------------------------------------------- phone

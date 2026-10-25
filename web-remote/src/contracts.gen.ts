@@ -22,6 +22,8 @@ export type Message =
   | StateSync
   | Presence
   | RoomKey
+  | RoomDelete
+  | RoomDeleted
   | DeviceRevoke
   | Ping
   | Pong
@@ -300,36 +302,50 @@ export type Type18 = "room.key";
 export type V18 = 1;
 export type From19 = string;
 export type Id20 = string;
-export type DeviceId2 = string;
 export type ReplyTo19 = string | null;
 export type RoomId19 = string;
 export type Ts19 = number;
-export type Type19 = "device.revoke";
+export type Type19 = "room.delete";
 export type V19 = 1;
 export type From20 = string;
 export type Id21 = string;
 export type ReplyTo20 = string | null;
 export type RoomId20 = string;
 export type Ts20 = number;
-export type Type20 = "ping";
+export type Type20 = "room.deleted";
 export type V20 = 1;
 export type From21 = string;
 export type Id22 = string;
+export type DeviceId2 = string;
 export type ReplyTo21 = string | null;
 export type RoomId21 = string;
 export type Ts21 = number;
-export type Type21 = "pong";
+export type Type21 = "device.revoke";
 export type V21 = 1;
 export type From22 = string;
 export type Id23 = string;
-export type Code = string;
-export type Message2 = string;
-export type Retryable = boolean;
 export type ReplyTo22 = string | null;
 export type RoomId22 = string;
 export type Ts22 = number;
-export type Type22 = "error";
+export type Type22 = "ping";
 export type V22 = 1;
+export type From23 = string;
+export type Id24 = string;
+export type ReplyTo23 = string | null;
+export type RoomId23 = string;
+export type Ts23 = number;
+export type Type23 = "pong";
+export type V23 = 1;
+export type From24 = string;
+export type Id25 = string;
+export type Code = string;
+export type Message2 = string;
+export type Retryable = boolean;
+export type ReplyTo24 = string | null;
+export type RoomId24 = string;
+export type Ts24 = number;
+export type Type24 = "error";
+export type V24 = 1;
 
 export interface PairRequest {
   from: From;
@@ -700,22 +716,22 @@ export interface RoomKeyPayload {
   key_id: KeyId;
 }
 /**
- * PC -> relay: cut a phone off (live connections are closed, future tokens refused).
+ * PC -> relay: forget this room (its phones and records). "Delete my cloud data".
  */
-export interface DeviceRevoke {
+export interface RoomDelete {
   from: From19;
   id: Id20;
-  payload: DeviceRevokePayload;
+  payload?: Empty;
   reply_to?: ReplyTo19;
   room_id: RoomId19;
   ts: Ts19;
   type?: Type19;
   v?: V19;
 }
-export interface DeviceRevokePayload {
-  device_id: DeviceId2;
-}
-export interface Ping {
+/**
+ * Relay -> PC: the room and every phone record of it are gone.
+ */
+export interface RoomDeleted {
   from: From20;
   id: Id21;
   payload?: Empty;
@@ -725,25 +741,51 @@ export interface Ping {
   type?: Type20;
   v?: V20;
 }
-export interface Pong {
+/**
+ * PC -> relay: cut a phone off (live connections are closed, future tokens refused).
+ */
+export interface DeviceRevoke {
   from: From21;
   id: Id22;
-  payload?: Empty;
+  payload: DeviceRevokePayload;
   reply_to?: ReplyTo21;
   room_id: RoomId21;
   ts: Ts21;
   type?: Type21;
   v?: V21;
 }
-export interface ErrorMsg {
+export interface DeviceRevokePayload {
+  device_id: DeviceId2;
+}
+export interface Ping {
   from: From22;
   id: Id23;
-  payload: ErrorPayload;
+  payload?: Empty;
   reply_to?: ReplyTo22;
   room_id: RoomId22;
   ts: Ts22;
   type?: Type22;
   v?: V22;
+}
+export interface Pong {
+  from: From23;
+  id: Id24;
+  payload?: Empty;
+  reply_to?: ReplyTo23;
+  room_id: RoomId23;
+  ts: Ts23;
+  type?: Type23;
+  v?: V23;
+}
+export interface ErrorMsg {
+  from: From24;
+  id: Id25;
+  payload: ErrorPayload;
+  reply_to?: ReplyTo24;
+  room_id: RoomId24;
+  ts: Ts24;
+  type?: Type24;
+  v?: V24;
 }
 export interface ErrorPayload {
   code: Code;

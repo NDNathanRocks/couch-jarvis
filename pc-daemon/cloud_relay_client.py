@@ -30,6 +30,8 @@ from contracts import (
     InputText,
     Ping,
     Presence,
+    RoomDelete,
+    RoomDeleted,
     RoomKey,
     StateSync,
     dump_message,
@@ -59,6 +61,8 @@ PHONE_MESSAGES = (
     AudioEnd,
     StateSync,
 )
+# PC -> relay messages the relay itself acts on: sent even when no phone is online.
+RELAY_CONTROL_TYPES = frozenset({"device.revoke", "room.delete"})
 
 
 def backoff_delay(
@@ -103,6 +107,9 @@ class CloudRelayClient:
         self._clock = clock
         self.status: Status = "down"
         self._ws: ClientConnection | None = None
+        # From the relay's presence. None = not told yet (forward everything, to be safe).
+        self.phones_online: bool | None = None
+        self._deleted: asyncio.Future[None] | None = None  # waiting for room.deleted
 
     def _set_status(self, status: Status) -> None:
         if status != self.status:
@@ -147,6 +154,19 @@ class CloudRelayClient:
             ):
                 await self._sleep(delay)
 
+    async def delete_room(self, timeout_s: float = 10.0) -> bool:
+        """Ask the relay to forget this room and its phones; True once it confirms."""
+        ws = self._ws
+        if ws is None:
+            return False
+        self._deleted = asyncio.get_running_loop().create_future()
+        await ws.send(dump_message(envelope(RoomDelete, self._store.identity.room_id, {})))
+        try:
+            await asyncio.wait_for(self._deleted, timeout_s)
+        except TimeoutError:
+            return False
+        return True
+
     async def reconnect(self) -> None:
         """Drop the connection so the next one announces the current room secret (QR reset)."""
         ws, self._ws = self._ws, None
@@ -168,6 +188,7 @@ class CloudRelayClient:
             self._endpoint(), additional_headers=headers, open_timeout=10, max_size=64 * 1024
         ) as ws:
             self._ws = ws
+            self.phones_online = None  # a new connection: wait for the relay's presence
             self._set_status("up")
             await ws.send(dump_message(envelope(StateSync, room_id, {})))  # hello -> room.key
             await self._send_snapshot(ws)
@@ -201,6 +222,10 @@ class CloudRelayClient:
                 event = await queue.get()
                 if self._bus.consume_lag(queue):  # events were dropped: resync the phones
                     await self._send_snapshot(ws)
+                if self.phones_online is False and event.type not in RELAY_CONTROL_TYPES:
+                    # Nobody would receive it, and the relay is paid per message. A phone that
+                    # connects asks for the full state (state.sync) anyway.
+                    continue
                 if len(event.data.encode("utf-8")) > MAX_FRAME_BYTES:
                     log.warning(
                         "dropping oversize %s event (%d bytes)", event.type, len(event.data)
@@ -217,13 +242,18 @@ class CloudRelayClient:
                 continue
             if isinstance(msg, RoomKey):
                 self._store.set_room_key(msg.payload.key)
+            elif isinstance(msg, RoomDeleted):
+                if self._deleted is not None and not self._deleted.done():
+                    self._deleted.set_result(None)
             elif isinstance(msg, Presence):
+                self.phones_online = any(d.online for d in msg.payload.devices)
                 if msg.payload.revoked:
                     self._store.add_revoked(msg.payload.revoked)  # keep LAN auth in step
                     for device_id in msg.payload.revoked:
                         self._service.revoked.add(device_id)
                 self._service.set_cloud_devices(msg.payload.devices)
             elif isinstance(msg, PHONE_MESSAGES):
+                self.phones_online = True  # a phone is clearly there, even if presence lags
                 replies = await self._service.handle_envelope(msg, msg.from_)
                 for reply in replies:
                     await ws.send(dump_message(reply))

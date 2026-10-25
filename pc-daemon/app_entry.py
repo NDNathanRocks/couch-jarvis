@@ -25,6 +25,7 @@ MUTEX_NAME = "Local\\CouchJarvisDaemon"
 FIRST_DELAY_S = 2
 MAX_DELAY_S = 60
 HEALTHY_RUN_S = 60
+QUICK_RESTART_MIN_S = 5
 
 _TEMPLATE = (
     "# CouchJarvis settings. Lines starting with # are ignored; restart the app after editing.\n"
@@ -46,6 +47,19 @@ def ensure_user_config(target: Path, defaults: Path) -> bool:
     text = defaults.read_text(encoding="utf-8") if defaults.is_file() else _TEMPLATE
     target.write_text(text, encoding="utf-8")
     return True
+
+
+def after_exit(code: int, delay: float, ran_for: float) -> float | None:
+    """What the supervisor does when the daemon exits: None = stop for good (the user quit),
+    0 = start again now (a requested restart), else wait this long (a crash). A restart
+    request seconds after starting is treated like a crash, so a bug can never spin the CPU."""
+    from lifecycle import EXIT_QUIT, EXIT_RESTART
+
+    if code == EXIT_QUIT:
+        return None
+    if code == EXIT_RESTART and ran_for >= QUICK_RESTART_MIN_S:
+        return 0.0
+    return delay
 
 
 def next_delay(delay: float, ran_for: float) -> float:
@@ -144,8 +158,15 @@ def run_supervisor(argv: list[str]) -> int:
         )
         argv = without_one_shot(argv)
         ran = time.monotonic() - started
-        log.warning("daemon exited with code %s after %.0fs; restarting in %.0fs", code, ran, delay)
-        time.sleep(delay)
+        wait = after_exit(code, delay, ran)
+        if wait is None:
+            log.info("daemon quit at the user's request; stopping")
+            return 0
+        if wait == 0:
+            log.info("daemon asked to restart; starting it again")
+            continue
+        log.warning("daemon exited with code %s after %.0fs; restarting in %.0fs", code, ran, wait)
+        time.sleep(wait)
         delay = next_delay(delay, ran)
 
 

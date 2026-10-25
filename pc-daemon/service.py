@@ -160,6 +160,7 @@ class CommandService:
         stt: STTEngine | None = None,
         mode: Literal["cloud", "lan"] = "cloud",
         state_poll_s: float = 10.0,
+        idle_poll_s: float = 60.0,
         remote_input: bool = True,
     ) -> None:
         self.room_id = room_id
@@ -173,6 +174,8 @@ class CommandService:
         self._stt = stt
         self._timers = timers
         self._poll_s = state_poll_s
+        self._idle_poll_s = idle_poll_s
+        self._poll_wake = asyncio.Event()
         self.queue = CommandQueue(self._run_command, on_result=self._on_result)
         self._audio: dict[tuple[str, str], _AudioBuffer] = {}  # (device_id, command_id)
         self._limiter = TokenBucket(rate=4.0, burst=12.0)
@@ -259,7 +262,10 @@ class CommandService:
             *self._cloud_devices,
             *(d for d in self._devices.values() if d.device_id not in lan_ids),
         ]
+        was_watched = self.phones_online
         self.state.update(devices=merged)
+        if self.phones_online and not was_watched:
+            self._poll_wake.set()  # fresh position/volume for the phone that just arrived
 
     # ------------------------------------------------------------------ inbound
 
@@ -568,7 +574,16 @@ class CommandService:
         timers: list[TimerInfo] = self._timers.list()
         self.state.update(now_playing=playing, volume=level, muted=muted, timers=timers)
 
+    @property
+    def phones_online(self) -> bool:
+        return any(d.online for d in self.state.state.devices)
+
     async def _poll_state(self) -> None:
+        """Every few seconds while someone watches the phone; rarely when nobody does (the
+        relay is paid per message). A phone coming online wakes the poller at once."""
         while True:
             await self.refresh_state()
-            await asyncio.sleep(self._poll_s)
+            self._poll_wake.clear()
+            interval = self._poll_s if self.phones_online else self._idle_poll_s
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(self._poll_wake.wait(), interval)
