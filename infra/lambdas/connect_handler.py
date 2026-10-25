@@ -10,6 +10,7 @@ Returning a non-2xx statusCode rejects the handshake.
 from __future__ import annotations
 
 import logging
+import os
 import time
 from typing import Any
 
@@ -21,9 +22,10 @@ from common.runtime import get_gateway, get_store
 log = logging.getLogger(__name__)
 
 # Per source IP. Generous for a household behind one router (several phones reconnecting at
-# once), tight for a script. New rooms are rare: one per install.
-CONNECTS_PER_MINUTE = 60
-NEW_ROOMS_PER_HOUR = 5
+# once), tight for a script. New rooms are rare: one per install. Stack parameters (staging
+# raises them for scripts/relay_load.py, which runs many homes from one machine).
+CONNECTS_PER_MINUTE = int(os.environ.get("CONNECTS_PER_MINUTE", "60"))
+NEW_ROOMS_PER_HOUR = int(os.environ.get("NEW_ROOMS_PER_HOUR", "5"))
 
 
 def _reject(status: int, reason: str) -> dict[str, Any]:

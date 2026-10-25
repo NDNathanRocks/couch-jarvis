@@ -29,4 +29,5 @@ region = "us-east-2"
 capabilities = "CAPABILITY_IAM"
 confirm_changeset = true
 resolve_s3 = true
-parameter_overrides = "StageName=staging MonthlyBudgetUsd=5 ThrottleRatePerSecond=200 ThrottleBurst=400"
+parameter_overrides = "StageName=staging MonthlyBudgetUsd=5 ThrottleRatePerSecond=200 ThrottleBurst=400 ConnectsPerMinute=2000 NewRoomsPerHour=1000"
+# The load test costs well under 1 USD; remove the stack afterwards with: sam delete --config-env staging

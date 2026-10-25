@@ -734,7 +734,7 @@ customers' licences.
 | 5A MSIX spike | **Go** (2026-10-25, see below) |
 | 5B Brand | waiting for the name; channels done in 5C |
 | 5C Licence-safe defaults | done: `phi4-mini` CPU default (eval on this PC: 8/12 right action, 3.2 s median, vs 6/12 for `qwen2.5:1.5b`), `edge-tts` dev-only, GPLv3 `pymsgbox`/`mouseinfo` excluded, licence gate + notices, pop-up protection, Butler / Sterling / Aurora |
-| 5D Relay | done except the custom relay domain (needs the domain) and the staging deploy + load run (needs your OK) |
+| 5D Relay | done except the staging deploy + load run (needs your OK); the custom relay domain is dropped for 1.0.0 (13.10) |
 | 5E-5L | not started |
 
 **5A result: go.** A Store-channel build packed with `build_msix.ps1`, test-signed and installed with `Add-AppxPackage`
@@ -753,3 +753,66 @@ What package virtualization changes:
 Still to test in 5J: an MSIX -> MSIX update keeps the data, WACK, and a clean PC (Windows Sandbox).
 Small findings: the 5 s Edge probe logged one line per call (httpx now logs warnings only in the app), and speech checks
 Hugging Face for model updates at every start (5I: go offline once the model is cached).
+
+### 13.10 Recent developments and further action (2026-10-25)
+**Done since approval** (local commits, nothing pushed or deployed): 5C and 5D (`4547e42`, `0c618ed`), the 5A spike and
+its fixes (`dd8eaa5`), and per-IP relay limits as stack parameters (`ConnectsPerMinute`, `NewRoomsPerHour`) so staging can
+run the load test without loosening production. Tray **Quit** really quits. The relay must be redeployed before any PC
+uses "delete my cloud data" (`room.delete`).
+
+**Housekeeping from the spike**
+- `installer\dist` now holds a **store-channel** build, including `CouchJarvis-Setup.exe`: rebuild with
+  `build.ps1` (default `direct`) before handing out a direct installer.
+- The test certificate `CN=CouchJarvisDev` stays trusted in Local Machine > Trusted People until 5J's MSIX tests are
+  done; then remove it (admin PowerShell):
+  `Get-ChildItem Cert:\LocalMachine\TrustedPeople | Where-Object Subject -eq 'CN=CouchJarvisDev' | Remove-Item`
+
+**"As free as possible" plan** (user goal). The fixed monthly cost can be about 0 USD:
+| Item | Free option | Note |
+|---|---|---|
+| Phone app hosting | **Cloudflare Pages** free plan (commercial use allowed, unlimited bandwidth) | replaces Vercel Hobby (non-commercial) |
+| Domain | `nathandsouza.dpdns.org` (free DigitalPlat domain, DNS already on Cloudflare) | see the concerns below |
+| Website, privacy policy, terms, support page | the same Pages project, or the portfolio | the Store needs a privacy-policy URL |
+| Support email | Cloudflare Email Routing (free): `support@<domain>` forwards to an existing inbox | needs MX records in the zone |
+| Relay | AWS: cents per month at small scale, ~0.05-0.10 USD per active PC per month later (13.2) | budget alerts stay on |
+| Store account and signing | Microsoft made individual developer registration free in 2025 (check in Partner Center); the Store signs MSIX packages itself | no certificate to buy for the Store |
+| Payments | the Store keeps 15% of sales, no fixed fee | direct-download sales (Paddle / Lemon Squeezy) also take only a percentage |
+| Crash reports | none, or the Sentry free tier (opt-in) | decision pending |
+| Direct-download signing | skip (Windows SmartScreen warns on first run) | the Store build is the main product; buy signing only if direct sales matter |
+
+**Using `nathandsouza.dpdns.org`: possible, with care**
+- It works technically: the zone is on Cloudflare (`aarav`/`arushi.ns.cloudflare.com`), so a subdomain such as
+  `remote.nathandsouza.dpdns.org` can point at a Pages project with one CNAME, without touching the portfolio on Vercel.
+- **Concern 1: the domain is free and not yours outright.** `dpdns.org` belongs to DigitalPlat; a free-subdomain service
+  can change its rules, ask for renewal, or lose its parent domain. Free subdomain services are also popular with
+  phishers, so some security filters and school or office networks block whole parent domains.
+- **Concern 2: the phone app's address is hard to change later.** A phone's pairing is stored per web address (origin), and
+  every TV's QR code points there. If that domain ever stops working, every paired phone breaks at once.
+- **Recommendation:** use Cloudflare's own free address (`<project>.pages.dev`, owned by Cloudflare and permanent) as the
+  phone app's address that QR codes point to, and use `nathandsouza.dpdns.org` (or a subdomain) for the website,
+  landing page, privacy policy and support. If that domain is ever lost, only the web pages move and no install
+  breaks. If you later buy your own domain (~10-15 USD/year), the 5E fragment handoff can move phones to it.
+- **Relay custom domain (5D): dropped for 1.0.0.** On a free domain it would add the same risk to every install for
+  little gain; keep the AWS `execute-api` URL. Revisit with a bought domain, keeping the raw URL as a fallback.
+- The old Vercel URL stays up only as the 5E redirect, so phones paired with 0.x move across; it is retired once
+  0.x users have updated.
+
+**Staging load test: cost**
+Deploy `couch-jarvis-staging`, run `scripts/relay_load.py` (e.g. 200 homes for 5 minutes, one button press every 5 s),
+then `sam delete --config-env staging`. That is about 12,000 commands and roughly 100,000 API Gateway messages, plus
+similar numbers of Lambda calls and DynamoDB reads. **Under 0.50 USD even with no free tier left**, and 0 USD if the
+account's free tier or credits still cover API Gateway. A deleted stack costs nothing afterwards. Numbers go into 13.2.
+
+**Further action**
+| Who | Action |
+|---|---|
+| You | Pick the name (13.6) and run a trademark search |
+| You | Create a Cloudflare Pages project (or let me deploy it with `wrangler` after `wrangler login`); choose `<project>.pages.dev` as the app address |
+| You | Optional: a `remote`/`www` subdomain and Email Routing for `support@` |
+| You | Crash reports: Sentry opt-in or none |
+| You | Partner Center account; reserve the name; set price and trial length |
+| You | Say go for the staging deploy and load test |
+| Me | 5F licensing (Store trial/purchase, offline keys for direct downloads) |
+| Me | 5G PC Control Center |
+| Me | 5E once the address is chosen |
+| Me, then 5H-5L | Phone features, reliability, packaging tests (MSIX update, WACK, clean PC), legal drafts, Critic |

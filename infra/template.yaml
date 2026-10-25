@@ -33,6 +33,14 @@ Parameters:
     Type: Number
     Default: 0
     Description: Optional cost ceiling on the message router (0 = no reservation). Needs spare account concurrency.
+  ConnectsPerMinute:
+    Type: Number
+    Default: 60
+    Description: WebSocket connects allowed per source IP per minute.
+  NewRoomsPerHour:
+    Type: Number
+    Default: 5
+    Description: New rooms (first PC connects) allowed per source IP per hour. Staging raises it for the load test.
 
 Conditions:
   HasBudgetEmail: !Not [!Equals [!Ref BudgetEmail, ""]]
@@ -52,6 +60,8 @@ Globals:
         DEVICES_TABLE: !Ref DevicesTable
         IDEMPOTENCY_TABLE: !Ref IdempotencyTable
         CONFIG_TABLE: !Ref ConfigTable
+        CONNECTS_PER_MINUTE: !Ref ConnectsPerMinute
+        NEW_ROOMS_PER_HOUR: !Ref NewRoomsPerHour
         LOG_LEVEL: INFO
 
 Resources:
