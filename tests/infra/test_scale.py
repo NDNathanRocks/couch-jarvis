@@ -77,3 +77,22 @@ def test_phones_cannot_delete_a_room(world: World) -> None:
     (err,) = world.api.to("p1", "error")
     assert err["payload"]["code"] == "forbidden_type"
     assert world.store.get_room(ROOM) is not None
+
+
+def test_the_management_api_client_is_built_once_per_endpoint(
+    world: World, monkeypatch: Any
+) -> None:
+    """Building a boto3 client per relayed message cost tens of ms each (seen on staging)."""
+    import boto3
+
+    from common import runtime
+
+    built: list[str] = []
+    monkeypatch.setattr(
+        boto3, "client", lambda _name, endpoint_url: built.append(endpoint_url) or object()
+    )
+    monkeypatch.setattr(runtime, "_gateway_factory", None)
+    monkeypatch.setattr(runtime, "_api_clients", {})
+    for cid in ("a", "b", "c"):
+        runtime.get_gateway(World.event(cid))
+    assert built == ["https://x.test/prod"]

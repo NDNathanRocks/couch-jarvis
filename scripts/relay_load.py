@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import collections
 import hashlib
 import json
 import secrets
@@ -56,9 +57,14 @@ class Stats:
     messages: int = 0
     failures: int = 0
     latencies: list[float] = field(default_factory=list)
+    errors: set[str] = field(default_factory=set)
+    received: collections.Counter[str] = field(default_factory=collections.Counter)
 
 
-async def one_home(url: str, minutes: float, every_s: float, stats: Stats) -> None:
+async def one_home(
+    url: str, minutes: float, every_s: float, stats: Stats, delay_s: float = 0.0
+) -> None:
+    await asyncio.sleep(delay_s)  # homes come online gradually, as they do in real life
     room, secret, pc_key = (
         secrets.token_urlsafe(9),
         secrets.token_urlsafe(24),
@@ -84,7 +90,11 @@ async def one_home(url: str, minutes: float, every_s: float, stats: Stats) -> No
                     async for raw in pc:
                         stats.messages += 1
                         msg = json.loads(raw)
-                        if msg["type"] == "cmd.button":
+                        code = (msg.get("payload") or {}).get("code", "")
+                        stats.received[
+                            f"pc<-{msg.get('type', 'gateway error')} {code}".strip()
+                        ] += 1
+                        if msg.get("type") == "cmd.button":
                             cid = msg["payload"]["command_id"]
                             for kind, payload in (
                                 ("cmd.ack", {"command_id": cid, "status": "accepted"}),
@@ -94,17 +104,24 @@ async def one_home(url: str, minutes: float, every_s: float, stats: Stats) -> No
                                 await pc.send(env(kind, room, payload))
                                 stats.messages += 1
 
+                paired = asyncio.Event()
+
                 async def phone_side() -> None:
                     async for raw in phone:
                         stats.messages += 1
                         msg = json.loads(raw)
-                        if msg["type"] == "cmd.result":
+                        code = (msg.get("payload") or {}).get("code", "")
+                        stats.received[f"{msg.get('type', 'gateway error')} {code}".strip()] += 1
+                        if msg.get("type") == "pair.granted":
+                            paired.set()  # a real phone only sends commands after this
+                        elif msg.get("type") == "cmd.result":
                             started = pending.pop(msg["payload"]["command_id"], None)
                             if started is not None:
                                 stats.answered += 1
                                 stats.latencies.append(time.monotonic() - started)
 
                 tasks = [asyncio.create_task(pc_side()), asyncio.create_task(phone_side())]
+                await asyncio.wait_for(paired.wait(), timeout=20)
                 end = time.monotonic() + minutes * 60
                 while time.monotonic() < end:
                     cid = str(uuid.uuid4())
@@ -114,10 +131,12 @@ async def one_home(url: str, minutes: float, every_s: float, stats: Stats) -> No
                     stats.sent += 1
                     stats.messages += 1
                     await asyncio.sleep(every_s)
+                await asyncio.sleep(3)  # let the last answers arrive
                 for t in tasks:
                     t.cancel()
-    except Exception:  # noqa: BLE001 - count it, keep the other homes running
+    except Exception as exc:  # noqa: BLE001 - count it, keep the other homes running
         stats.failures += 1
+        stats.errors.add(f"{type(exc).__name__}: {exc}"[:200])
 
 
 async def main() -> None:
@@ -128,13 +147,17 @@ async def main() -> None:
     p.add_argument("--rooms", type=int, default=50)
     p.add_argument("--minutes", type=float, default=2.0)
     p.add_argument("--every", type=float, default=5.0, help="seconds between button presses")
+    p.add_argument("--ramp", type=float, default=0.0, help="seconds over which homes start")
     args = p.parse_args()
     if "/prod" in args.url:
         raise SystemExit("Refusing to load-test a /prod stage. Use the staging stack.")
     stats = Stats()
     started = time.monotonic()
     await asyncio.gather(
-        *(one_home(args.url, args.minutes, args.every, stats) for _ in range(args.rooms))
+        *(
+            one_home(args.url, args.minutes, args.every, stats, i * args.ramp / args.rooms)
+            for i in range(args.rooms)
+        )
     )
     elapsed_min = (time.monotonic() - started) / 60
     lat = sorted(stats.latencies)
@@ -142,17 +165,23 @@ async def main() -> None:
         f"homes {args.rooms}, failed {stats.failures}, "
         f"commands {stats.sent}, answered {stats.answered}"
     )
+    for error in sorted(stats.errors)[:5]:
+        print(f"  error: {error}")
+    print("phones received: " + ", ".join(f"{k} x{n}" for k, n in stats.received.most_common()))
     if lat:
         p95 = lat[int(len(lat) * 0.95) - 1]
         print(f"round trip p50 {statistics.median(lat) * 1000:.0f} ms, p95 {p95 * 1000:.0f} ms")
-    per_home_month = stats.messages / max(args.rooms, 1) / max(elapsed_min, 1e-6) * 60 * 24 * 30
-    print(f"messages per home per month at this pace: {per_home_month:,.0f}")
-    cost = (
-        per_home_month * PRICE_PER_MILLION_MESSAGES / 1e6
-        + 2 * 43_200 * PRICE_PER_MILLION_CONNECTION_MINUTES / 1e6  # PC + phone online all month
-        + per_home_month * PRICE_PER_MILLION_LAMBDA_CALLS / 1e6
+    per_command = stats.messages / max(stats.sent, 1)
+    print(f"took {elapsed_min:.1f} min; {stats.messages:,} messages, {per_command:.1f} per command")
+    per_message = (PRICE_PER_MILLION_MESSAGES + PRICE_PER_MILLION_LAMBDA_CALLS) / 1e6
+    per_thousand = 1000 * per_command * per_message
+    print(f"relay cost per 1,000 commands (no free tier): ${per_thousand:.4f}")
+    # A realistic home: the PC online all month, a phone online 2 h a day, 50 commands a day.
+    monthly = (
+        30 * 50 * per_thousand / 1000
+        + (43_200 + 30 * 120) * PRICE_PER_MILLION_CONNECTION_MINUTES / 1e6
     )
-    print(f"estimated relay cost per home per month at this pace (no free tier): ${cost:.3f}")
+    print(f"estimated relay cost per typical home per month (no free tier): ${monthly:.4f}")
 
 
 if __name__ == "__main__":

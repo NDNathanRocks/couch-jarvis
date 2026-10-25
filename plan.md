@@ -673,6 +673,22 @@ roughly 4-6 years of relay per buyer; a later optional subscription (for example
 long-term revenue lever. Your fixed costs: Partner Center account (check the current fee), a domain (~15 USD/year),
 code signing for the direct download (~10 USD/month with Azure Artifact Signing, optional), hosting (0-20 USD/month, 5E).
 
+**Measured on the staging stack (2026-10-25, `scripts/relay_load.py`, stack deleted afterwards):**
+- **Per command:** about 8 relay messages (phone -> PC, then ack, result and state back), about **0.013 USD per 1,000
+  commands** with no free tier.
+- **A typical home:** the PC online all month, a phone 2 h a day, 50 commands a day: about **0.03 USD per month**,
+  under the 13.2 estimate.
+- **10 homes**, one press every 5 s each: 240/240 answered, round trip median 297 ms, p95 484 ms.
+- **40 homes** (8 commands/s together): 94% answered. API Gateway refused the rest (141 throttled messages; the phone
+  shows "No answer from the PC").
+- **Cause: this AWS account may run only 10 Lambda functions at once** (the new-account default, shared by production,
+  staging and anything else in the account). That caps the relay at roughly 6-7 commands per second for all customers
+  together. **Before launch, ask AWS to raise "Lambda concurrent executions" to 1,000 in Service Quotas (free).**
+  Then set `ReservedConcurrency` as a cost ceiling.
+- **Fixed on the way:** the router built a new API client for every message. It is now cached per container: median
+  round trip 470 -> 297 ms, shorter billed time. `relay_load.py` now waits for pairing, ramps homes up gradually
+  (`--ramp`), reports the cost per 1,000 commands, and shows errors and message counts.
+
 ### 13.3 Milestones and gates
 | Milestone | Change | Gate |
 |---|---|---|
@@ -743,7 +759,7 @@ customers' licences.
 | 5A MSIX spike | **Go** (2026-10-25, see below) |
 | 5B Brand | done: **Armrest** in the phone app (title, header, home-screen name), tray ("A" icon), TV overlay, installer (shortcuts, prompts, uninstall entry; an update removes the old "Couch Jarvis" shortcuts), MSIX display name, README/INSTALL; "hey Armrest" works like "hey Jarvis". Internal names stay (`CouchJarvis.exe`, data folders, AppId, `CJ_` settings, storage keys) so updates and pairings keep working. Left: exe version info shows "Armrest" in Task Manager (5J) |
 | 5C Licence-safe defaults | done: `phi4-mini` CPU default (eval on this PC: 8/12 right action, 3.2 s median, vs 6/12 for `qwen2.5:1.5b`), `edge-tts` dev-only, GPLv3 `pymsgbox`/`mouseinfo` excluded, licence gate + notices, pop-up protection, Butler / Sterling / Aurora |
-| 5D Relay | done except the staging deploy + load run (needs your OK); the custom relay domain is dropped for 1.0.0 (13.10) |
+| 5D Relay | done: staging deploy + load test run and the stack deleted (results in 13.2); the custom relay domain is dropped for 1.0.0 (13.10). Production still runs the old relay: it needs a deploy (with your OK) before any PC sends `room.delete` |
 | 5I Crash reports | done (rest of 5I not started): opt-in Sentry, free Developer plan. `CJ_CRASH_REPORTS=true` turns it on (the 5G wizard will ask). The DSN is baked into `build_info.json` by `build.ps1 -CrashDsn` or `CJ_CRASH_DSN` in `.env`; without one, a build cannot send. Reports keep only the error type, the app's code frames, version, channel and OS. The PC name, user name, IP, local variables, logs, web addresses, emails and token-like strings are removed (`crash_reports.scrub_event`, tested). Over the free quota, reports are dropped, never billed |
 | 5E-5H, 5J-5L | not started |
 
@@ -821,7 +837,7 @@ account's free tier or credits still cover API Gateway. A deleted stack costs no
 | You | Optional: a `remote`/`www` subdomain and Email Routing for `support@` |
 | You | Sentry setup (free, no card): create the account and a Python project `armrest`; turn on Settings > Security & Privacy > "Prevent Storing of IP Addresses"; put its DSN in the repo `.env` as `CJ_CRASH_DSN=...` |
 | You | Partner Center account; reserve the name; set price and trial length |
-| You | Say go for the staging deploy and load test |
+| You | Raise the Lambda concurrency quota to 1,000 (Service Quotas > AWS Lambda > Concurrent executions; free) or let me file the request |
 | Me | 5F licensing (Store trial/purchase, offline keys for direct downloads) |
 | Me | 5G PC Control Center |
 | Me | 5E once the address is chosen |

@@ -11,6 +11,9 @@ from common.ddb import Store, TableNames
 
 _store: Store | None = None
 _gateway_factory: Callable[[dict[str, Any], Store], Gateway] | None = None
+# One management-API client per endpoint, kept for the life of the Lambda container: building a
+# boto3 client costs tens of milliseconds, which every relayed message used to pay.
+_api_clients: dict[str, Any] = {}
 
 
 def get_store() -> Store:
@@ -33,9 +36,13 @@ def get_gateway(event: dict[str, Any]) -> Gateway:
     store = get_store()
     if _gateway_factory is not None:
         return _gateway_factory(event, store)
-    import boto3
+    url = endpoint_url(event)
+    client = _api_clients.get(url)
+    if client is None:
+        import boto3
 
-    return Gateway(boto3.client("apigatewaymanagementapi", endpoint_url=endpoint_url(event)), store)
+        client = _api_clients[url] = boto3.client("apigatewaymanagementapi", endpoint_url=url)
+    return Gateway(client, store)
 
 
 def override(
