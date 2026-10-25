@@ -47,7 +47,7 @@ class MciPlayer:
 
     def _mci(self, command: str) -> str:
         buf = ctypes.create_unicode_buffer(128)
-        code = ctypes.windll.winmm.mciSendStringW(command, buf, 127, 0)  # type: ignore[attr-defined]
+        code = ctypes.windll.winmm.mciSendStringW(command, buf, 127, 0)
         if code:
             raise OSError(f"MCI error {code} for: {command.split(' ')[0]}")
         return buf.value

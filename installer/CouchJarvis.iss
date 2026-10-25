@@ -69,22 +69,30 @@ end;
 
 procedure SaveGeminiKey;
 var
-  Config, Defaults: String;
-  Text: AnsiString;
-  Key: String;
+  Config, Key: String;
+  Lines, Kept: TArrayOfString;
+  I, N: Integer;
 begin
   Key := Trim(KeyPage.Values[0]);
   if Key = '' then Exit;
   Config := ExpandConstant('{userappdata}\CouchJarvis\config.env');
   ForceDirectories(ExpandConstant('{userappdata}\CouchJarvis'));
-  if not FileExists(Config) then
-  begin
-    { start from the shipped defaults so the relay and phone-app addresses are kept }
-    Defaults := ExpandConstant('{app}\_internal\installer\defaults.env');
-    if LoadStringFromFile(Defaults, Text) then
-      SaveStringToFile(Config, Text + #13#10, False);
-  end;
-  SaveStringToFile(Config, 'CJ_GEMINI_API_KEY=' + Key + #13#10, True);
+  { keep the user's settings, else start from the shipped defaults (relay and phone-app addresses) }
+  if not LoadStringsFromFile(Config, Lines) then
+    if not LoadStringsFromFile(ExpandConstant('{app}\_internal\installer\defaults.env'), Lines) then
+      SetArrayLength(Lines, 0);
+  { whole lines only, and any earlier key is replaced (a reinstall must not add a second one) }
+  SetArrayLength(Kept, GetArrayLength(Lines) + 1);
+  N := 0;
+  for I := 0 to GetArrayLength(Lines) - 1 do
+    if Pos('CJ_GEMINI_API_KEY=', Trim(Lines[I])) <> 1 then
+    begin
+      Kept[N] := Lines[I];
+      N := N + 1;
+    end;
+  Kept[N] := 'CJ_GEMINI_API_KEY=' + Key;
+  SetArrayLength(Kept, N + 1);
+  SaveStringsToUTF8FileWithoutBOM(Config, Kept, False);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);

@@ -444,6 +444,7 @@ class EdgeCDP:
         self._browser: Any = None
         self._page_ref: Any = None
         self._lock = asyncio.Lock()
+        self._window_fs: int | None = None  # Edge window we made fullscreen: undo when video exits
 
     # ------------------------------------------------------------------ connection
 
@@ -883,6 +884,7 @@ class EdgeCDP:
                         "Browser.setWindowBounds",
                         {"windowId": win["windowId"], "bounds": {"windowState": "fullscreen"}},
                     )
+                    self._window_fs = win["windowId"]
                     await asyncio.sleep(0.4)
                     win = await session.send("Browser.getWindowForTarget")
                     bounds = win.get("bounds", {})
@@ -897,6 +899,22 @@ class EdgeCDP:
         except Exception:
             log.warning("settle_fullscreen failed", exc_info=True)
             return None
+
+    async def _restore_window(self, page: Any) -> None:
+        """The video left fullscreen (Esc, it ended): bring back the tab strip we hid. Only a
+        window we fullscreened ourselves; one the user put in F11 mode stays as it is."""
+        window_id, self._window_fs = self._window_fs, None
+        try:
+            session = await page.context.new_cdp_session(page)
+            try:
+                await session.send(
+                    "Browser.setWindowBounds",
+                    {"windowId": window_id, "bounds": {"windowState": "normal"}},
+                )
+            finally:
+                await session.detach()
+        except Exception:
+            log.warning("could not restore the Edge window", exc_info=True)
 
     async def click_selector(self, selector: str, timeout_ms: int) -> ActionResult:
         async def click(page: Any) -> ActionResult:
@@ -1105,6 +1123,8 @@ class EdgeCDP:
                 if inner:
                     data = {**data, **inner}
             tabs = len([p for p in page.context.pages if not p.is_closed()])
+            if self._window_fs is not None and not data["is_fullscreen"]:
+                await self._restore_window(page)
         except Exception:
             return BrowserSnapshot(tab_count=0)
         return BrowserSnapshot(

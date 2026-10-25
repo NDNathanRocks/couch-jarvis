@@ -214,12 +214,14 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
 
     timers = TimerService(on_timer, on_change=on_timers_changed)
     deps.timers = timers
+
+    def on_voice_changed(voice: VoiceState) -> None:
+        service_ref[0].state.update(voice=voice)
+
     if dry_run:  # no speakers: keep the saved choices and the settings flow, make no sound
-        deps.voice = VoiceService(
-            VoicePrefsStore(None), None, on_change=lambda v: service_ref[0].state.update(voice=v)
-        )
+        deps.voice = VoiceService(VoicePrefsStore(None), None, on_change=on_voice_changed)
     else:
-        deps.voice = build_voice(settings, on_change=lambda v: service_ref[0].state.update(voice=v))
+        deps.voice = build_voice(settings, on_change=on_voice_changed)
     runner = AgentRunner(deps)
     service = CommandService(
         room_id=room_id,

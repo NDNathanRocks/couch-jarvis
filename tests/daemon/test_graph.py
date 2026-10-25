@@ -181,6 +181,32 @@ async def test_llm_outage_is_reported(env: AgentEnv) -> None:
     assert not result.ok and "Set up AI brain" in result.message
 
 
+async def test_a_slow_brain_is_cut_off_at_the_router_budget(
+    env: AgentEnv, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import agent.graph as graph
+
+    monkeypatch.setattr(graph, "ROUTER_BUDGET_S", 0.05)
+
+    async def slow(system: str, user: str) -> Any:
+        await asyncio.sleep(5)
+
+    env.router.complete = slow  # type: ignore[method-assign]
+    result = await env.runner().run(text("play something nice"))
+    assert not result.ok and "took too long" in result.message
+
+
+async def test_no_repair_retry_without_time_left(
+    env: AgentEnv, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import agent.graph as graph
+
+    monkeypatch.setattr(graph, "ROUTER_REPAIR_MIN_S", 1000.0)  # never enough time left
+    env.router.replies = ["not json", json.dumps(PLAY_PLAN)]
+    result = await env.runner().run(text("play something nice"))
+    assert not result.ok and env.router.replies == [json.dumps(PLAY_PLAN)]  # 2nd never asked
+
+
 async def test_hard_timeout_ceiling(env: AgentEnv) -> None:
     async def hang(query: str, source: str, *, play: bool = True) -> ActionResult:
         await asyncio.sleep(10)

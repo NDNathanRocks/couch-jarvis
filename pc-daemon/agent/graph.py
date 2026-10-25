@@ -75,6 +75,10 @@ VISION_ELIGIBLE = {
 BROWSER_MEDIA = {"play", "pause", "play_pause", "next", "prev"}
 OS_FALLBACK_KEYS: dict[str, MediaKey] = {"play_pause": "play_pause", "next": "next", "prev": "prev"}
 FAIL_MESSAGE = "Sorry, that did not work. Try again."
+# Most time the brain may spend on one command, repair retry included: a slow CPU model behind a
+# rate-limited cloud key must not leave the couch waiting for minutes.
+ROUTER_BUDGET_S = 60.0
+ROUTER_REPAIR_MIN_S = 10.0  # do not start the repair retry with less time than this left
 LEAVE_PAGE_MESSAGE = "I stayed on this page. Say 'search' or 'YouTube' if you want me to leave it."
 # Failures that retrying cannot fix: end the command now with the step's own message.
 TERMINAL_REASONS = {"off_site", "item_not_found", "no_history", "no_search_bar"}
@@ -333,12 +337,21 @@ def build_graph(deps: AgentDeps) -> Any:
                 )
         user = router_user_prompt(state.utterance, context)
         bad_reply, error = "", ""
+        deadline = time.monotonic() + ROUTER_BUDGET_S
         for attempt in range(2):  # one repair retry
+            left = deadline - time.monotonic()
+            if attempt > 0 and left < ROUTER_REPAIR_MIN_S:
+                break
             prompt = (
                 user if attempt == 0 else router_repair_prompt(state.utterance, bad_reply, error)
             )
             with tele.span("llm.call", attributes={"cj.purpose": "router"}) as llm_span:
-                reply = await deps.router.complete(ROUTER_SYSTEM, prompt)
+                try:
+                    reply = await asyncio.wait_for(
+                        deps.router.complete(ROUTER_SYSTEM, prompt), left
+                    )
+                except TimeoutError as exc:
+                    raise LLMError("the brain took too long to answer", "timeout") from exc
                 llm_span.set_attribute("gen_ai.system", reply.system)
                 llm_span.set_attribute("gen_ai.request.model", reply.model)
                 llm_span.set_attribute("gen_ai.usage.input_tokens", reply.input_tokens)
