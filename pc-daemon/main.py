@@ -20,6 +20,7 @@ from pathlib import Path
 
 import uvicorn
 
+import crash_reports
 import lifecycle
 from agent.graph import AgentDeps, AgentRunner
 from agent.memory import ConversationMemory
@@ -260,6 +261,8 @@ async def amain(args: argparse.Namespace) -> None:
     logging.basicConfig(
         level=settings.log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
+    if not args.dry_run:
+        crash_reports.start(settings.crash_reports, settings.crash_dsn)
     rt = build_runtime(settings, dry_run=args.dry_run)
     if args.dry_run and rt.room_store is None:
         # --dry-run has no real identity, but pairing, LAN auth and the HUD QR all need one. Use a
@@ -460,7 +463,7 @@ def run_with_qt(args: argparse.Namespace) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="CouchJarvis PC daemon")
+    parser = argparse.ArgumentParser(description="Armrest PC daemon")
     parser.add_argument(
         "--dry-run", action="store_true", help="use fakes instead of Edge/Windows/LLMs"
     )

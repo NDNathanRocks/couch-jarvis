@@ -1,4 +1,4 @@
-"""Tell the user when a newer Couch Jarvis has been released.
+"""Tell the user when a newer version of the app has been released.
 
 Once a day the app asks GitHub's public "latest release" endpoint for the newest version number.
 Nothing about this PC is sent, and nothing is downloaded or run: the phone and TV only show that a
@@ -71,7 +71,7 @@ async def run_update_check(
             else:
                 found = newer_version(latest)
                 if found:
-                    log.info("a newer Couch Jarvis (%s) has been released", found)
+                    log.info("a newer version (%s) has been released", found)
                 on_update(found)
                 wait = CHECK_EVERY_S
             await sleep(wait)  # type: ignore[misc]

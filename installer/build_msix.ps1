@@ -29,8 +29,8 @@
 param(
     [string]$IdentityName = 'CouchJarvis.Dev',
     [string]$Publisher = 'CN=CouchJarvisDev',
-    [string]$DisplayName = 'Couch Jarvis',
-    [string]$PublisherDisplayName = 'Couch Jarvis',
+    [string]$DisplayName = 'Armrest',
+    [string]$PublisherDisplayName = 'Armrest',  # for the Store: the publisher name shown in Partner Center
     [string]$Description = 'Control the PC on your TV from any phone: voice, buttons, touchpad and keyboard.',
     [string]$Version,
     [string]$ToolsDir,

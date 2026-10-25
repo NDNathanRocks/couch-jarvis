@@ -9,6 +9,7 @@ import { LogPanel } from "./components/LogPanel";
 import { NowPlayingCard } from "./components/NowPlayingCard";
 import { QRScanner, readPairParams, stripPairParams } from "./components/QRScanner";
 import { SettingsSheet } from "./components/SettingsSheet";
+import { APP_NAME } from "./brand";
 import { BookmarkList } from "./components/BookmarkList";
 import { QuestionCard } from "./components/QuestionCard";
 import { Suggestions } from "./components/Suggestions";
@@ -141,7 +142,7 @@ export default function App() {
   return (
     <main className="mx-auto flex min-h-full w-full max-w-md flex-col gap-4 px-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-[calc(env(safe-area-inset-top)+1rem)]">
       <header className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-        <h1 className="whitespace-nowrap bg-gradient-to-r from-white to-accent bg-clip-text text-xl font-bold tracking-tight text-transparent">Couch Jarvis</h1>
+        <h1 className="whitespace-nowrap bg-gradient-to-r from-white to-accent bg-clip-text text-xl font-bold tracking-tight text-transparent">{APP_NAME}</h1>
         <div className="flex items-center gap-2">
           {paired && (
             <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" className="press glass-btn min-h-11 min-w-11">
@@ -169,7 +170,7 @@ export default function App() {
             <aside className="glass rise flex items-center gap-3 rounded-2xl p-3 text-sm" aria-label="Update available">
               <Icon name="download" size={18} />
               <span className="flex-1">
-                Couch Jarvis <b>{update}</b> is out.{" "}
+                {APP_NAME} <b>{update}</b> is out.{" "}
                 <a href={RELEASES_URL} target="_blank" rel="noopener noreferrer" className="font-semibold text-accent underline underline-offset-2">
                   Get it
                 </a>

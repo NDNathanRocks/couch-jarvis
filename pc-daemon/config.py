@@ -89,6 +89,10 @@ class Settings(BaseSettings):
     # at your keyboard; set false to keep phones to media/browser commands.
     remote_input: bool = True
     update_check: bool = True  # once a day, ask GitHub if a newer release exists (notice only)
+    # Opt-in: send a scrubbed error report when the app crashes (see crash_reports.py for what is
+    # sent). crash_dsn overrides the address baked into the build (testing only).
+    crash_reports: bool = False
+    crash_dsn: str | None = None
 
     # Spoken replies ("Now playing X on YouTube Music"). Preferences are changed from the phone and
     # saved per TV. ElevenLabs is optional (its free plan is ~10k credits a month); without a key

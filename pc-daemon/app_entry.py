@@ -29,7 +29,7 @@ QUICK_RESTART_MIN_S = 5
 QUIET_LOGGERS = ("httpx", "httpx2", "httpcore")
 
 _TEMPLATE = (
-    "# CouchJarvis settings. Lines starting with # are ignored; restart the app after editing.\n"
+    "# Armrest settings. Lines starting with # are ignored; restart the app after editing.\n"
     "# CJ_RELAY_WS_URL=wss://...        cloud relay\n"
     "# CJ_PWA_BASE_URL=https://...      where the phone app is hosted\n"
 )
@@ -145,7 +145,7 @@ def run_supervisor(argv: list[str]) -> int:
     if _already_running():
         # Opening the app again (taskbar, Start menu) flips the pairing QR on the TV.
         shown = toggle_running_qr()
-        log.info("another CouchJarvis is already running; QR toggled (%s); exiting", shown)
+        log.info("the app is already running; QR toggled (%s); exiting", shown)
         return 0
     ensure_user_config(user_config_file(), resource_root() / "installer" / "defaults.env")
 

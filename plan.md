@@ -706,9 +706,18 @@ code signing for the direct download (~10 USD/month with Azure Artifact Signing,
   existing users only.
 - Review the legal drafts, and give a support email address.
 
-### 13.6 Name candidates (all unchecked; a trademark search decides)
-**SofaPilot**, **CouchPilot**, **LoungeDeck**, **TVPilot**. Voice labels become **Butler** (style) and **Sterling /
-Aurora / Chill / Aria** (voices).
+### 13.6 Name: **Armrest** (chosen 2026-10-25), tagline "Your PC, within arm's reach"
+Checked on 2026-10-25 (web, app stores, Product Hunt):
+- **CouchPilot** is taken (a phone-to-Mac remote on Product Hunt, the same idea).
+- **TVPilot** is taken ("TvPilot – Universal TV Remote" on the App Store).
+- **SofaPilot** sits next to Sofabaton, a TV-remote brand.
+- **LoungeDeck** is one letter from Logitech's Loupedeck.
+- **Armrest** has no software or app product found; `armrest.pages.dev` is a car-accessory shop, so the phone app uses
+  `armrest-app.pages.dev` (free).
+- Still to do before it is final: an official trademark search (USPTO class 9 and 42, CIPO) and reserving the name in
+  Partner Center (the Store check). The winget Store search could not run on this PC.
+
+Voice labels: **Butler** (style) and **Sterling / Aurora / Chill / Aria** (voices).
 
 ### 13.7 Risks
 - **MSIX virtualization** may change how Edge, the TV profile or the LAN port behave inside the package: the 5A spike
@@ -732,10 +741,11 @@ customers' licences.
 | Milestone | State |
 |---|---|
 | 5A MSIX spike | **Go** (2026-10-25, see below) |
-| 5B Brand | waiting for the name; channels done in 5C |
+| 5B Brand | done: **Armrest** in the phone app (title, header, home-screen name), tray ("A" icon), TV overlay, installer (shortcuts, prompts, uninstall entry; an update removes the old "Couch Jarvis" shortcuts), MSIX display name, README/INSTALL; "hey Armrest" works like "hey Jarvis". Internal names stay (`CouchJarvis.exe`, data folders, AppId, `CJ_` settings, storage keys) so updates and pairings keep working. Left: exe version info shows "Armrest" in Task Manager (5J) |
 | 5C Licence-safe defaults | done: `phi4-mini` CPU default (eval on this PC: 8/12 right action, 3.2 s median, vs 6/12 for `qwen2.5:1.5b`), `edge-tts` dev-only, GPLv3 `pymsgbox`/`mouseinfo` excluded, licence gate + notices, pop-up protection, Butler / Sterling / Aurora |
 | 5D Relay | done except the staging deploy + load run (needs your OK); the custom relay domain is dropped for 1.0.0 (13.10) |
-| 5E-5L | not started |
+| 5I Crash reports | done (rest of 5I not started): opt-in Sentry, free Developer plan. `CJ_CRASH_REPORTS=true` turns it on (the 5G wizard will ask). The DSN is baked into `build_info.json` by `build.ps1 -CrashDsn` or `CJ_CRASH_DSN` in `.env`; without one, a build cannot send. Reports keep only the error type, the app's code frames, version, channel and OS. The PC name, user name, IP, local variables, logs, web addresses, emails and token-like strings are removed (`crash_reports.scrub_event`, tested). Over the free quota, reports are dropped, never billed |
+| 5E-5H, 5J-5L | not started |
 
 **5A result: go.** A Store-channel build packed with `build_msix.ps1`, test-signed and installed with `Add-AppxPackage`
 (no admin once the test certificate is trusted). Inside the package: the daemon, the supervisor and the TV overlay start;
@@ -806,10 +816,10 @@ account's free tier or credits still cover API Gateway. A deleted stack costs no
 **Further action**
 | Who | Action |
 |---|---|
-| You | Pick the name (13.6) and run a trademark search |
-| You | Create a Cloudflare Pages project (or let me deploy it with `wrangler` after `wrangler login`); choose `<project>.pages.dev` as the app address |
+| You | Trademark search for **Armrest** (USPTO class 9/42, CIPO); reserve it in Partner Center |
+| You | Create the Cloudflare Pages project `armrest-app` (or let me deploy it with `wrangler` after `wrangler login`) |
 | You | Optional: a `remote`/`www` subdomain and Email Routing for `support@` |
-| You | Crash reports: Sentry opt-in or none |
+| You | Sentry setup (free, no card): create the account and a Python project `armrest`; turn on Settings > Security & Privacy > "Prevent Storing of IP Addresses"; put its DSN in the repo `.env` as `CJ_CRASH_DSN=...` |
 | You | Partner Center account; reserve the name; set price and trial length |
 | You | Say go for the staging deploy and load test |
 | Me | 5F licensing (Store trial/purchase, offline keys for direct downloads) |

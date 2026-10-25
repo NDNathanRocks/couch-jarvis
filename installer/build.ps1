@@ -37,7 +37,8 @@ param(
     [string]$PwaUrl,
     [string]$Version,
     [switch]$SkipWeb,
-    [ValidateSet('direct', 'store')][string]$Channel = 'direct'
+    [ValidateSet('direct', 'store')][string]$Channel = 'direct',
+    [string]$CrashDsn  # Sentry DSN for opt-in crash reports (public by design); default: CJ_CRASH_DSN in .env
 )
 
 Set-StrictMode -Version Latest
@@ -78,6 +79,9 @@ if (-not $RelayUrl -or -not $PwaUrl) {
 }
 if ($RelayUrl -notmatch '^wss://') { throw "RelayUrl must start with wss:// (got $RelayUrl)" }
 if ($PwaUrl -notmatch '^https://') { throw "PwaUrl must start with https:// (got $PwaUrl)" }
+if (-not $CrashDsn) { $CrashDsn = $env_['CJ_CRASH_DSN'] }
+if ($CrashDsn -and $CrashDsn -notmatch '^https://[0-9a-f]+@[\w.-]+/\d+$') { throw "CrashDsn is not a Sentry DSN (got $CrashDsn)" }
+if (-not $CrashDsn) { Write-Host '==> no CJ_CRASH_DSN: this build cannot send crash reports' }
 
 Write-Host "==> relay $RelayUrl"
 Write-Host "==> phone app $PwaUrl"
@@ -106,7 +110,9 @@ $defaults = @(
     '# CJ_REMOTE_INPUT=true        false = phones cannot move the mouse or type'
 )
 Set-Content -LiteralPath (Join-Path $PSScriptRoot 'defaults.env') -Value $defaults -Encoding utf8
-$buildInfo = @{ channel = $Channel; version = $Version } | ConvertTo-Json -Compress
+$info = [ordered]@{ channel = $Channel; version = $Version }
+if ($CrashDsn) { $info.crash_dsn = $CrashDsn }
+$buildInfo = $info | ConvertTo-Json -Compress
 [IO.File]::WriteAllText((Join-Path $PSScriptRoot 'build_info.json'), $buildInfo, [Text.UTF8Encoding]::new($false))
 Write-Host "==> channel $Channel"
 

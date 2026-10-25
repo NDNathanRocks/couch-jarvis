@@ -9,6 +9,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
+from brand import APP_NAME
+
 
 def _icon() -> QIcon:
     pix = QPixmap(64, 64)
@@ -22,7 +24,7 @@ def _icon() -> QIcon:
     font = QFont("Segoe UI", 24)
     font.setBold(True)
     painter.setFont(font)
-    painter.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter, "CJ")
+    painter.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter, APP_NAME[0])
     painter.end()
     return QIcon(pix)
 
@@ -35,7 +37,7 @@ class QrTray:
         quit_app: Callable[[], None],
     ) -> None:
         self._tray = QSystemTrayIcon(_icon())
-        self._tray.setToolTip("Couch Jarvis - click to show or hide the QR code")
+        self._tray.setToolTip(f"{APP_NAME} - click to show or hide the QR code")
         menu = QMenu()
         self._toggle_action = QAction("Show / hide QR code")
         self._toggle_action.triggered.connect(lambda: toggle())

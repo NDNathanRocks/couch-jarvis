@@ -22,6 +22,8 @@ for package in ("faster_whisper", "ctranslate2", "playwright", "segno", "mss", "
     hiddenimports += h
 hiddenimports += collect_submodules("langgraph") + collect_submodules("uvicorn")
 hiddenimports += ["websockets.asyncio.server", "pycaw.pycaw", "comtypes.client", "qasync"]
+# sentry_sdk imports its default integrations by name at init (opt-in crash reports)
+hiddenimports += collect_submodules("sentry_sdk.integrations")
 
 web_dist = os.path.join(ROOT, "web-remote", "dist")
 if os.path.isdir(web_dist):

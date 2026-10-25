@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.3.0",
   "type": "module",
-  "description": "CouchJarvis mobile remote (PWA)",
+  "description": "Armrest mobile remote (PWA)",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

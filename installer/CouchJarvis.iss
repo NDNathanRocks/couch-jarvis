@@ -1,5 +1,9 @@
-; Inno Setup script for Couch Jarvis. Build with installer\build.ps1 (needs Inno Setup 6).
+; Inno Setup script for {#AppName}. Build with installer\build.ps1 (needs Inno Setup 6).
 ; Per-user install: no administrator rights, nothing is written outside the user profile.
+
+#define AppName "Armrest"
+; The 0.x name: its shortcuts are removed on update. Internal names (exe, folders, AppId) never change.
+#define OldAppName "Couch Jarvis"
 
 #ifndef AppVersion
   #define AppVersion "0.1.0"
@@ -7,11 +11,11 @@
 
 [Setup]
 AppId={{7B1E3C52-5A9D-4B5E-9C1A-2F4D8E6A0C31}
-AppName=Couch Jarvis
+AppName={#AppName}
 AppVersion={#AppVersion}
-AppPublisher=Couch Jarvis
+AppPublisher={#AppName}
 DefaultDirName={autopf}\CouchJarvis
-DefaultGroupName=Couch Jarvis
+DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=dist
@@ -21,11 +25,17 @@ SolidCompression=yes
 WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-UninstallDisplayName=Couch Jarvis
+UninstallDisplayName={#AppName}
 CloseApplications=force
 
+[InstallDelete]
+; 0.x shortcuts used the old name; the new ones replace them (the app, its data and the AppId are unchanged)
+Type: files; Name: "{autoprograms}\{#OldAppName}.lnk"
+Type: files; Name: "{autoprograms}\{#OldAppName} settings.lnk"
+Type: files; Name: "{autodesktop}\{#OldAppName}.lnk"
+
 [Tasks]
-Name: "startup"; Description: "Start Couch Jarvis when I sign in to Windows"; GroupDescription: "Startup:"
+Name: "startup"; Description: "Start {#AppName} when I sign in to Windows"; GroupDescription: "Startup:"
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
 
 [Files]
@@ -33,17 +43,17 @@ Source: "dist\CouchJarvis\*"; DestDir: "{app}"; Flags: recursesubdirs createalls
 Source: "..\scripts\setup_brain.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\Couch Jarvis"; Filename: "{app}\CouchJarvis.exe"
-Name: "{autoprograms}\Couch Jarvis settings"; Filename: "{app}\CouchJarvis.exe"; Parameters: "--open-settings"; Comment: "Open your settings file (add your own Groq or Gemini key here)"
+Name: "{autoprograms}\{#AppName}"; Filename: "{app}\CouchJarvis.exe"
+Name: "{autoprograms}\{#AppName} settings"; Filename: "{app}\CouchJarvis.exe"; Parameters: "--open-settings"; Comment: "Open your settings file (add your own Groq or Gemini key here)"
 Name: "{autoprograms}\Set up AI brain"; Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\setup_brain.ps1"" -Pause"; Comment: "Download the local AI model that understands free-form commands (about 2-8 GB)"
-Name: "{autodesktop}\Couch Jarvis"; Filename: "{app}\CouchJarvis.exe"; Tasks: desktopicon
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\CouchJarvis.exe"; Tasks: desktopicon
 
 [Registry]
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "CouchJarvis"; ValueData: """{app}\CouchJarvis.exe"""; Flags: uninsdeletevalue; Tasks: startup
 
 [Run]
 Filename: "{app}\CouchJarvis.exe"; Flags: nowait runasoriginaluser; Check: RelaunchAfterSilentUpdate
-Filename: "{app}\CouchJarvis.exe"; Description: "Start Couch Jarvis now (a pairing QR code appears on screen)"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\CouchJarvis.exe"; Description: "Start {#AppName} now (a pairing QR code appears on screen)"; Flags: nowait postinstall skipifsilent
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\setup_brain.ps1"" -PauseOnError"; Description: "Download the local AI brain now (Ollama and a model, 2-8 GB; skip it if you entered a Gemini key)"; Flags: nowait postinstall skipifsilent; Check: OfferBrainDownload
 
 [UninstallRun]
@@ -110,7 +120,7 @@ begin
     'A free Gemini key makes free-form commands fast and needs no big download.',
     'Get a free key at aistudio.google.com/apikey and paste it here, or leave this empty to ' +
     'download a local AI model after installing (several GB). You can change it later in ' +
-    'Start menu > Couch Jarvis settings.');
+    'Start menu > {#AppName} settings.');
   KeyPage.Add('Gemini API key (optional):', False);
 end;
 
@@ -171,15 +181,16 @@ begin
   begin
     Order := CompareVersions(PreviousVersion, '{#AppVersion}');
     if Order > 0 then
-      Result := SuppressibleMsgBox('Couch Jarvis ' + PreviousVersion + ' is already installed, which is newer ' +
+      Result := SuppressibleMsgBox('{#AppName} ' + PreviousVersion + ' is already installed, which is newer ' +
                   'than this installer ({#AppVersion}). Install the older version over it?',
                   mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDNO) = IDYES
     else if Order = 0 then
-      Result := SuppressibleMsgBox('Couch Jarvis ' + PreviousVersion + ' is already installed. Reinstall it?',
+      Result := SuppressibleMsgBox('{#AppName} ' + PreviousVersion + ' is already installed. Reinstall it?',
                   mbConfirmation, MB_YESNO, IDYES) = IDYES
     else
-      Result := SuppressibleMsgBox('Couch Jarvis ' + PreviousVersion + ' is installed. This will update it to ' +
-                  '{#AppVersion}.' + #13#10#13#10 + 'Your settings and paired phones are kept. Couch Jarvis ' +
+      Result := SuppressibleMsgBox('{#AppName} (formerly {#OldAppName}) ' + PreviousVersion +
+                  ' is installed. This will update it to {#AppVersion}.' + #13#10#13#10 +
+                  'Your settings and paired phones are kept. {#AppName} ' +
                   'is closed for a moment and started again afterwards.',
                   mbInformation, MB_OKCANCEL, IDOK) = IDOK;
     { The app is a background process with no window Windows could ask to close, so Setup's own
@@ -187,8 +198,8 @@ begin
     if Result then StopCouchJarvis;
   end
   else if not EdgeInstalled then
-    Result := SuppressibleMsgBox('Microsoft Edge was not found. Couch Jarvis drives Edge to play your media, so ' +
-                     'install Edge first.' + #13#10#13#10 + 'Install Couch Jarvis anyway?',
+    Result := SuppressibleMsgBox('Microsoft Edge was not found. {#AppName} drives Edge to play your media, so ' +
+                     'install Edge first.' + #13#10#13#10 + 'Install {#AppName} anyway?',
                      mbConfirmation, MB_YESNO, IDYES) = IDYES;
 end;
 
@@ -196,7 +207,7 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usPostUninstall then
     { suppressible, so a silent uninstall never waits for a click; the silent answer keeps the data }
-    if SuppressibleMsgBox('Also delete your Couch Jarvis settings, paired phones and the TV browser profile?',
+    if SuppressibleMsgBox('Also delete your {#AppName} settings, paired phones and the TV browser profile?',
               mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDNO) = IDYES then
     begin
       DelTree(ExpandConstant('{userappdata}\CouchJarvis'), True, True, True);

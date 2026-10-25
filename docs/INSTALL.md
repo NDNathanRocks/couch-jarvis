@@ -1,6 +1,6 @@
 # Install guide
 
-This gets Couch Jarvis running on a Windows PC that's connected to your TV, and pairs your phone to it.
+This gets Armrest running on a Windows PC that's connected to your TV, and pairs your phone to it.
 Time needed: about 10 minutes, plus a few more the first time voice is used (it downloads a speech model).
 
 ## What you need
@@ -18,12 +18,12 @@ Time needed: about 10 minutes, plus a few more the first time voice is used (it 
 1. Download **CouchJarvis-Setup.exe** and run it. It installs just for you; no administrator rights needed.
    - Windows may show **"Windows protected your PC"** because the installer isn't code-signed. Click **More info**,
      then **Run anyway**.
-2. Choose whether to **start Couch Jarvis when you sign in to Windows**. Say yes if this PC lives next to the TV.
-3. Leave **Start Couch Jarvis now** ticked and click **Finish**.
+2. Choose whether to **start Armrest when you sign in to Windows**. Say yes if this PC lives next to the TV.
+3. Leave **Start Armrest now** ticked and click **Finish**.
 4. A **QR code** appears on the screen (the overlay goes on the monitor set by `CJ_HUD_SCREEN_INDEX`, default `0`).
-5. A **Microsoft Edge** window opens: this is the "TV browser" Couch Jarvis controls. **Sign in to YouTube (and anything
+5. A **Microsoft Edge** window opens: this is the "TV browser" Armrest controls. **Sign in to YouTube (and anything
    else you use) once here**; it remembers.
-6. Windows may ask to allow Couch Jarvis through the firewall. **Allow on private networks** if you want the
+6. Windows may ask to allow Armrest through the firewall. **Allow on private networks** if you want the
    local-network backup mode; it works without it.
 
 ## Option B: portable zip
@@ -65,14 +65,14 @@ else the app needs an AI model ("the brain"). Without one you will hear *"My bra
   **Set up AI brain** from the Start menu any time. It installs [Ollama](https://ollama.com) and downloads `qwen2.5:7b`
   (NVIDIA GPU) or the smaller `phi4-mini` (no GPU), plus `qwen2.5vl:7b` for finding buttons on screen when there is a GPU.
   Without a GPU, local answers take several seconds: a Gemini key is much faster.
-- With both, the key is used first and the local model is the fallback. Couch Jarvis starts Ollama and loads the model for you at startup.
+- With both, the key is used first and the local model is the fallback. Armrest starts Ollama and loads the model for you at startup.
 
 ## Your settings file
 
 `%APPDATA%\CouchJarvis\config.env` (paste that into the File Explorer address bar). It's a plain text file of `NAME=value`
-lines; lines starting with `#` are ignored. **Restart Couch Jarvis after editing**: end `CouchJarvis.exe` in Task Manager, then start it from the Start menu. All settings are listed in the [README](../README.md#settings).
+lines; lines starting with `#` are ignored. **Restart Armrest after editing**: end `CouchJarvis.exe` in Task Manager, then start it from the Start menu. All settings are listed in the [README](../README.md#settings).
 
-The Start menu has a **Couch Jarvis settings** shortcut that opens this file for you.
+The Start menu has an **Armrest settings** shortcut that opens this file for you.
 
 **API keys are never shipped inside the app.** The installer contains no Groq or Gemini key (the build refuses to finish if
 it finds the builder's keys in it). If you want cloud speech or cloud understanding, get your own free key and add a line
@@ -85,14 +85,14 @@ Logs are in `%LOCALAPPDATA%\CouchJarvis\logs`. They never contain pairing links 
 ## Updating and uninstalling
 
 - **Update:** run the new installer. It finds the copy you already have (any version from 0.2.0 on), tells you
-  "Couch Jarvis X is installed. This will update it to Y", closes the running app, installs over it in the same folder and
+  "Armrest X is installed. This will update it to Y", closes the running app, installs over it in the same folder and
   starts it again. Your settings, paired phones, room keys and TV browser sign-ins are never touched, and you are not asked
   for the Gemini key again. Installing an older version over a newer one asks first.
-- **Update notice:** once a day Couch Jarvis asks GitHub whether a newer release exists and shows "Couch Jarvis X is out" on
+- **Update notice:** once a day Armrest asks GitHub whether a newer release exists and shows "Armrest X is out" on
   the phone. It only tells you; nothing is downloaded or run for you. Turn it off with `CJ_UPDATE_CHECK=false`.
 - **Phone app problems after an update?** Settings -> **Reset app cache** reloads the newest page without un-pairing.
   If the update adds features that need the cloud relay, the person who runs the relay must update it too.
-- **Uninstall:** Windows Settings -> Apps -> Couch Jarvis -> Uninstall. It asks whether to also delete your settings, paired
+- **Uninstall:** Windows Settings -> Apps -> Armrest -> Uninstall. It asks whether to also delete your settings, paired
   phones and the TV browser profile.
 
 ## Troubleshooting
@@ -102,7 +102,7 @@ Tap **Log** at the top of the phone app first: it shows what the PC heard and wh
 | Problem | What to try |
 |---|---|
 | No QR code appears | Check it's running (Task Manager -> `CouchJarvis.exe`). The overlay may be on another monitor: set `CJ_HUD_SCREEN_INDEX=1` |
-| The phone says **PC offline** | Couch Jarvis isn't running or the PC is asleep. Start it from the Start menu |
+| The phone says **PC offline** | Armrest isn't running or the PC is asleep. Start it from the Start menu |
 | The phone stays on **Connecting...** | Open the link in Chrome to rule out a Safari quirk; check the PC has internet; look at `daemon.log` for `cloud relay: up` |
 | **"Recording was incomplete"** | Update both the PC app and the cloud relay to the latest version |
 | Voice says it couldn't hear you | The Log shows `heard:`. Allow the mic in the phone browser. First use downloads the model, so wait. Try `CJ_STT_DEVICE=cpu` or a Groq key |
@@ -110,7 +110,7 @@ Tap **Log** at the top of the phone app first: it shows what the PC heard and wh
 | **"My brain took too long"** | The local model is slow on a CPU. Add a Gemini key, or use a smaller model: `CJ_OLLAMA_TEXT_MODEL=qwen2.5:1.5b` (faster, understands less) |
 | It misunderstands a command | The Log shows what it heard. Free-form commands need the AI brain (above) |
 | Fullscreen doesn't work | Tap it twice (ad pages swallow the first click). The Log shows what failed. If Edge's tab strip still shows, use **Touchpad & keys -> F11** or say "press F11" |
-| Edge doesn't open / commands do nothing | Close every Edge window and restart Couch Jarvis; it owns the TV browser on debug port 9222 |
+| Edge doesn't open / commands do nothing | Close every Edge window and restart Armrest; it owns the TV browser on debug port 9222 |
 | I want to remove someone's access | On the PC: `curl.exe http://127.0.0.1:8765/api/devices` lists phones; `curl.exe -X POST http://127.0.0.1:8765/api/devices/<id>/revoke` removes one. Or delete `%APPDATA%\CouchJarvis\room.json` and restart: that makes a new room and QR, and every phone has to pair again |
 | Touchpad / keyboard tab is missing | `CJ_REMOTE_INPUT=false` is set on the PC, or the phone isn't connected |
 
@@ -118,7 +118,7 @@ Tap **Log** at the top of the phone app first: it shows what the PC heard and wh
 
 ## Building the installer
 
-For whoever publishes Couch Jarvis (you, not the people installing it).
+For whoever publishes Armrest (you, not the people installing it).
 
 ### One-time prerequisites
 

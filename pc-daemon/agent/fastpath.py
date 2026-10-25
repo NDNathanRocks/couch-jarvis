@@ -8,7 +8,7 @@ from agent.state import ActionStep, Intent, IntentPlan
 from contracts import QuickAction
 from executors.subtitles import SPOKEN_LANGUAGES
 
-_FILLER = re.compile(r"^(?:hey |ok |okay )?(?:jarvis[, ]+)?(?:please[, ]+)?")
+_FILLER = re.compile(r"^(?:hey |ok |okay )?(?:(?:armrest|jarvis)[, ]+)?(?:please[, ]+)?")
 _TRAILING = re.compile(r"[\s.!?,]+$")
 _MEDIA_NOUN = r"(?: the)?(?: video| music| song| track| it)?"
 

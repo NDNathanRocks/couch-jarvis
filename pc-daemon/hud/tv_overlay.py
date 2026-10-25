@@ -10,6 +10,7 @@ from PySide6.QtCore import QRect, QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QGuiApplication, QPainter, QPaintEvent
 from PySide6.QtWidgets import QWidget
 
+from brand import APP_NAME
 from hud.qr import qr_matrix
 from hud.viewmodel import HudFrame, HudViewModel, QrCard, ToastItem
 
@@ -48,7 +49,7 @@ class TvOverlay(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self.setWindowTitle("Couch Jarvis HUD")
+        self.setWindowTitle(f"{APP_NAME} HUD")
         self._place_on_screen(screen_index)
         self._timer = QTimer(self)
         self._timer.setInterval(500)

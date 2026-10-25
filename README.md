@@ -1,4 +1,6 @@
-# Couch Jarvis
+# Armrest
+
+*Your PC, within arm's reach.* (Formerly "Couch Jarvis": same app, same settings and paired phones.)
 
 Control the Windows PC that's plugged into your TV from any phone, by voice, buttons, touchpad or keyboard, from
 anywhere. **No accounts and no Wi-Fi/IP setup.** Scan a QR code on the TV once and the phone stays paired; friends
@@ -84,7 +86,7 @@ From top to bottom the Remote tab has:
   (it jumps the queue).
 - **Touchpad:** right under the favourites (see below), then **timers** with live countdowns and **Connected friends**.
 
-A PC running an older Couch Jarvis than the phone app shows plain volume buttons and a progress bar instead of the sliders.
+A PC running an older Armrest than the phone app shows plain volume buttons and a progress bar instead of the sliders.
 
 ### Use it as a touchpad and keyboard (Remote tab and Keys tab)
 
@@ -196,7 +198,7 @@ Tap **Log** on the phone first: it usually names the cause.
 
 | Symptom | Check |
 |---|---|
-| "The PC is offline" | Is Couch Jarvis running on the PC? (Start menu -> Couch Jarvis.) Is the PC online? |
+| "The PC is offline" | Is Armrest running on the PC? (Start menu -> Armrest.) Is the PC online? |
 | Phone stuck on "Connecting..." | Use Chrome first to rule out a browser quirk; see [INSTALL.md](docs/INSTALL.md#troubleshooting). Check the daemon log for `cloud relay: up` |
 | "Recording was incomplete" | Fixed in current versions (parts can arrive out of order); update the PC app **and** redeploy the relay |
 | Voice says "I could not hear that" / "I did not hear anything" | Check the Log's `heard:` line, then `%LOCALAPPDATA%\CouchJarvis\logs`. `cublas64_12.dll is not found` means the GPU libraries are missing: it now falls back to the CPU by itself, and `uv pip install -r requirements-gpu.txt` (from source) enables the GPU. First use downloads the speech model. Or add `CJ_GROQ_API_KEY` |

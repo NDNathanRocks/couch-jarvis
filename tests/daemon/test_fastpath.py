@@ -83,6 +83,7 @@ def test_pause_expects_paused_and_play_expects_playing() -> None:
 
 def test_normalize() -> None:
     assert normalize("  Hey Jarvis, please Pause!!  ") == "pause"
+    assert normalize("Hey Armrest, pause") == "pause"  # the new name works the same way
 
 
 SLIDERS = ("volume_set", "seek_to")  # applied directly by the service, never planned

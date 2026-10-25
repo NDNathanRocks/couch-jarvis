@@ -111,7 +111,7 @@ def create_app(
     static_dir: Path | None = None,
     delete_cloud: DeleteCloudFn | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="CouchJarvis daemon", docs_url=None, redoc_url=None)
+    app = FastAPI(title="Armrest daemon", docs_url=None, redoc_url=None)
     if allowed_origins:
         app.add_middleware(
             CORSMiddleware,

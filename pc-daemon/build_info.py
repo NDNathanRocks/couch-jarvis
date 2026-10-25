@@ -37,7 +37,26 @@ def read_channel(path: Path) -> Channel:
 
 @lru_cache(maxsize=1)
 def channel() -> Channel:
-    return read_channel(resource_root() / "installer" / "build_info.json")
+    return read_channel(_info_file())
+
+
+def read_crash_dsn(path: Path) -> str | None:
+    """The crash-report address baked into the build (a Sentry DSN: public by design, it only
+    lets the app send reports). None in a source checkout or when the builder set none."""
+    try:
+        value = json.loads(path.read_text(encoding="utf-8")).get("crash_dsn")
+    except (OSError, ValueError, AttributeError):
+        return None
+    return value if isinstance(value, str) and value.startswith("https://") else None
+
+
+@lru_cache(maxsize=1)
+def crash_dsn() -> str | None:
+    return read_crash_dsn(_info_file())
+
+
+def _info_file() -> Path:
+    return resource_root() / "installer" / "build_info.json"
 
 
 @lru_cache(maxsize=1)

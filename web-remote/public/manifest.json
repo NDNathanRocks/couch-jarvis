@@ -1,7 +1,7 @@
 {
-  "name": "Couch Jarvis",
-  "short_name": "Jarvis",
-  "description": "Voice and button remote for the TV PC",
+  "name": "Armrest",
+  "short_name": "Armrest",
+  "description": "Your PC, within arm's reach: voice and button remote for the TV PC",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

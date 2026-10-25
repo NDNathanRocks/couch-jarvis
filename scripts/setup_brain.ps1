@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Sets up Couch Jarvis's local AI brain: installs Ollama if needed and downloads a model that fits this PC.
+    Sets up Armrest's local AI brain: installs Ollama if needed and downloads a model that fits this PC.
 
 .DESCRIPTION
     Free-form commands ("put on the one with the cat", "search X and play a song featuring Y") are
@@ -105,13 +105,13 @@ try {
     }
 
     Write-Host ''
-    Write-Host 'Done. The brain is ready: restart Couch Jarvis (or just try a command).'
+    Write-Host 'Done. The brain is ready: restart Armrest (or just try a command).'
     Close-Window
 } catch {
     Write-Host ''
     Write-Host "Could not finish: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host 'You can run "Set up AI brain" from the Start menu again, or add a free Gemini key instead:'
-    Write-Host '  https://aistudio.google.com/apikey  ->  put CJ_GEMINI_API_KEY=... in Couch Jarvis settings.'
+    Write-Host '  https://aistudio.google.com/apikey  ->  put CJ_GEMINI_API_KEY=... in Armrest settings.'
     Close-Window -Failed
     exit 1
 }

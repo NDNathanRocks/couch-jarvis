@@ -59,10 +59,18 @@ def test_only_the_uninstaller_can_delete_user_data_and_it_asks_first() -> None:
     assert all(pos > uninstall for pos in deletes), (
         "DelTree outside the uninstaller would wipe data on update"
     )
-    assert (
-        "Also delete your Couch Jarvis settings" in ISS and "MB_DEFBUTTON2" in ISS
-    )  # default is No
-    assert "[InstallDelete]" not in ISS and "[UninstallDelete]" not in ISS
+    assert "Also delete your {#AppName} settings" in ISS and "MB_DEFBUTTON2" in ISS  # default is No
+    assert "[UninstallDelete]" not in ISS
+    # An update may only remove old shortcuts (the 0.x name), never files or folders of the user.
+    if "[InstallDelete]" in ISS:
+        section = ISS.split("[InstallDelete]", 1)[1].split("\n[", 1)[0]
+        entries = [ln for ln in section.splitlines() if ln.strip() and not ln.startswith(";")]
+        assert entries
+        for entry in entries:
+            assert re.fullmatch(
+                r'Type: files; Name: "\{(autoprograms|autodesktop)\}\\[^"*?\\]+\.lnk"',
+                entry.strip(),
+            ), entry
 
 
 def test_the_installer_never_writes_the_room_identity() -> None:

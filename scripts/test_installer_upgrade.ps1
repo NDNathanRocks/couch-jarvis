@@ -6,7 +6,7 @@
     Installs an OLD published installer silently into a throwaway folder, starts the app, installs the NEW
     installer over it, and checks: the version changed, the same folder was reused, the running app was closed
     and started again, the user's data (room.json, config.env, the settings folder) was not touched, and the
-    uninstaller keeps user data by default. Run it on a PC (or Windows Sandbox / VM) with no Couch Jarvis
+    uninstaller keeps user data by default. Run it on a PC (or Windows Sandbox / VM) with no Armrest
     installed: the installers share one registry entry, so it refuses to run when one is registered.
 
 .PARAMETER OldInstaller
@@ -92,8 +92,11 @@ try {
     # (a config.env that did not exist is created by the app's first run: only an existing one must be unchanged)
     Check 'config.env untouched' (($configBefore -eq 'absent') -or ((Hash $config) -eq $configBefore))
     Check 'settings folder not wiped' (Test-Path -LiteralPath $marker)
-    $links = @(Get-ChildItem -Recurse -Path (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs') -Filter 'Couch Jarvis.lnk' -ErrorAction SilentlyContinue)
+    $programs = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
+    $links = @(Get-ChildItem -Recurse -Path $programs -Filter 'Armrest.lnk' -ErrorAction SilentlyContinue)
     Check 'one Start-menu shortcut' ($links.Count -eq 1) "($($links.Count))"
+    $old = @(Get-ChildItem -Recurse -Path $programs -Filter 'Couch Jarvis*.lnk' -ErrorAction SilentlyContinue)
+    Check 'the 0.x shortcuts (old name) are gone' ($old.Count -eq 0) "($($old.Count))"
 
     # 4. uninstall (the prompt to delete settings defaults to No) and confirm the data is still there
     $unins = Get-ChildItem -LiteralPath $app -Filter 'unins*.exe' | Select-Object -First 1
