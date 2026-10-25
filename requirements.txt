@@ -21,4 +21,9 @@ PySide6>=6.7,<7
 qasync>=0.27,<1
 segno>=1.6,<2
 sentry-sdk>=2.20,<3  # opt-in crash reports (off unless the user turns them on)
+cryptography>=43,<51  # checks licence keys of the direct download (Ed25519, offline)
+# the Microsoft Store licence and trial (only used inside the Store package)
+winrt-runtime>=3,<5; sys_platform == "win32"
+winrt-Windows.Foundation>=3; sys_platform == "win32"
+winrt-Windows.Services.Store>=3; sys_platform == "win32"
 edge-tts>=7,<8  # free Microsoft neural voices for spoken replies

@@ -41,6 +41,7 @@ QuickAction = Literal[
     "subtitles",
     "volume_set",  # args: level 0-100 (the slider; applied at once, never queued)
     "seek_to",  # args: position_s >= 0 (the timeline slider; applied at once)
+    "buy",  # opens where to buy on the TV (Store page or website); PC 1.0.0+, see RoomState.license
 ]
 
 PointerAction = Literal[
@@ -116,6 +117,13 @@ class Bookmark(_Model):
     url: str = Field(max_length=2000)
 
 
+class LicenseState(_Model):
+    """Shown while the app is not fully licensed (absent = paid, or a PC older than 1.0.0)."""
+
+    status: Literal["trial", "expired"]
+    days_left: int | None = None
+
+
 class RoomState(_Model):
     pc_online: bool = False
     mode: Literal["cloud", "lan"] = "cloud"
@@ -132,6 +140,7 @@ class RoomState(_Model):
     voice: VoiceState = Field(default_factory=VoiceState)
     browser: BrowserState = Field(default_factory=BrowserState)
     bookmarks: list[Bookmark] = Field(default_factory=list, max_length=100)
+    license: LicenseState | None = None
     rev: int = 0
 
 

@@ -24,6 +24,12 @@ hiddenimports += collect_submodules("langgraph") + collect_submodules("uvicorn")
 hiddenimports += ["websockets.asyncio.server", "pycaw.pycaw", "comtypes.client", "qasync"]
 # sentry_sdk imports its default integrations by name at init (opt-in crash reports)
 hiddenimports += collect_submodules("sentry_sdk.integrations")
+# the Store licence check is imported lazily (licensing.query_store)
+hiddenimports += collect_submodules("winrt.windows.services.store") + [
+    "winrt.runtime",
+    "winrt.windows.foundation",
+    "winrt.windows.foundation.collections",
+]
 
 web_dist = os.path.join(ROOT, "web-remote", "dist")
 if os.path.isdir(web_dist):

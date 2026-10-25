@@ -356,4 +356,43 @@ describe("the remote page", () => {
     fireEvent.click(screen.getByRole("button", { name: "Dismiss update notice" }));
     expect(screen.queryByText("0.4.0")).not.toBeInTheDocument();
   });
+
+  it("shows trial days left, says when the trial has ended, and Buy asks the PC", async () => {
+    render(<App />);
+    await waitFor(() => expect(FakeSocket.instances.length).toBe(1));
+    const sock = FakeSocket.last;
+    await act(async () => sock.open());
+    await act(async () => {
+      sock.receive(incoming("pair.granted", { device_id: "dev-7", device_token: "t", expires_at: 2_000_000_000 }));
+    });
+    await act(async () => {
+      sock.receive(incoming("state.snapshot", { pc_online: true, rev: 1, daemon_version: "1.0.0", license: { status: "trial", days_left: 3 } }));
+    });
+    expect(await screen.findByText(/Free trial:/)).toHaveTextContent("Free trial: 3 days left.");
+    await act(async () => {
+      sock.receive(incoming("state.patch", { rev: 2, license: { status: "expired", days_left: 0 } }));
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("trial has ended");
+    fireEvent.click(screen.getByRole("button", { name: "Buy" }));
+    expect(sock.sent.at(-1)).toMatchObject({ type: "cmd.button", payload: { action: "buy" } });
+    await act(async () => {
+      sock.receive(incoming("state.patch", { rev: 3, license: null })); // bought
+    });
+    expect(screen.queryByRole("button", { name: "Buy" })).not.toBeInTheDocument();
+  });
+
+  it("shows no licence banner for a PC that sends none (paid, or older than 1.0.0)", async () => {
+    render(<App />);
+    await waitFor(() => expect(FakeSocket.instances.length).toBe(1));
+    const sock = FakeSocket.last;
+    await act(async () => sock.open());
+    await act(async () => {
+      sock.receive(incoming("pair.granted", { device_id: "dev-7", device_token: "t", expires_at: 2_000_000_000 }));
+    });
+    await act(async () => {
+      sock.receive(incoming("state.snapshot", { pc_online: true, rev: 1, daemon_version: "0.3.0" }));
+    });
+    await screen.findByRole("tablist");
+    expect(screen.queryByRole("button", { name: "Buy" })).not.toBeInTheDocument();
+  });
 });

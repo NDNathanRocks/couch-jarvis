@@ -135,6 +135,7 @@ export default function App() {
   }, [askId, askLength]);
 
   const update = view.room.update_available;
+  const licence = view.room.license; // absent: paid, or a PC older than 1.0.0
   const inputOff = (
     <p className="glass rounded-2xl p-4 text-sm text-zinc-400">Touchpad and keyboard are turned off on the PC (CJ_REMOTE_INPUT=false).</p>
   );
@@ -177,6 +178,33 @@ export default function App() {
               </span>
               <button type="button" aria-label="Dismiss update notice" onClick={() => setDismissedUpdate(update)} className="press min-h-11 min-w-11 text-zinc-400">
                 ✕
+              </button>
+            </aside>
+          )}
+
+          {licence && (
+            // only a 1.0.0+ PC sends `license`, so Buy never reaches a PC that cannot handle it
+            <aside
+              className={`glass rise flex items-center gap-3 rounded-2xl p-3 text-sm ${licence.status === "expired" ? "ring-1 ring-rose-400/60" : ""}`}
+              aria-label="Licence"
+              role={licence.status === "expired" ? "alert" : undefined}
+            >
+              <span className="flex-1">
+                {licence.status === "expired" ? (
+                  <>Your free {APP_NAME} trial has ended.</>
+                ) : (
+                  <>
+                    Free trial: <b>{licence.days_left ?? "a few"}</b> {licence.days_left === 1 ? "day" : "days"} left.
+                  </>
+                )}
+              </span>
+              <button
+                type="button"
+                disabled={!connected}
+                onClick={() => actions.sendButton("buy")}
+                className="press min-h-11 rounded-full bg-accent px-4 font-semibold text-zinc-950"
+              >
+                Buy
               </button>
             </aside>
           )}

@@ -1,4 +1,4 @@
-import type { Bookmark } from "../contracts.gen";
+import type { Bookmark, LicenseState } from "../contracts.gen";
 import type { DevicePresence, Incoming, NowPlaying, TimerInfo, VoicePrefs } from "../protocol";
 
 /**
@@ -30,6 +30,8 @@ export interface RoomSnapshot {
   daemon_version: string;
   /** A newer released version, when the PC's daily check found one. */
   update_available: string | null;
+  /** Trial days left or "expired"; null once paid (and from a PC older than 1.0.0). */
+  license: LicenseState | null;
   rev: number;
 }
 
@@ -117,6 +119,7 @@ export const emptyRoom: RoomSnapshot = {
   bookmarks: [],
   daemon_version: "",
   update_available: null,
+  license: null,
   rev: 0,
 };
 

@@ -621,7 +621,8 @@
             "scroll_down",
             "subtitles",
             "volume_set",
-            "seek_to"
+            "seek_to",
+            "buy"
           ],
           "title": "Action",
           "type": "string"
@@ -1333,6 +1334,37 @@
       "title": "InputTextPayload",
       "type": "object"
     },
+    "LicenseState": {
+      "additionalProperties": false,
+      "description": "Shown while the app is not fully licensed (absent = paid, or a PC older than 1.0.0).",
+      "properties": {
+        "days_left": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Days Left"
+        },
+        "status": {
+          "enum": [
+            "trial",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "LicenseState",
+      "type": "object"
+    },
     "NowPlaying": {
       "additionalProperties": false,
       "properties": {
@@ -2040,6 +2072,17 @@
           ],
           "default": null,
           "title": "Driver"
+        },
+        "license": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LicenseState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "mode": {
           "default": "cloud",

@@ -624,6 +624,8 @@ def plan_button(
     del args  # reserved for parameterized buttons
     if action in ("volume_set", "seek_to"):
         raise ValueError(f"{action} is a slider: the service applies it directly")
+    if action == "buy":
+        raise ValueError("buy is handled by the service (licensing), never by the agent")
     table: dict[str, IntentPlan] = {
         "play_pause": _media("play_pause"),
         "next": _media("next"),

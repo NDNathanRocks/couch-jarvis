@@ -9,3 +9,7 @@ from __future__ import annotations
 
 APP_NAME = "Armrest"
 TAGLINE = "Your PC, within arm's reach"
+# Where "Buy" goes. The Store build opens the Store page instead, once STORE_PRODUCT_ID is set
+# (Partner Center > the app > Product identity > Store ID, e.g. 9NBLGGH4R315).
+BUY_URL = "https://armrest-app.pages.dev/buy"
+STORE_PRODUCT_ID = ""

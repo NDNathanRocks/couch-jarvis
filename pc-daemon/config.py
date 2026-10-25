@@ -93,6 +93,9 @@ class Settings(BaseSettings):
     # sent). crash_dsn overrides the address baked into the build (testing only).
     crash_reports: bool = False
     crash_dsn: str | None = None
+    # Direct download: paste the licence key you bought here (the Control Center will do it).
+    license_key: SecretStr | None = None
+    license_file: Path = _roaming_app_dir() / "license.json"
 
     # Spoken replies ("Now playing X on YouTube Music"). Preferences are changed from the phone and
     # saved per TV. ElevenLabs is optional (its free plan is ~10k credits a month); without a key

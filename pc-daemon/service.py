@@ -14,7 +14,7 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel
 
@@ -106,6 +106,14 @@ def _plain(value: Any) -> Any:
     return value
 
 
+class LicenceGate(Protocol):
+    """What the service needs from licensing.LicenceManager."""
+
+    def allows(self) -> bool: ...
+    def refusal(self) -> str: ...
+    def buy(self) -> str: ...
+
+
 class TokenBucket:
     """Per-key rate limiter: burst immediate actions, refilled at rate per second."""
 
@@ -183,6 +191,7 @@ class CommandService:
         self._slider_limiter = TokenBucket(rate=12.0, burst=30.0)  # a drag sends many values
         self._input_lock = asyncio.Lock()
         self.remote_input_enabled = remote_input
+        self.licence: LicenceGate | None = None  # set by main; None = always licensed (tests)
         self.state.update(remote_input=remote_input, daemon_version=__version__)
         self._stt_slots = asyncio.Semaphore(MAX_CONCURRENT_STT)
         self._devices: dict[str, DevicePresence] = {}
@@ -290,6 +299,12 @@ class CommandService:
         self.on_activity()
         if msg.type == "state.sync":
             return [self.state.snapshot_message()]
+        if isinstance(msg, CmdButton) and msg.payload.action == "buy":
+            message = self.licence.buy() if self.licence is not None else "Already licensed."
+            self._publish_result(msg.payload.command_id, True, message)
+            return []
+        if self.licence is not None and not self.licence.allows():
+            return [self._error("trial_ended", self.licence.refusal())]
         if isinstance(msg, CmdButton):
             button = msg.payload
             if button.action in ("volume_set", "seek_to"):

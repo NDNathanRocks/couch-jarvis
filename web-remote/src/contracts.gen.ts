@@ -82,7 +82,8 @@ export type Action =
   | "scroll_down"
   | "subtitles"
   | "volume_set"
-  | "seek_to";
+  | "seek_to"
+  | "buy";
 export type CommandId = string;
 export type IdempotencyKey = string;
 export type ReplyTo3 = string | null;
@@ -235,6 +236,8 @@ export type Name = string;
 export type Online = boolean;
 export type Devices = DevicePresence[];
 export type Driver = string | null;
+export type DaysLeft = number | null;
+export type Status2 = "trial" | "expired";
 export type Mode = "cloud" | "lan";
 export type Muted = boolean;
 export type DurationS = number;
@@ -600,6 +603,7 @@ export interface RoomState {
   daemon_version?: DaemonVersion;
   devices?: Devices;
   driver?: Driver;
+  license?: LicenseState | null;
   mode?: Mode;
   muted?: Muted;
   now_playing?: NowPlaying | null;
@@ -631,6 +635,13 @@ export interface DevicePresence {
   last_seen: LastSeen;
   name: Name;
   online: Online;
+}
+/**
+ * Shown while the app is not fully licensed (absent = paid, or a PC older than 1.0.0).
+ */
+export interface LicenseState {
+  days_left?: DaysLeft;
+  status: Status2;
 }
 export interface NowPlaying {
   duration_s?: DurationS;

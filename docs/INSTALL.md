@@ -82,6 +82,15 @@ or put it in a shared folder. Use a free-tier key you can revoke.
 
 Logs are in `%LOCALAPPDATA%\CouchJarvis\logs`. They never contain pairing links or secrets.
 
+## Free trial and licence
+
+- **From the Microsoft Store:** the Store runs the free trial and the purchase. When the trial ends, the phone shows
+  **Buy**, which opens the Store page on the TV.
+- **From the website (direct download):** the app is free for 14 days from its first start. After that it still pairs
+  phones and shows what is playing, but commands stop until a licence key is added. Put the key you received in your
+  settings file as `CJ_LICENSE_KEY=ARMREST1....` and restart the app (the PC Control Center will have a box for it).
+  The key is checked on the PC, offline.
+
 ## Updating and uninstalling
 
 - **Update:** run the new installer. It finds the copy you already have (any version from 0.2.0 on), tells you
@@ -150,6 +159,20 @@ Speech and vision models are **not** bundled: they download on first use, which 
 Playwright's browsers are **not** bundled either; the app drives the Edge already on the PC.
 
 Before sharing a build, test it on a PC (or Windows user account) that has no Python, Node or Visual C++ runtime installed. So far it has been verified on the development PC: a silent install into a temp folder, launching the installed app (serves the phone app, connects to the relay, creates its settings, refuses a second copy), and a clean uninstall that leaves your settings alone. A truly clean machine has not been tried yet.
+
+### Licence keys (direct download)
+
+Keys are signed with a private key that never leaves your PC and never enters the repository:
+
+```
+python scripts/license_keys.py new-keypair      # once; it is already done if %USERPROFILE%\.armrest exists
+python scripts/license_keys.py issue --name "Jane Doe" --order 1042
+python scripts/license_keys.py check ARMREST1....
+```
+
+**Back up `%USERPROFILE%\.armrest\licence-signing-key.pem`** (a password manager or an encrypted USB stick).
+Without it no new keys can be issued; anyone who has it can make keys. The app contains only the public half
+(`PUBLIC_KEY_B64` in `pc-daemon/licensing.py`).
 
 ### What every install shares (read this before handing it out)
 

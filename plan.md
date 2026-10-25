@@ -761,7 +761,8 @@ customers' licences.
 | 5C Licence-safe defaults | done: `phi4-mini` CPU default (eval on this PC: 8/12 right action, 3.2 s median, vs 6/12 for `qwen2.5:1.5b`), `edge-tts` dev-only, GPLv3 `pymsgbox`/`mouseinfo` excluded, licence gate + notices, pop-up protection, Butler / Sterling / Aurora |
 | 5D Relay | done: staging deploy + load test run and the stack deleted (results in 13.2); the custom relay domain is dropped for 1.0.0 (13.10). Production still runs the old relay: it needs a deploy (with your OK) before any PC sends `room.delete` |
 | 5I Crash reports | done (rest of 5I not started): opt-in Sentry, free Developer plan. `CJ_CRASH_REPORTS=true` turns it on (the 5G wizard will ask). The DSN is baked into `build_info.json` by `build.ps1 -CrashDsn` or `CJ_CRASH_DSN` in `.env`; without one, a build cannot send. Reports keep only the error type, the app's code frames, version, channel and OS. The PC name, user name, IP, local variables, logs, web addresses, emails and token-like strings are removed (`crash_reports.scrub_event`, tested). Over the free quota, reports are dropped, never billed |
-| 5E-5H, 5J-5L | not started |
+| 5F Licensing | done (`licensing.py`, `scripts/license_keys.py`). **Store build:** the Store's licence and trial (`Windows.Services.Store` through `winrt`); Buy opens the Store page once `STORE_PRODUCT_ID` (brand.py) is set from Partner Center. **Direct build:** a 14-day trial from the first run (turning the clock back does not restart it), then an Ed25519 licence key checked offline (`CJ_LICENSE_KEY`). The signing key was made on this PC at `%USERPROFILE%\.armrest\licence-signing-key.pem`, outside the repo: **back it up**. **Dev:** always licensed. If the Store cannot be reached, the last answer is kept, and a first check that fails counts as licensed. When the trial has ended, phones still pair and see the TV, but commands get `trial_ended` with a Buy hint. `RoomState.license` and the `buy` QuickAction were added; the phone shows the days left or "trial ended" with a Buy button (only a 1.0.0 PC sends `license`, so older PCs never see Buy). No relay change. Free keys for 0.x users: `license_keys.py issue`. Left for 5G: a key box in the Control Center and Buy on the TV overlay |
+| 5E, 5G, 5H, 5J-5L | not started |
 
 **5A result: go.** A Store-channel build packed with `build_msix.ps1`, test-signed and installed with `Add-AppxPackage`
 (no admin once the test certificate is trusted). Inside the package: the daemon, the supervisor and the TV overlay start;
@@ -835,6 +836,8 @@ account's free tier or credits still cover API Gateway. A deleted stack costs no
 | You | Trademark search for **Armrest** (USPTO class 9/42, CIPO); reserve it in Partner Center |
 | You | Create the Cloudflare Pages project `armrest-app` (or let me deploy it with `wrangler` after `wrangler login`) |
 | You | Optional: a `remote`/`www` subdomain and Email Routing for `support@` |
+| You | Back up `%USERPROFILE%\.armrest\licence-signing-key.pem` (licence-key signing; never commit or share it) |
+| You | After reserving the name: put the Store ID in `STORE_PRODUCT_ID` (pc-daemon/brand.py) |
 | You | Sentry setup (free, no card): create the account and a Python project `armrest`; turn on Settings > Security & Privacy > "Prevent Storing of IP Addresses"; put its DSN in the repo `.env` as `CJ_CRASH_DSN=...` |
 | You | Partner Center account; reserve the name; set price and trial length |
 | You | Raise the Lambda concurrency quota to 1,000 (Service Quotas > AWS Lambda > Concurrent executions; free) or let me file the request |

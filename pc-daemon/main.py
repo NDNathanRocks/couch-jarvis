@@ -25,10 +25,13 @@ import lifecycle
 from agent.graph import AgentDeps, AgentRunner
 from agent.memory import ConversationMemory
 from bookmarks import BookmarkStore
+from brand import APP_NAME
 from browser_prefs import BrowserPrefs
 from build_info import (
     allows_hobby_services,
+    channel,
     edge_profile_dir,
+    is_packaged,
     package_family_name,
     shows_update_notice,
 )
@@ -45,6 +48,7 @@ from executors.vision_grounding import VisionGrounder
 from hud.qr import detect_lan_ip
 from hud.viewmodel import HudViewModel
 from lan_auth import LanAuth
+from licensing import Licence, LicenceFile, LicenceManager
 from llm.base import TextLLM, VisionLLM
 from llm.fake import DryRunRouter
 from local_api import create_app
@@ -255,6 +259,24 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
     return Runtime(service, telemetry, watchdog, room_id, room_store, bus, deps, stt)
 
 
+def start_licensing(rt: Runtime, settings: Settings) -> asyncio.Task[None]:
+    """Check the licence now and then; phones see trial days left, and commands stop at expiry."""
+    manager = LicenceManager(channel(), is_packaged(), LicenceFile(settings.license_file))
+    key = settings.license_key.get_secret_value() if settings.license_key else None
+    if key and not manager.uses_store and manager.enter_key(key) is None:
+        log.warning("CJ_LICENSE_KEY is not a valid %s licence key", APP_NAME)
+    rt.service.licence = manager
+    service = rt.service
+
+    def on_change(licence: Licence) -> None:
+        log.info(
+            "licence: %s (%s, %s days left)", licence.status, licence.source, licence.days_left
+        )
+        service.state.update(license=manager.state())
+
+    return asyncio.create_task(manager.run(on_change), name="licensing")
+
+
 async def amain(args: argparse.Namespace) -> None:
     init_dpi_awareness()
     settings = get_settings()
@@ -318,6 +340,8 @@ async def amain(args: argparse.Namespace) -> None:
     lifecycle.set_stopper(stop_server)
     await rt.service.start()
     background: list[asyncio.Task[None]] = []
+    if not args.dry_run:
+        background.append(start_licensing(rt, settings))
     if not args.dry_run:  # start/preload the local model now, not during your first command
         background.append(asyncio.create_task(prepare_brain(settings), name="brain-warm-up"))
     if settings.update_check and shows_update_notice() and not args.dry_run:

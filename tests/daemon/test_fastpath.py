@@ -87,9 +87,10 @@ def test_normalize() -> None:
 
 
 SLIDERS = ("volume_set", "seek_to")  # applied directly by the service, never planned
+SERVICE_ONLY = (*SLIDERS, "buy")  # "buy" opens the Store/website (licensing), never the agent
 
 
-@pytest.mark.parametrize("action", [a for a in get_args(QuickAction) if a not in SLIDERS])
+@pytest.mark.parametrize("action", [a for a in get_args(QuickAction) if a not in SERVICE_ONLY])
 def test_every_quick_action_has_a_plan(action: str) -> None:
     plan = plan_button(action)  # type: ignore[arg-type]
     assert plan.source == "fastpath" and len(plan.steps) == 1
@@ -99,6 +100,11 @@ def test_every_quick_action_has_a_plan(action: str) -> None:
 def test_slider_actions_are_not_agent_plans(action: str) -> None:
     with pytest.raises(ValueError, match="slider"):
         plan_button(action)  # type: ignore[arg-type]
+
+
+def test_buy_is_never_an_agent_plan() -> None:
+    with pytest.raises(ValueError, match="licensing"):
+        plan_button("buy")
 
 
 def test_panic_is_an_idempotent_pause_not_a_toggle() -> None:
