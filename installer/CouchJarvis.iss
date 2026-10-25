@@ -42,8 +42,8 @@ Name: "{autodesktop}\Couch Jarvis"; Filename: "{app}\CouchJarvis.exe"; Tasks: de
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "CouchJarvis"; ValueData: """{app}\CouchJarvis.exe"""; Flags: uninsdeletevalue; Tasks: startup
 
 [Run]
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\setup_brain.ps1"" -Pause"; Description: "Download the local AI brain now (Ollama and a model, 2-8 GB; skip it if you entered a Gemini key)"; Flags: postinstall skipifsilent; Check: NoGeminiKey
 Filename: "{app}\CouchJarvis.exe"; Description: "Start Couch Jarvis now (a pairing QR code appears on screen)"; Flags: nowait postinstall skipifsilent
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\setup_brain.ps1"" -PauseOnError"; Description: "Download the local AI brain now (Ollama and a model, 2-8 GB; skip it if you entered a Gemini key)"; Flags: nowait postinstall skipifsilent; Check: NoGeminiKey
 
 [UninstallRun]
 Filename: "taskkill.exe"; Parameters: "/im CouchJarvis.exe /f"; Flags: runhidden; RunOnceId: "StopCouchJarvis"

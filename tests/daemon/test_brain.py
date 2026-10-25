@@ -71,10 +71,18 @@ async def test_fallback_uses_the_next_provider_and_stops_at_the_first_answer() -
     assert reply.text == "ok" and (bad.calls, good.calls, spare.calls) == (1, 1, 0)
 
 
-async def test_fallback_raises_the_first_error_when_all_fail() -> None:
-    with pytest.raises(LLMError) as err:
-        await FallbackLLM([Stub(None), Stub(None)]).complete("s", "u")  # type: ignore[list-item]
-    assert err.value.kind == "timeout"
+async def test_fallback_raises_the_error_the_user_can_act_on() -> None:
+    class Failing(Stub):
+        def __init__(self, kind: str) -> None:
+            super().__init__(None)
+            self.kind = kind
+
+        async def complete(self, system: str, user: str) -> LLMReply:
+            raise LLMError("down", self.kind)
+
+    with pytest.raises(LLMError) as err:  # rate-limited cloud, no local model installed
+        await FallbackLLM([Failing("rate_limited"), Failing("unavailable")]).complete("s", "u")  # type: ignore[list-item]
+    assert err.value.kind == "unavailable"
 
 
 def test_models_fit_the_hardware(monkeypatch: pytest.MonkeyPatch) -> None:

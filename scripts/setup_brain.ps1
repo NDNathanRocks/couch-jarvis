@@ -14,6 +14,9 @@
 .PARAMETER Pause
     Wait for Enter before closing the window (for the Start-menu shortcut).
 
+.PARAMETER PauseOnError
+    Wait for Enter before closing only when something went wrong (for the installer's last page).
+
 .PARAMETER SkipVision
     Do not download the screen-reading model even with a GPU.
 #>
@@ -21,6 +24,7 @@
 [CmdletBinding()]
 param(
     [switch]$Pause,
+    [switch]$PauseOnError,
     [switch]$SkipVision
 )
 
@@ -51,7 +55,8 @@ function Test-NvidiaGpu {
 }
 
 function Close-Window {
-    if ($Pause) { Read-Host 'Press Enter to close' | Out-Null }
+    param([switch]$Failed)
+    if ($Pause -or ($PauseOnError -and $Failed)) { Read-Host 'Press Enter to close' | Out-Null }
 }
 
 try {
@@ -64,6 +69,11 @@ try {
         Write-Host '==> downloading Ollama (about 1 GB)'
         $installer = Join-Path $env:TEMP 'OllamaSetup.exe'
         Invoke-WebRequest -Uri 'https://ollama.com/download/OllamaSetup.exe' -OutFile $installer -UseBasicParsing
+        $signature = Get-AuthenticodeSignature -FilePath $installer
+        if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Ollama') {
+            Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
+            throw 'The downloaded Ollama installer is not signed by Ollama, so it was not run.'
+        }
         Write-Host '==> installing Ollama'
         $proc = Start-Process -FilePath $installer -ArgumentList '/SILENT' -Wait -PassThru
         if ($proc.ExitCode -ne 0) { throw "The Ollama installer failed (exit code $($proc.ExitCode))." }
@@ -72,6 +82,9 @@ try {
     }
     Write-Host "==> using $ollama"
 
+    # Ollama's own installer starts it in the background: give it a moment before starting a second copy.
+    $settle = (Get-Date).AddSeconds(15)
+    while (-not (Test-OllamaUp) -and (Get-Date) -lt $settle) { Start-Sleep -Seconds 1 }
     if (-not (Test-OllamaUp)) {
         Write-Host '==> starting Ollama'
         Start-Process -FilePath $ollama -ArgumentList 'serve' -WindowStyle Hidden
@@ -99,6 +112,6 @@ try {
     Write-Host "Could not finish: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host 'You can run "Set up AI brain" from the Start menu again, or add a free Gemini key instead:'
     Write-Host '  https://aistudio.google.com/apikey  ->  put CJ_GEMINI_API_KEY=... in Couch Jarvis settings.'
-    Close-Window
+    Close-Window -Failed
     exit 1
 }

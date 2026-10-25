@@ -88,3 +88,30 @@ async def test_the_model_cannot_use_press_key() -> None:
     env.router.replies += [json.dumps(plan), json.dumps(plan)]
     result = await env.runner(max_attempts=0).run(req("close everything for me please"))
     assert not result.ok and not env.os.pressed
+
+
+@pytest.mark.parametrize(
+    ("op", "args"),
+    [
+        ("qr_control", {"action": "reset"}),
+        ("bookmark", {"action": "remove", "name": "netflix"}),
+        ("browser_pref", {"adblock": False}),
+        ("type", {"text": "hello"}),
+    ],
+)
+async def test_the_model_cannot_use_ops_reserved_for_the_user(
+    op: str, args: dict[str, object]
+) -> None:
+    """A web page that steers the model must not rotate the pairing secret, delete saved pages or
+    switch the ad blocker off: those exist only as the user's own spoken commands."""
+    env = make_env()
+    plan = {
+        "intent": "system",
+        "confidence": 0.9,
+        "slots": {},
+        "source": "llm",
+        "steps": [{"op": op, "args": args}],
+    }
+    env.router.replies += [json.dumps(plan), json.dumps(plan)]
+    result = await env.runner(max_attempts=0).run(req("tidy things up for me please"))
+    assert not result.ok

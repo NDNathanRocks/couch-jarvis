@@ -199,7 +199,7 @@ export default function App() {
 
         </>
       )}
-      <Toasts toasts={view.toasts} onDismiss={actions.dismiss} onSuggest={actions.sendText} />
+      <Toasts toasts={view.toasts} onDismiss={actions.dismiss} onSuggest={sendCommand} />
       {paired && view.connection !== "rejected" && tab === "remote" && (
         <CommandBar disabled={!connected} voice={voice} micMode={micMode} onSend={sendTyped} />
       )}

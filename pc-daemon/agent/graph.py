@@ -72,6 +72,9 @@ VISION_ELIGIBLE = {
     "vision_click",
     "subtitles",
 }
+# Ops only the user's own words (fastpath) may produce. The router prompt never offers them, but
+# a web page that steers the model could still name them, so they are refused in code.
+USER_ONLY_OPS = {"press_key", "qr_control", "bookmark", "browser_pref", "type"}
 BROWSER_MEDIA = {"play", "pause", "play_pause", "next", "prev"}
 OS_FALLBACK_KEYS: dict[str, MediaKey] = {"play_pause": "play_pause", "next": "next", "prev": "prev"}
 FAIL_MESSAGE = "Sorry, that did not work. Try again."
@@ -359,8 +362,8 @@ def build_graph(deps: AgentDeps) -> Any:
             try:
                 plan = IntentPlan.model_validate(json.loads(extract_json(reply.text)))
                 plan = plan.model_copy(update={"source": "llm"})
-                if any(step.op == "press_key" for step in plan.steps):
-                    raise ValueError("press_key is only for the user's own key commands")
+                if any(step.op in USER_ONLY_OPS for step in plan.steps):
+                    raise ValueError("that op is only for the user's own commands")
                 return without_unrequested_clicks(
                     with_requested_new_tab(plan, state.utterance), state.utterance
                 )

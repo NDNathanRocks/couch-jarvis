@@ -77,6 +77,8 @@ The Start menu has a **Couch Jarvis settings** shortcut that opens this file for
 **API keys are never shipped inside the app.** The installer contains no Groq or Gemini key (the build refuses to finish if
 it finds the builder's keys in it). If you want cloud speech or cloud understanding, get your own free key and add a line
 to your settings file: `CJ_GROQ_API_KEY=gsk_...` and/or `CJ_GEMINI_API_KEY=...`. Both are optional.
+Keys are stored as plain text in that file, which only your Windows account can read by default; do not share it
+or put it in a shared folder. Use a free-tier key you can revoke.
 
 Logs are in `%LOCALAPPDATA%\CouchJarvis\logs`. They never contain pairing links or secrets.
 
