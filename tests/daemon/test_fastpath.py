@@ -116,3 +116,38 @@ def test_naming_the_site_is_enough_to_skip_the_llm() -> None:
     plan = plan_text("play lofi hip hop on youtube")
     assert plan is not None and plan.source == "fastpath"
     assert plan.steps[0].args == {"query": "lofi hip hop", "source": "youtube", "play": True}
+
+
+@pytest.mark.parametrize(
+    ("said", "op", "args"),
+    [
+        ("skip this song", "media_key", {"key": "next"}),
+        ("volume 30", "volume_set", {"level": 30}),
+        ("exit fullscreen", "press_key", {"key": "esc"}),
+        ("go back 30 seconds", "seek", {"delta_s": -30}),
+        ("skip forward a minute", "seek", {"delta_s": 60}),
+        ("rewind 2 minutes", "seek", {"delta_s": -120}),
+        ("restart the video", "seek", {"delta_s": -100_000}),
+        ("play from the beginning", "seek", {"delta_s": -100_000}),
+        ("open netflix", "navigate", {"url": "https://www.netflix.com/"}),
+        ("go to disney plus", "navigate", {"url": "https://www.disneyplus.com/"}),
+        ("skip intro", "click_text", {"text": "Skip Intro"}),
+        ("next episode", "click_text", {"text": "Next Episode"}),
+    ],
+)
+def test_everyday_phrases_need_no_ai(said: str, op: str, args: dict[str, object]) -> None:
+    plan = plan_text(said)
+    assert plan is not None and plan.steps[-1].op == op and plan.steps[-1].args == args
+
+
+def test_the_old_meanings_stay() -> None:
+    go_back = plan_text("go back")
+    assert go_back is not None and go_back.steps[0].op == "browser_nav"  # the back button
+    assert plan_text("open my bookmark netflix").steps[0].op == "bookmark"  # type: ignore[union-attr]
+
+
+def test_every_open_shortcut_is_a_site_the_policy_allows() -> None:
+    from agent.fastpath import _OPEN_URLS
+    from agent.policy import url_allowed
+
+    assert all(url_allowed(u) for u in _OPEN_URLS.values())

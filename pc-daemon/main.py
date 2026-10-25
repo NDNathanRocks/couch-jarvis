@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 import uvicorn
 
 import crash_reports
+import datafiles
 import lifecycle
 from agent.graph import AgentDeps, AgentRunner
 from agent.memory import ConversationMemory
@@ -298,6 +299,7 @@ async def amain(args: argparse.Namespace) -> None:
     )
     if not args.dry_run:
         crash_reports.start(settings.crash_reports, settings.crash_dsn)
+        datafiles.migrate(settings.room_file.parent)  # before anything reads the user's data
     rt = build_runtime(settings, dry_run=args.dry_run)
     if args.dry_run and rt.room_store is None:
         # --dry-run has no real identity, but pairing, LAN auth and the HUD QR all need one. Use a

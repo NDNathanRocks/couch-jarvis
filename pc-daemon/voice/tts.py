@@ -29,6 +29,8 @@ from typing import Literal, Protocol
 
 import httpx
 
+from datafiles import atomic_write_text
+
 log = logging.getLogger(__name__)
 
 Engine = Literal["elevenlabs", "edge", "windows"]
@@ -113,10 +115,7 @@ class UsageLedger:
         if self._path is None:
             return
         with contextlib.suppress(OSError):
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            self._path.write_text(
-                json.dumps({"month": self._month, "chars": self.chars}), encoding="utf-8"
-            )
+            atomic_write_text(self._path, json.dumps({"month": self._month, "chars": self.chars}))
 
 
 class ElevenLabsProvider:

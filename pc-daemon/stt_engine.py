@@ -109,7 +109,15 @@ class FasterWhisperTranscriber:
         )  # "auto" picks a size the device can keep up with
         threads = 0 if device == "cuda" else max(4, (os.cpu_count() or 4) - 2)
         log.info("loading speech model %s on %s", name, device)
-        model = WhisperModel(name, device=device, compute_type=compute_type, cpu_threads=threads)
+        options: dict[str, Any] = {
+            "device": device,
+            "compute_type": compute_type,
+            "cpu_threads": threads,
+        }
+        try:  # downloaded once: load it without asking Hugging Face for updates at every start
+            model = WhisperModel(name, local_files_only=True, **options)
+        except (OSError, ValueError):  # not downloaded yet (a missing file, not a GPU failure)
+            model = WhisperModel(name, **options)
         self._active_device = device
         return model
 

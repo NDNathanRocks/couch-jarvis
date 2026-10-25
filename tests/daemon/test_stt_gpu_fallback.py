@@ -18,15 +18,31 @@ CUBLAS_ERROR = "Library cublas64_12.dll is not found or cannot be loaded"
 class FakeFasterWhisper:
     """Stands in for the faster_whisper module; records every model it is asked to build."""
 
-    def __init__(self, *, fail_load_on: str | None = None, fail_run_on: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        fail_load_on: str | None = None,
+        fail_run_on: str | None = None,
+        cached: bool = True,
+    ) -> None:
         self.built: list[str] = []
+        self.online_loads = 0
         self.fail_load_on, self.fail_run_on = fail_load_on, fail_run_on
         outer = self
 
         class WhisperModel:
             def __init__(
-                self, name: str, device: str, compute_type: str, cpu_threads: int = 0
+                self,
+                name: str,
+                device: str,
+                compute_type: str,
+                cpu_threads: int = 0,
+                local_files_only: bool = False,
             ) -> None:
+                if local_files_only and not cached:
+                    raise FileNotFoundError("not in the local cache")  # huggingface_hub's error
+                if not local_files_only:
+                    outer.online_loads += 1
                 if device == outer.fail_load_on:
                     raise RuntimeError(f"cannot load on {device}")
                 outer.built.append(device)
@@ -118,3 +134,19 @@ async def test_a_failing_warm_up_never_raises(monkeypatch: pytest.MonkeyPatch) -
     broken.fail_load_on = "cpu"
     install(monkeypatch, broken)
     await STTEngine(FasterWhisperTranscriber("m", "cpu"), None).warm_up()  # logged, not raised
+
+
+async def test_a_downloaded_model_loads_without_asking_the_internet(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = FakeFasterWhisper()
+    install(monkeypatch, fake)
+    await FasterWhisperTranscriber("small", "cpu").warm_up()
+    assert fake.built == ["cpu"] and fake.online_loads == 0
+
+
+async def test_the_first_start_downloads_the_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeFasterWhisper(cached=False)
+    install(monkeypatch, fake)
+    await FasterWhisperTranscriber("small", "cpu").warm_up()
+    assert fake.built == ["cpu"] and fake.online_loads == 1

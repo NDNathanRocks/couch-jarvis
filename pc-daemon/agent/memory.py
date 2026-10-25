@@ -11,6 +11,7 @@ from pathlib import Path
 
 from agent.policy import sanitize_untrusted
 from agent.state import IntentPlan
+from datafiles import atomic_write_text
 
 MAX_TURNS = 6
 IDLE_EXPIRY_S = 30 * 60
@@ -124,10 +125,7 @@ class ConversationMemory:
         if self._path is None:
             return
         with contextlib.suppress(OSError):
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            self._path.write_text(
-                json.dumps({"turns": [asdict(t) for t in self._turns]}), encoding="utf-8"
-            )
+            atomic_write_text(self._path, json.dumps({"turns": [asdict(t) for t in self._turns]}))
 
     def _load(self) -> None:
         if self._path is None:

@@ -21,9 +21,23 @@ ALLOWED_KEY_COMBOS: frozenset[str] = frozenset(
     }
 )  # fmt: skip
 
+# The streaming sites the app may open and click around in (LLM plans included). Only well-known
+# first-party media hosts: a page can never send the TV browser anywhere else (prompt injection).
 MEDIA_HOSTS: frozenset[str] = frozenset(
-    {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"}
-)
+    {
+        "youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be",
+        "netflix.com", "www.netflix.com",
+        "open.spotify.com",
+        "disneyplus.com", "www.disneyplus.com",
+        "primevideo.com", "www.primevideo.com",
+        "twitch.tv", "www.twitch.tv",
+        "app.plex.tv",
+        "crunchyroll.com", "www.crunchyroll.com",
+        "hulu.com", "www.hulu.com",
+        "play.max.com",
+        "tv.apple.com",
+    }
+)  # fmt: skip
 
 
 def normalize_keys(keys: str) -> str:

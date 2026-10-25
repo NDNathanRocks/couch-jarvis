@@ -10,7 +10,7 @@ from executors.subtitles import SPOKEN_LANGUAGES
 
 _FILLER = re.compile(r"^(?:hey |ok |okay )?(?:(?:armrest|jarvis)[, ]+)?(?:please[, ]+)?")
 _TRAILING = re.compile(r"[\s.!?,]+$")
-_MEDIA_NOUN = r"(?: the)?(?: video| music| song| track| it)?"
+_MEDIA_NOUN = r"(?: the| this)?(?: video| music| song| track| it)?"
 
 _NUM = r"(\d{1,3})"
 
@@ -69,6 +69,14 @@ _ORDINALS = {
 }  # fmt: skip
 _ORD = rf"(\d{{1,3}})(?:st|nd|rd|th)|({'|'.join(_ORDINALS)})"
 _PICK_VERB = r"(?:(?:play|watch|put on|open|start|click|select|choose|pick)(?: on)? )?"
+
+
+def _seconds(m: re.Match[str], default: int) -> int:
+    """ "30 seconds", "a minute", "2 mins" from groups (number, a/an/one, unit)."""
+    if not (m.group(1) or m.group(2)):
+        return default
+    count = int(m.group(1)) if m.group(1) else 1
+    return count * 60 if (m.group(3) or "s").startswith("m") else count
 
 
 def _ordinal(m: re.Match[str], first_group: int) -> int:
@@ -242,6 +250,18 @@ _ENGINE_NAMES = {
 }  # fmt: skip
 _SITES = {"youtube music": "ytmusic", "youtube": "youtube"}
 _SITE_URLS = {"youtube music": "https://music.youtube.com/", "youtube": "https://www.youtube.com/"}
+# "open netflix": the home page of the sites people watch (the phone's Apps row sends these too)
+_OPEN_URLS = {
+    "netflix": "https://www.netflix.com/",
+    "spotify": "https://open.spotify.com/",
+    "disney plus": "https://www.disneyplus.com/", "disney+": "https://www.disneyplus.com/",
+    "disney": "https://www.disneyplus.com/",
+    "prime video": "https://www.primevideo.com/", "amazon prime": "https://www.primevideo.com/",
+    "prime": "https://www.primevideo.com/",
+    "twitch": "https://www.twitch.tv/", "plex": "https://app.plex.tv/",
+    "crunchyroll": "https://www.crunchyroll.com/", "hulu": "https://www.hulu.com/",
+    "max": "https://play.max.com/", "apple tv": "https://tv.apple.com/",
+}  # fmt: skip
 _NEW_TAB = ActionStep(op="browser_nav", args={"action": "new_tab"})
 
 
@@ -271,6 +291,17 @@ def _plan_site(t: str) -> IntentPlan | None:
     if m:
         name = m.group(1)
         go = ActionStep(op="navigate", args={"url": _SITE_URLS[name]}, expect="navigated")
+        steps = [_NEW_TAB, go] if m.group(2) else [go]
+        return _plan(Intent.NAVIGATE, steps, {"site": name})
+    others = "|".join(re.escape(n) for n in sorted(_OPEN_URLS, key=len, reverse=True))
+    m = re.fullmatch(
+        rf"(?:open|go to|launch|take me to|bring up|start|put on)(?: up)?(?: the)? ({others})"
+        r"(?: (?:app|website|site|home ?page))?( in a new tab)?",
+        t,
+    )
+    if m:
+        name = m.group(1)
+        go = ActionStep(op="navigate", args={"url": _OPEN_URLS[name]}, expect="navigated")
         steps = [_NEW_TAB, go] if m.group(2) else [go]
         return _plan(Intent.NAVIGATE, steps, {"site": name})
     return None
@@ -539,7 +570,9 @@ def _plan_single(utterance: str) -> IntentPlan | None:
     if re.fullmatch(rf"(?:previous|prev|last|play previous){_MEDIA_NOUN}", t):
         return _media("prev")
 
-    m = re.fullmatch(rf"(?:set |turn |change )?(?:the )?volume (?:to|at) {_NUM}(?: percent|%)?", t)
+    m = re.fullmatch(
+        rf"(?:set |turn |change )?(?:the )?volume (?:(?:to|at) )?{_NUM}(?: percent|%)?", t
+    )
     if m or (m := re.fullmatch(rf"(?:set |make it |turn it to ){_NUM}(?: percent|%)? ?volume", t)):
         level = min(100, int(m.group(1)))
         return _plan(
@@ -560,17 +593,40 @@ def _plan_single(utterance: str) -> IntentPlan | None:
         r"(?:(?:make it |go |turn on |enter )?full ?screen|maximize(?: the video)?)", t
     ):
         return _plan(Intent.FULLSCREEN, [ActionStep(op="fullscreen", expect="is_fullscreen")])
-    if re.fullmatch(r"(?:skip|close|get rid of)(?: the| this)? ads?", t):
+    if re.fullmatch(r"(?:exit|leave|get out of|close|stop)(?: the)? full ?screen(?: mode)?", t):
+        return _plan_keypress("press escape")
+    if re.fullmatch(r"(?:play |go to |watch |start )?(?:the )?next episode", t):
+        return _plan(Intent.NAVIGATE, [ActionStep(op="click_text", args={"text": "Next Episode"})])
+    m = re.fullmatch(r"skip(?: the| this)? (intro|recap|credits|opening)", t)
+    if m:  # the streaming sites' own buttons: "Skip Intro", "Skip Recap", "Skip Credits"
+        label = f"Skip {m.group(1).capitalize()}"
+        return _plan(Intent.NAVIGATE, [ActionStep(op="click_text", args={"text": label})])
+    if re.fullmatch(
+        r"(?:restart|start over|start again|replay)(?: the| this)?(?: video| episode| song| movie)?"
+        r"(?: from the (?:beginning|start))?"
+        r"|(?:play|go back to|start) from the (?:beginning|start)",
+        t,
+    ):
+        return _seek(-100_000)  # clamped to the start
+    if re.fullmatch(r"(?:skip|skip this ad|skip the ad|close|get rid of)(?: the| this)? ads?", t):
         return _plan(Intent.MEDIA_CONTROL, [ActionStep(op="close_ad", expect="no_ad")])
     if re.fullmatch(r"close(?: this| the)? tab", t):
         return _plan(Intent.TAB, [ActionStep(op="close_tab")])
 
-    m = re.fullmatch(rf"(?:skip ahead|seek forward|forward|fast forward)(?: {_NUM} seconds?)?", t)
+    span = rf"(?: (?:by )?(?:{_NUM}|(a|an|one)) ?(seconds?|secs?|minutes?|mins?))?"
+    m = re.fullmatch(
+        rf"(?:skip ahead|skip forward|seek forward|forward|fast forward|jump ahead|go forward)"
+        rf"{span}",
+        t,
+    )
     if m:
-        return _seek(int(m.group(1) or 10))
-    m = re.fullmatch(rf"(?:skip back|seek back(?:ward)?|rewind|back)(?: {_NUM} seconds?)?", t)
+        return _seek(_seconds(m, default=10))
+    m = re.fullmatch(rf"(?:skip back(?:ward)?|seek back(?:ward)?|rewind|back|jump back){span}", t)
     if m:
-        return _seek(-int(m.group(1) or 10))
+        return _seek(-_seconds(m, default=10))
+    m = re.fullmatch(rf"go back{span}", t)  # plain "go back" is the browser's back button
+    if m and (m.group(1) or m.group(2)):
+        return _seek(-_seconds(m, default=10))
 
     m = re.fullmatch(
         rf"(?:set (?:a |an )?|start (?:a |an )?)?(sleep )?timer (?:for |of )?{_NUM} ?"

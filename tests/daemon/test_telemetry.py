@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from telemetry import Telemetry, percentile
+from telemetry import MAX_ROTATIONS, Telemetry, percentile
 
 
 def read_records(directory: Path) -> list[dict[str, object]]:
@@ -85,11 +85,11 @@ def test_rollup_empty_is_safe() -> None:
 
 def test_rotation_at_max_bytes(tmp_path: Path) -> None:
     t = Telemetry(tmp_path, max_bytes=150)
-    for i in range(12):
+    for i in range(6):  # a few files, within the daily cap (test_telemetry_retention: beyond)
         t.emit(span_record("cmd.lifecycle", float(i)))
     files = list(tmp_path.glob("*.jsonl"))
-    assert len(files) >= 4
-    assert len(read_records(tmp_path)) == 12  # nothing lost in rotation
+    assert 2 <= len(files) <= MAX_ROTATIONS + 1
+    assert len(read_records(tmp_path)) == 6  # nothing lost in rotation
     for p in files:
         assert p.stat().st_size <= 150  # rotation happens before a file would overflow
 

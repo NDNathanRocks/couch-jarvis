@@ -1,7 +1,9 @@
 """Structured JSONL telemetry with OpenTelemetry-compatible span fields.
 
 One JSON object per finished span is appended to <dir>/YYYY-MM-DD.jsonl (rotated at
-max_bytes). An in-memory ring of recent spans powers rollup() for GET /api/metrics.
+max_bytes, at most MAX_ROTATIONS extra files a day). Days older than keep_days are deleted, so
+the folder stays small on a PC that runs for years. An in-memory ring of recent spans powers
+rollup() for GET /api/metrics.
 """
 
 from __future__ import annotations
@@ -11,11 +13,12 @@ import json
 import logging
 import math
 import os
+import re
 import time
 from collections import deque
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -78,21 +81,45 @@ def percentile(values: list[float], pct: float) -> float | None:
     return ordered[rank - 1]
 
 
+_DAY_FILE = re.compile(r"^(\d{4}-\d{2}-\d{2})(?:\.(\d+))?\.jsonl$")
+MAX_ROTATIONS = 3
+
+
 class Telemetry:
     def __init__(
         self,
         directory: Path | None,
         *,
-        max_bytes: int = 50 * 1024 * 1024,
+        max_bytes: int = 20 * 1024 * 1024,
+        keep_days: int = 14,
         ring_size: int = 5000,
         time_ns: Callable[[], int] = time.time_ns,
     ) -> None:
         self._dir = directory
         self._max_bytes = max_bytes
+        self._keep_days = keep_days
         self._ring: deque[dict[str, Any]] = deque(maxlen=ring_size)
         self._time_ns = time_ns
+        self._pruned_day = ""
         if directory is not None:
             directory.mkdir(parents=True, exist_ok=True)
+
+    def prune(self, today: str) -> list[Path]:
+        """Delete day files older than keep_days (once a day). Returns what was deleted."""
+        if self._dir is None or today == self._pruned_day:
+            return []
+        self._pruned_day = today
+        cutoff = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=self._keep_days)).date()
+        removed = []
+        for path in self._dir.glob("*.jsonl"):
+            m = _DAY_FILE.match(path.name)
+            if m and datetime.strptime(m[1], "%Y-%m-%d").date() < cutoff:
+                try:
+                    path.unlink()
+                    removed.append(path)
+                except OSError:
+                    log.warning("could not delete old telemetry %s", path.name)
+        return removed
 
     # ------------------------------------------------------------------ spans
 
@@ -159,11 +186,17 @@ class Telemetry:
     def _target_path(self, incoming: int) -> Path:
         assert self._dir is not None
         day = datetime.fromtimestamp(self._time_ns() / 1e9, tz=UTC).strftime("%Y-%m-%d")
+        self.prune(day)
         path = self._dir / f"{day}.jsonl"
         if path.exists() and path.stat().st_size + incoming > self._max_bytes:
             n = 1
-            while (self._dir / f"{day}.{n}.jsonl").exists():
+            while n <= MAX_ROTATIONS and (self._dir / f"{day}.{n}.jsonl").exists():
                 n += 1
+            if n > MAX_ROTATIONS:  # a runaway day: drop the oldest rotation, keep the newest
+                (self._dir / f"{day}.1.jsonl").unlink()
+                for k in range(2, MAX_ROTATIONS + 1):
+                    (self._dir / f"{day}.{k}.jsonl").rename(self._dir / f"{day}.{k - 1}.jsonl")
+                n = MAX_ROTATIONS
             path.rename(self._dir / f"{day}.{n}.jsonl")
         return path
 
