@@ -163,12 +163,35 @@ begin
          or RegKeyExists(HKCU, 'SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe');
 end;
 
-procedure StopCouchJarvis;
+function CouchJarvisRunning: Boolean;
 var
   Code: Integer;
 begin
-  Exec('taskkill.exe', '/im CouchJarvis.exe /f /t', '', SW_HIDE, ewWaitUntilTerminated, Code);
-  Sleep(1500);  { let Windows release the files }
+  Result := Exec(ExpandConstant('{cmd}'),
+    '/c tasklist /fi "imagename eq CouchJarvis.exe" /nh | find /i "CouchJarvis.exe" >nul',
+    '', SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0);
+end;
+
+{ A supervisor can start a fresh copy between one kill and the next, so kill until none is left. }
+procedure StopCouchJarvis;
+var
+  Code, Tries: Integer;
+begin
+  for Tries := 1 to 10 do
+  begin
+    Exec('taskkill.exe', '/im CouchJarvis.exe /f /t', '', SW_HIDE, ewWaitUntilTerminated, Code);
+    Sleep(1000);
+    if not CouchJarvisRunning then Break;
+  end;
+  Sleep(500);  { let Windows release the files }
+end;
+
+{ Runs right before Setup checks for files in use: a copy started since InitializeSetup would
+  make that check give up, and a silent update would then abort. }
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := '';
+  if PreviousVersion <> '' then StopCouchJarvis;
 end;
 
 function InitializeSetup: Boolean;
