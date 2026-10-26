@@ -82,3 +82,21 @@ def test_every_prompt_can_be_answered_by_a_silent_install_or_uninstall() -> None
     assert not re.search(r"(?<![A-Za-z])MsgBox\(", ISS), (
         "use SuppressibleMsgBox with a safe default"
     )
+
+
+def test_cloudflare_headers_match_the_vercel_policy() -> None:
+    """5E: the new host must send the same security headers as vercel.json."""
+    import json
+    from pathlib import Path
+
+    web = Path(__file__).resolve().parents[2] / "web-remote"
+    vercel = json.loads((web / "vercel.json").read_text(encoding="utf-8"))
+    csp = next(
+        h["value"]
+        for rule in vercel["headers"]
+        for h in rule["headers"]
+        if h["key"] == "Content-Security-Policy"
+    )
+    headers = (web / "public" / "_headers").read_text(encoding="utf-8")
+    assert f"Content-Security-Policy: {csp}" in headers
+    assert "/*  /index.html  200" in (web / "public" / "_redirects").read_text(encoding="utf-8")

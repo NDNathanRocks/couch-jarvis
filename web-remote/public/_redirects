@@ -1,0 +1,2 @@
+# Cloudflare Pages: single-page app routing. Real files (assets, legal pages) are served first.
+/*  /index.html  200

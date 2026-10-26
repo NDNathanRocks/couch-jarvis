@@ -1,0 +1,9 @@
+# Cloudflare Pages response headers (same policy as vercel.json; keep the two in step).
+/*
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Permissions-Policy: microphone=(self), camera=(), geolocation=()
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://i.ytimg.com https://*.ytimg.com https://*.googleusercontent.com; connect-src 'self' wss://*.execute-api.us-east-2.amazonaws.com; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'none'
+/sw.js
+  Cache-Control: no-cache

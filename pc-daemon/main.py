@@ -28,7 +28,7 @@ import lifecycle
 from agent.graph import AgentDeps, AgentRunner
 from agent.memory import ConversationMemory
 from bookmarks import BookmarkStore
-from brand import APP_NAME
+from brand import APP_NAME, qr_base_url
 from browser_prefs import BrowserPrefs
 from build_info import (
     allows_hobby_services,
@@ -335,7 +335,7 @@ async def amain(args: argparse.Namespace) -> None:
         token_verifier=lan_auth.verify_token if lan_auth else None,
         pairing=lan_auth.pair if lan_auth else None,
         allowed_origins=[
-            settings.pwa_base_url,
+            qr_base_url(settings.pwa_base_url),
             f"http://localhost:{port}",
             f"http://127.0.0.1:{port}",
         ],
@@ -400,7 +400,9 @@ async def amain(args: argparse.Namespace) -> None:
         log.warning("CJ_RELAY_WS_URL is not set: running in LAN-only mode")
     if rt.room_store is not None and sys.stdout is not None and sys.stdout.isatty():
         # The URL embeds the room secret: show it on the console, never write it to log files.
-        print("Pair a phone:", rt.room_store.identity.pairing_url(settings.pwa_base_url))
+        print(
+            "Pair a phone:", rt.room_store.identity.pairing_url(qr_base_url(settings.pwa_base_url))
+        )
     log.info(
         "daemon up on http://%s:%d (room %s, dry_run=%s)", host, port, rt.room_id, args.dry_run
     )
@@ -486,7 +488,7 @@ def start_hud(rt: Runtime, settings: Settings, host: str, port: int) -> asyncio.
     assert store is not None
 
     def cloud_url() -> str | None:
-        return store.identity.pairing_url(settings.pwa_base_url)
+        return store.identity.pairing_url(qr_base_url(settings.pwa_base_url))
 
     def lan_url() -> str | None:
         ip = detect_lan_ip() if host in ("0.0.0.0", "") else host
