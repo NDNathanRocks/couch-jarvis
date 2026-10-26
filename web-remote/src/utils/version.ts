@@ -14,7 +14,7 @@ export function versionAtLeast(have: string, need: string): boolean {
 export const SLIDERS_SINCE = "0.3.0";
 
 /** The first PC app version that opens the streaming apps without the AI (the Apps row). */
-export const APPS_SINCE = "1.0.0";
+export const APPS_SINCE = "0.4.0";
 
 /** The first PC app version with exit fullscreen, duplicate tab and playback speed. */
 export const EXTRAS_SINCE = "0.4.0";

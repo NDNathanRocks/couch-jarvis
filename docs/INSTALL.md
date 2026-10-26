@@ -84,7 +84,7 @@ and pairing your first phone. Closing the window keeps the app running in the tr
 ## Your settings file
 
 `%APPDATA%\CouchJarvis\config.env` (paste that into the File Explorer address bar). It's a plain text file of `NAME=value`
-lines; lines starting with `#` are ignored. **Restart Armrest after editing**: end `CouchJarvis.exe` in Task Manager, then start it from the Start menu. All settings are listed in the [README](../README.md#settings).
+lines; lines starting with `#` are ignored. **Restart Armrest after editing**: end `CouchJarvis.exe` in Task Manager, then start it from the Start menu. All settings are listed [below](#all-settings).
 
 The Start menu's **Armrest settings** shortcut opens the Settings page (or this file, if the app is not running).
 The window offers the everyday settings; advanced ones are still edited here.
@@ -96,6 +96,28 @@ Keys are stored as plain text in that file, which only your Windows account can 
 or put it in a shared folder. Use a free-tier key you can revoke.
 
 Logs are in `%LOCALAPPDATA%\CouchJarvis\logs`. They never contain pairing links or secrets.
+
+### All settings
+
+| Setting | Default | What it does |
+|---|---|---|
+| `CJ_RELAY_WS_URL` | set by the installer | The cloud relay the phones and the PC meet at |
+| `CJ_PWA_BASE_URL` | set by the installer | Where the phone app is hosted; the QR code points here |
+| `CJ_STT_DEVICE` | `auto` | Speech recognition on `auto` (the GPU if there is one), `cuda` or `cpu` |
+| `CJ_STT_MODEL` | `auto` | Whisper model. `auto` = `large-v3-turbo` with an NVIDIA GPU, `small` without; set `base` on a very weak PC |
+| `CJ_GROQ_API_KEY` | none | Free cloud speech-to-text, used only if local speech fails |
+| `CJ_ROUTER_PROVIDER` | `auto` | The AI helper: `auto` = Gemini when `CJ_GEMINI_API_KEY` is set, else a local Ollama model (the other is the fallback); or force `ollama` / `gemini` |
+| `CJ_OLLAMA_TEXT_MODEL` / `CJ_OLLAMA_VLM_MODEL` | `auto` / `qwen2.5vl:7b` | Local models. `auto` = `qwen2.5:7b` with an NVIDIA GPU, `phi4-mini` without. **Set up AI brain** (Start menu) downloads them |
+| `CJ_GEMINI_API_KEY` | none | Free Gemini key for understanding free-form commands and finding buttons on screen |
+| `CJ_SUBTITLE_LANG` | `en` | The language "turn on subtitles" picks when you don't name one (`en`, `es`, `fr`, `de`...) |
+| `CJ_ELEVENLABS_API_KEY` | none | Optional spoken-reply voice (capped at `CJ_ELEVENLABS_MONTHLY_CHARS`, default 9000), then offline Windows voices. Replies are switched on and styled from the phone's Settings |
+| `CJ_REMOTE_INPUT` | `true` | Let paired owner phones move the pointer and type |
+| `CJ_HUD_SCREEN_INDEX` | `0` | Which monitor shows the TV overlay |
+| `CJ_HUD_BADGE_HIDE_S` | `10` | The status pill on the TV fades after this many quiet seconds (`0` = always shown) |
+| `CJ_UPDATE_CHECK` | `true` | Once a day, ask GitHub whether a newer release exists and show a notice (nothing is downloaded or sent) |
+| `CJ_CRASH_REPORTS` | `false` | Send anonymous crash reports (the welcome window asks) |
+| `CJ_EDGE_PATH` | auto | Path to `msedge.exe` if it isn't found |
+| `CJ_LOG_LEVEL` | `INFO` | `DEBUG` for more detail |
 
 ## Free trial and licence
 

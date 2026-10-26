@@ -1,323 +1,143 @@
 # Armrest
 
-*Your PC, within arm's reach.* (Formerly "Couch Jarvis": same app, same settings and paired phones.)
+**Your PC, within arm's reach.** Turn any phone into the remote for the Windows PC on your TV.
 
-Control the Windows PC that's plugged into your TV from any phone, by voice, buttons, touchpad or keyboard, from
-anywhere. **No accounts and no Wi-Fi/IP setup.** Scan a QR code on the TV once and the phone stays paired; friends
-can scan the same QR and get their own remote.
+<p align="center">
+  <img src="docs/store/phone-remote-medium.png" alt="The Armrest remote on a phone: now playing with a seek bar, play controls, a volume slider and favourite buttons" width="300">
+</p>
 
-> **Want to install it?** Read [docs/INSTALL.md](docs/INSTALL.md): a step-by-step guide for the installer, the
-> portable zip, or running from source.
+If your laptop or PC is plugged into the TV, you know the routine: get up, find the mouse, squint at a tiny button,
+sit back down. Armrest fixes that. Scan a QR code on the TV once and your phone becomes a remote: say *"play lofi on
+YouTube"*, drag the volume slider, skip the intro, or use your phone as a touchpad and keyboard.
 
----
+- **No accounts, no app store install, no Wi-Fi settings.** Scan the code and you're in. It works on any phone with a
+  browser and keeps working when you lock it.
+- **Everyone on the couch gets a remote.** Friends scan the same code. Everyone sees what's playing, and button
+  presses never collide.
+- **Talk to it like a person.** "Turn on Spanish subtitles", "go back 30 seconds", "play at 1.25x", "open Netflix".
+- **Built for the sofa.** If the browser crashes, it comes back signed in. If your internet drops, it switches to your
+  home network.
 
-## What you can do with it
-
-### Talk to it
-
-Tap the round **mic** in the bar at the bottom, say a command, then tap **Tap to send** (or **Cancel**). Or type in
-the same bar. Prefer press-and-hold? Switch with the small "Mic mode" link at the bottom of the Remote tab. Simple
-commands are matched instantly; anything else goes to the **AI brain**: a free Gemini key (fast) or a local model
-(`Set up AI brain` in the Start menu), see [Settings](#settings).
-
-**Playback and volume**
-
-| You say | What happens |
-|---|---|
-| "pause" / "stop" / "play" / "resume" | Pause or resume the video |
-| "next" / "skip" / "previous" | Next or previous track/video |
-| "skip ahead 30 seconds" / "rewind 20 seconds" | Seek (default 10 s) |
-| "volume up" / "louder" / "volume down" / "quieter" | Volume steps |
-| "volume to 30" / "mute" / "unmute" | Exact volume, mute state |
-| "fullscreen" | Fullscreen the player **and the Edge window**, so no tab strip is left on the TV |
-| "skip the ad" | Skip or close a video ad |
-| "turn on subtitles" / "subtitles off" / "spanish subtitles" | Turns subtitles on or off (**English by default**, `CJ_SUBTITLE_LANG`) and closes the language menu so the video carries on. Works on YouTube and custom players, including ones in an iframe |
-
-**Finding things**
-
-| You say | What happens |
-|---|---|
-| "play bruno mars on YouTube" / "play lofi on YouTube Music" | Searches and plays the first result |
-| "search for bruno mars on YouTube" / "search X on Google" (or Bing, DuckDuckGo) | Shows the search results and **waits**, so you choose |
-| "search big bang theory" | Types it into the search bar of the page you're on. No search bar: a one-tap prompt to search YouTube in a new tab |
-| "search ariana grande on YouTube Music and play a song featuring the weeknd" | Searches, then **reads the results and opens the one that fits** |
-| "play episode 5" / "open the second result" / "play number 3" | Picks that item from the list on the current page |
-| "click on Season 1" / "press Next" | Clicks whatever says that on the page (also in dropdowns); only words you said |
-| "what is the capital of Greece" / "weather today" | Opens a new tab and searches it on Edge/Bing |
-
-**Browser and keyboard**
-
-| You say | What happens |
-|---|---|
-| "new tab" / "close this tab" / "next tab" / "previous tab" | Tabs |
-| "go back" / "go forward" / "reload" / "scroll down" | Page navigation |
-| "press F11" / "hit escape" / "press control L" / "press alt left" | Presses that key or chord on the PC (F1-F12, arrows, Enter, letters, with Ctrl/Alt/Shift). Some chords such as Alt+F4 are refused |
-| "turn off pop-up protection" / "block pop-ups" | The same switch as the phone Settings: closes tabs a site opens by itself and undoes redirects (it does not block ads). "Ad blocking" still works as a phrase |
-
-**Timers, pairing and saved pages**
-
-| You say | What happens |
-|---|---|
-| "set a timer for 10 minutes" / "sleep timer 30 minutes" | A countdown on the TV; the sleep timer pauses the video when it ends |
-| "turn off the screen" | Blanks the TV without stopping anything |
-| "show the QR code" / "pair a friend" | Shows the pairing QR on the TV for 90 s |
-| "hide / toggle / reset the QR code" | Hides or toggles the QR. **Reset** makes a new code; the old ones stop working |
-| "save this page" / "open my bookmark netflix" / "remove the bookmark for bbc" | Saved pages, also a tap-able list on the phone |
-
-The assistant remembers the last few things you asked (about 30 minutes), so "retry that on a new tab" works. It can answer
-questions about the screen and ask a follow-up ("Which Ariana Grande song?") with tap-able choices; the phone then reopens the
-mic for a few seconds. Spoken replies play after *spoken* commands only (voice and volume are in Settings).
-
-Anything else ("put on the one with the cat", "play the pilot") goes to the AI brain, which sees the items on the current
-page and picks one. It stays on the current site unless you say *search*, *YouTube* or *music*.
-
-### Press buttons (Remote tab)
-
-From top to bottom the Remote tab has:
-
-- **Now playing** with a **seek slider**: drag the bar to jump to any point of a video or song (the time shows while you
-  drag). Live streams show a plain bar.
-- **Transport:** previous, play/pause, next, back/forward 10 s.
-- **Volume slider:** drag anywhere on the bar like the iPhone Control Centre; tap the speaker to mute.
-- **Favourites:** two rows of four buttons that are yours. Tap **Edit** (or long-press one), tap a slot, and pick from the
-  library: playback, volume, fullscreen, subtitles, skip ad, screen off, pair QR, browser buttons (back, forward, reload,
-  new tab, tabs, scroll), keys (**F1-F12**, Esc, Space, Enter) and spoken-style commands. Each phone keeps its own list.
-  Defaults: Fullscreen, Subtitles, Mute, Skip ad, Back, New tab, Stop, Screen off. **Stop** pauses everything at once
-  (it jumps the queue).
-- **Touchpad:** right under the favourites (see below), then **timers** with live countdowns and **Connected friends**.
-
-A PC running an older Armrest than the phone app shows plain volume buttons and a progress bar instead of the sliders.
-
-### Use it as a touchpad and keyboard (Remote tab and Keys tab)
-
-- **Touchpad:** drag to move the cursor, tap to click, two-finger tap to right-click, two-finger drag to scroll,
-  press-and-hold then drag to select or drag things. There are also Left / Double / Right click and Scroll buttons.
-- **Keyboard (Keys tab):** tap the box to bring up your phone's keyboard and type straight onto the TV (Enter and Backspace work).
-- **Keys:** arrows, Esc, Tab, Enter, Backspace, Delete, Space, Home/End, PgUp/PgDn, and a row of **F1-F12**.
-  **Ctrl / Alt / Shift** latch for the next key, so **Alt then ←** is "Back".
-- **One-tap shortcuts:** Back (Alt+←), Forward, Reload, New tab, Close tab, Next/Prev tab, Address bar, Zoom in/out/reset,
-  Switch window (Alt+Tab).
-
-Some combinations are blocked on purpose (Ctrl+Alt chords, Task Manager, the Start menu, clear-browsing-data, and there
-is no Windows key). Turn the whole feature off with `CJ_REMOTE_INPUT=false`.
-
-### Know what went wrong (Log button)
-
-Tap **Log** at the top of the phone app. It shows, newest first, every command you sent: what the PC **heard**, whether
-it worked, **which step failed and why**, how long it took, plus connection changes ("Connection lost - retrying").
-A red dot means the last thing was a problem. **Copy** puts it on the clipboard to paste somewhere.
-
-### Everyone gets a remote
-
-- Any number of phones at once; everyone sees the same live state. Simultaneous presses are queued, never raced.
-- Pairing survives closing the browser, locking the phone or rebooting it.
-- The **TV overlay** shows the QR (until someone pairs), toasts, timers and a connection pill.
-- **Forget this phone** unpairs a phone; you can also revoke any phone from the PC (see [Security](#security)).
-
-### It's built not to break on the sofa
-
-- Edge is supervised: if it crashes it comes back with your signed-in TV profile.
-- The app restarts itself if it crashes, and starts with Windows if you choose that in the installer.
-- The cloud connection reconnects by itself with backoff; if the internet is down, the TV shows a local-network QR.
-- Voice runs on your GPU when the CUDA libraries are installed (`faster-whisper`), otherwise on the CPU, with an optional free cloud fallback (Groq).
-
-### What it won't do (yet)
-
-- It controls **one Edge window** (the "TV profile"), not every app on the PC. The touchpad and keyboard can drive anything.
-- Sites full of ads can interfere: pop-ups are closed, redirects are undone, and you may need to tap fullscreen twice.
-  DRM sites such as Netflix may refuse a remote-controlled browser.
-- The phone talks to the PC through a cloud relay, so touchpad movement has a short delay (typically 0.1-0.3 s).
-- Microphone use needs the HTTPS phone app (the hosted one); the plain-HTTP LAN page can't record.
-- Windows only.
+> Formerly "Couch Jarvis": same app, same settings and paired phones.
 
 ---
 
-## Get it running
+## Get Armrest
 
-| I want to... | Do this |
+| | |
 |---|---|
-| Install it on a PC | [docs/INSTALL.md](docs/INSTALL.md), "Installer" |
-| Try it without installing | [docs/INSTALL.md](docs/INSTALL.md), "Portable zip" |
-| Run from source / develop | [Developing](#developing) below |
+| **Windows installer** | Download `CouchJarvis-Setup.exe` from the [latest release](https://github.com/NDNathanRocks/couch-jarvis/releases/latest) and run it. Updates install over the top; your settings and paired phones stay. |
+| **Microsoft Store** | Coming soon. |
+| **Phone** | Nothing to install. Scan the QR code on your TV. Optionally use *Add to Home Screen* for an app icon. |
 
-After installing: the TV shows a **QR code**. Scan it with your phone camera, open the link, and you're paired.
+You need Windows 10 or 11 with Microsoft Edge. A step-by-step guide, including the portable zip, is in
+[docs/INSTALL.md](docs/INSTALL.md).
 
-## Settings
+## Your first five minutes
 
-Settings live in `%APPDATA%\CouchJarvis\config.env` (the installer creates it). A `.env` file next to where you
-run from source overrides it. Restart the app after changing anything. The useful ones:
+1. **Install** Armrest on the PC that's connected to your TV. A short welcome window walks you through the setup.
+2. **Sign in to your streaming sites** in the browser window Armrest opens on the TV (YouTube, Netflix and so on). It's
+   a separate Edge profile just for the TV, so your everyday browsing stays separate.
+3. **Scan the QR code** on the TV with your phone's camera and open the link. You're paired.
+4. **Try it:** tap the mic and say *"play some jazz on YouTube"*, or use the buttons.
+5. **Invite friends:** say *"pair a friend"* and the QR code comes back for them to scan.
 
-| Setting | Default | What it does |
-|---|---|---|
-| `CJ_RELAY_WS_URL` | set by the installer | The cloud relay (WebSocket URL from `sam deploy`) |
-| `CJ_PWA_BASE_URL` | set by the installer | Where the phone app is hosted; the QR points here |
-| `CJ_STT_DEVICE` | `auto` | `auto` (GPU if there is one), `cuda` or `cpu` |
-| `CJ_STT_MODEL` | `auto` | Whisper model. `auto` = `large-v3-turbo` with an NVIDIA GPU, `small` without; set `base` on a very weak PC |
-| `CJ_GROQ_API_KEY` | none | Free cloud speech-to-text, used if local voice fails |
-| `CJ_ROUTER_PROVIDER` | `auto` | `auto` = Gemini when `CJ_GEMINI_API_KEY` is set, else local Ollama (the other is the fallback); or force `ollama` / `gemini` |
-| `CJ_OLLAMA_TEXT_MODEL` / `CJ_OLLAMA_VLM_MODEL` | `auto` / `qwen2.5vl:7b` | Local models. `auto` = `qwen2.5:7b` with an NVIDIA GPU, `phi4-mini` without. **Set up AI brain** (Start menu) downloads them |
-| `CJ_GEMINI_API_KEY` | none | Free Gemini key for understanding commands / finding buttons on screen |
-| `CJ_SUBTITLE_LANG` | `en` | Language "turn on subtitles" picks when you don't name one (`en`, `es`, `fr`, `de`...) |
-| `CJ_ELEVENLABS_API_KEY` | none | Optional. Spoken replies use ElevenLabs first (capped at `CJ_ELEVENLABS_MONTHLY_CHARS`, default 9000), then free Microsoft neural voices, then offline Windows voices. Turn replies on/off and pick the style/voice in the phone's Settings |
-| `CJ_REMOTE_INPUT` | `true` | Let paired phones move the cursor and type |
-| `CJ_HUD_SCREEN_INDEX` | `0` | Which monitor shows the QR overlay (the TV) |
-| `CJ_HUD_BADGE_HIDE_S` | `10` | The small status pill on the TV fades out after this many quiet seconds and returns on any phone activity (`0` = always shown) |
-| `CJ_UPDATE_CHECK` | `true` | Once a day, ask GitHub if a newer release exists and show a notice (nothing is downloaded or run, nothing is sent) |
-| `CJ_EDGE_PATH` | auto | Path to `msedge.exe` if it isn't found |
-| `CJ_LOG_LEVEL` | `INFO` | `DEBUG` for more detail |
+## What you can do
 
-Logs: `%LOCALAPPDATA%\CouchJarvis\logs`. They never contain pairing links or secrets.
+### Buttons that feel like a real remote
+- **Now playing** with a seek bar: drag to jump anywhere in the video or song.
+- **Play controls:** previous, play/pause, next, back and forward 10 seconds.
+- **Volume slider** that works like the iPhone's: drag anywhere on the bar and see the exact percentage.
+- **Favourites:** eight buttons that are yours. Choose from fullscreen, exit fullscreen, subtitles, skip ad, duplicate
+  tab, playback speed, screen off and more. You can also **make your own keyboard-shortcut buttons**, such as
+  *Ctrl+Shift+T* "Reopen tab". Long-press any favourite to rearrange them.
+- **Apps row:** one tap opens Netflix, YouTube, Prime Video, Disney+, Spotify, Twitch, Plex or Crunchyroll.
 
-## Security
+### Say it or type it
+Tap the mic, speak, and tap send. Or type in the same bar. A few examples:
 
-**Pair only people you would trust at your keyboard.** A paired phone can play media, and (unless you turn it off with
-`CJ_REMOTE_INPUT=false`) move the mouse and type like someone sitting at the PC. You can remove a phone at any time:
-on the PC, `curl.exe -X POST http://127.0.0.1:8765/api/devices/<device_id>/revoke` (`GET /api/devices` lists ids), or
-rotate the QR secret with `python pc-daemon\main.py --rotate-secret`.
-
-What is protected, in short:
-
-- The QR secret is exchanged for a long-lived per-phone token; the secret is removed from the address bar immediately.
-  Room secrets are encrypted at rest with Windows DPAPI. The relay stores only hashes.
-- Tokens are per-room signed JWTs (180 days, refreshed while in use). The relay stamps the real sender on every message,
-  rejects server-only message types from phones, and re-checks that a phone hasn't been revoked on every command,
-  keystroke and mouse message.
-- The local API trusts only the PC itself; everything else needs a device token. Because browsers don't apply CORS to
-  WebSockets, requests are also checked for same-origin/allow-listed `Origin` and an IP/`localhost` `Host` (stops web
-  pages you visit from hijacking the daemon, including DNS rebinding).
-- Anything the AI can ask for is policy-checked in code: allow-listed media keys, https media sites for navigation,
-  picking items only from a list the browser itself reported (the AI never supplies a selector), and fixed JS snippets
-  only. Page text shown to the AI is sanitized and treated as untrusted data.
-- Flooding is bounded: per-phone rate limits (commands and, separately, touchpad input), capped queues and audio
-  buffers, and 64 KB WebSocket frames. Dependencies are audited (`pip-audit`, `npm audit`) as part of releases.
-- A site that tries to redirect your TV tab to another site during a click is undone, and its pop-ups are closed.
-
-## Troubleshooting
-
-Tap **Log** on the phone first: it usually names the cause.
-
-| Symptom | Check |
+| Say | What happens |
 |---|---|
-| "The PC is offline" | Is Armrest running on the PC? (Start menu -> Armrest.) Is the PC online? |
-| Phone stuck on "Connecting..." | Use Chrome first to rule out a browser quirk; see [INSTALL.md](docs/INSTALL.md#troubleshooting). Check the daemon log for `cloud relay: up` |
-| "Recording was incomplete" | Fixed in current versions (parts can arrive out of order); update the PC app **and** redeploy the relay |
-| Voice says "I could not hear that" / "I did not hear anything" | Check the Log's `heard:` line, then `%LOCALAPPDATA%\CouchJarvis\logs`. `cublas64_12.dll is not found` means the GPU libraries are missing: it now falls back to the CPU by itself, and `uv pip install -r requirements-gpu.txt` (from source) enables the GPU. First use downloads the speech model. Or add `CJ_GROQ_API_KEY` |
-| "My brain is not set up" / "took too long" | No AI model yet, or a slow CPU: run **Set up AI brain** from the Start menu, or add a free `CJ_GEMINI_API_KEY` |
-| A command is misunderstood | The Log shows `heard:`. Free-form commands need the AI brain (Gemini key or local model) |
-| Fullscreen does nothing | Tap it again (ad pages eat the first click); the Log shows which step failed |
-| "Commands do nothing in Edge" | Edge is started and supervised by the app on port 9222. Close other Edge windows that use the TV profile |
-| The QR keeps showing | It hides after the first pairing. Say "hide the QR code", or click the taskbar tray icon to show/hide it. **Pair a friend** shows it again |
-| Touchpad/keyboard missing | The PC has `CJ_REMOTE_INPUT=false`, or the phone isn't connected yet |
+| "play bruno mars on YouTube" | Searches and plays it |
+| "pause" · "next" · "skip ahead 30 seconds" · "volume 40" | What you'd expect |
+| "turn on subtitles" · "Spanish subtitles" · "subtitles off" | Works on YouTube and most video players |
+| "fullscreen" · "exit fullscreen" | The video **and** the browser go fullscreen, so no tabs show on the TV |
+| "change the speed to 1.25 times" · "normal speed" · "speed up" | Playback speed |
+| "skip intro" · "next episode" · "play episode 5" | Clicks it on the page you're watching |
+| "new tab" · "duplicate this tab" · "go back" · "close this tab" | Browser tabs and pages |
+| "what's the weather today?" | Opens a web search on the TV |
+| "set a sleep timer for 30 minutes" | Pauses the video when the time is up |
+
+Common commands are understood instantly on your PC. Anything else goes to an optional AI helper that looks at
+what's on the screen. The **[full list of commands](docs/COMMANDS.md)** has everything.
+
+### A touchpad and keyboard in your pocket
+- Drag to move the pointer, tap to click, use two fingers to scroll or right-click, and press and hold then drag to
+  select. Choose Slow, Normal or Fast. A slow finger is precise and a quick flick crosses the whole TV.
+- Type on your phone's keyboard straight into the TV, with arrows, Esc, F1-F12 and Ctrl/Alt/Shift shortcuts.
+
+### Share it safely
+- **Owner and guest phones:** guests get playback, volume and voice. Only owners get the touchpad, the keyboard and
+  the settings.
+- **Several TVs on one phone:** "Living room" and "Bedroom", switched from the header.
+- Remove a phone at any time from the Armrest window on the PC, or make a new QR code so old ones stop working.
+
+## Privacy, in plain words
+
+- There are **no accounts**, and Armrest never asks for your name or email.
+- Your phone talks to your PC through a small relay in the cloud, or directly on your home network. The relay passes
+  messages along and keeps only what it needs to connect them.
+- Voice is turned into text **on your PC** when it can be. Free optional cloud services (for example a Gemini key for
+  smarter understanding) are off until you add them.
+- Crash reports are **off** unless you switch them on, and they never include what you watch or say.
+
+The details are in the [privacy policy](docs/PRIVACY.md).
+
+## Good to know
+
+- Armrest controls **one Edge window on the TV** (its own profile). The touchpad and keyboard can drive anything else
+  on the PC.
+- Some streaming sites limit what an automated browser can do. Armrest tells you on the phone when something didn't
+  work, and the **Log** button says why.
+- Over the internet, the touchpad has a small delay (usually under a third of a second).
+- The microphone needs the hosted phone app (HTTPS). The backup home-network page can't record audio.
+- Windows only, for now.
+
+## Help
+
+Start with the **Log** button on the phone. It shows what the PC heard and which step failed.
+
+| Problem | Try this |
+|---|---|
+| "The PC is offline" | Make sure Armrest is running on the PC (Start menu → Armrest) and the PC is online |
+| Voice commands aren't understood | Check the Log's `heard:` line. For free-form requests, set up the AI helper in the Armrest window |
+| Fullscreen does nothing | Tap it again. Pages with ads sometimes swallow the first click |
+| The phone shows plain volume buttons | The PC has an older Armrest. Install the latest version on the PC |
+| The touchpad or keys are missing | This phone is a guest, or the touchpad and keys are switched off on the PC |
+
+More answers are in [docs/INSTALL.md](docs/INSTALL.md#troubleshooting) and [docs/SUPPORT.md](docs/SUPPORT.md).
 
 ---
 
 ## For developers
 
-### How it works
+Armrest is a Windows agent (Python), a serverless relay (AWS Lambda, API Gateway WebSocket and DynamoDB) and a phone
+web app (React). [docs/DEVELOPING.md](docs/DEVELOPING.md) covers the architecture, running from source, the test
+suites, deploying the relay and the phone app, building the installer, and the release rules every change follows.
 
 ```
- phones (PWA, Vercel)            AWS (free-tier serverless)                 your PC (Windows)
+ phones (web app)                AWS relay (serverless)                     your PC (Windows)
 ┌──────────────────┐  wss   ┌───────────────────────────────┐  wss   ┌───────────────────────────┐
-│ Hold-to-talk     │◄──────►│ API Gateway WebSocket          │◄──────►│ daemon                    │
-│ Quick deck       │        │  $connect  → auth (pc_key/JWT) │        │  CommandQueue (priority,  │
-│ Touchpad / keys  │        │  $default  → pair / relay /    │        │   idempotency, 1 worker)  │
-│ Log              │        │              fan-out           │        │  LangGraph agent          │
-└──────────────────┘        │  $disconnect → presence        │        │   router→DOM→vision→verify│
-        ▲                   │ Lambda (py3.12) + DynamoDB     │        │  Edge (CDP) + Win32 input │
-        │   same LAN        └───────────────────────────────┘        │  faster-whisper / Groq    │
-        └─── LAN fallback: phone ⇄ daemon directly (/ws), no internet │  TV HUD (QR, toasts)      │
+│ voice, buttons   │◄──────►│ API Gateway WebSocket          │◄──────►│ Armrest app               │
+│ touchpad, keys   │        │ Lambda (Python 3.12)           │        │  command queue            │
+│ favourites, log  │        │ DynamoDB (rooms, phones)       │        │  agent: understand → act  │
+└──────────────────┘        └───────────────────────────────┘        │   → check → recover       │
+        └──────── home-network fallback: phone ⇄ PC directly ────────►│  Edge (CDP), Win32 input  │
+                                                                      │  speech, TV overlay       │
                                                                       └───────────────────────────┘
 ```
 
-| Path | What |
-|---|---|
-| `pc-daemon/` | The Windows agent (Python 3.12): queue, agent, executors, STT, local API, watchdog, HUD |
-| `infra/` | AWS SAM template + three Lambdas (`connect_handler`, `disconnect_handler`, `relay_router`) |
-| `web-remote/` | The phone PWA (Vite + React 19 + Tailwind 4, TypeScript strict) |
-| `shared/contracts/` | JSON Schema exported from `pc-daemon/contracts.py` (the single source of truth) |
-| `installer/` | PyInstaller spec, Inno Setup script and `build.ps1` |
-| `scripts/` | Edge profile setup, auto-restart wrapper, startup task, contract export |
-| `tests/` | `daemon/` and `infra/` (pytest), `e2e/` (real browser), `integration/` (real Edge); web tests live in `web-remote/src/__tests__` |
+## Licence
 
-### Run from source
-
-Prerequisites: Windows 11, Microsoft Edge, [uv](https://docs.astral.sh/uv/), Node 24+, and (optional) an NVIDIA GPU
-and [Ollama](https://ollama.com).
-
-```powershell
-uv venv --python 3.12 .venv
-uv pip install -r requirements.txt
-copy .env.example .env                       # then edit
-ollama pull qwen2.5:7b ; ollama pull qwen2.5vl:7b      # optional local models
-
-.\.venv\Scripts\python.exe pc-daemon\main.py --dry-run --hud   # no hardware: fakes for Edge/Windows/LLMs
-.\.venv\Scripts\python.exe pc-daemon\main.py --hud             # the real thing
-```
-
-`.ps1` files open in Notepad when double-clicked; run them with
-`powershell -ExecutionPolicy Bypass -File .\scripts\start_daemon.ps1 -Hud`. That wrapper restarts the daemon if it
-crashes; `install_startup_task.ps1` starts it at login. `--dry-run` only talks to a throwaway local room: a phone on the
-hosted app will sit on "Pairing..." because it uses the cloud relay.
-
-### Deploy the cloud relay (AWS)
-
-```powershell
-uv tool install aws-sam-cli
-cd infra
-sam build
-sam deploy --guided          # set BudgetEmail for a $1/month alarm; some organisations only allow one region
-```
-
-Copy the **WebSocketUrl** output into `CJ_RELAY_WS_URL` (and `VITE_RELAY_WS_URL` for the phone app). The relay creates its
-own master secret on first use. **Cost:** Lambda and DynamoDB (on-demand) have always-free allowances a household never
-exceeds. API Gateway WebSocket is free for the first 12 months, then cents per month at this traffic. Log retention is
-3 days and throttling is on. After upgrading the daemon, **redeploy the relay**: new message types (touchpad/keyboard)
-are rejected by an older relay.
-
-### Deploy the phone app (Vercel)
-
-```bash
-cd web-remote
-npm ci
-vercel --prod            # set VITE_RELAY_WS_URL to the WebSocketUrl; the build command is `vite build`
-```
-
-Set `CJ_PWA_BASE_URL` to the Vercel URL so the TV's QR points at it. `vercel.json` ships a strict CSP, `no-referrer`
-(the pairing link contains a secret) and the microphone permissions policy.
-
-### Build the installer
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\installer\build.ps1
-```
-
-See [docs/INSTALL.md](docs/INSTALL.md#building-the-installer).
-
-### Checks
-
-```powershell
-uv pip install -r requirements-dev.txt
-ruff check . ; ruff format --check . ; mypy pc-daemon
-pytest                                              # quick: unit tests only (about 40 s)
-pytest -m ""                                        # everything, incl. real-browser e2e and real-Edge tests (release gate, ~3 min)
-python scripts/export_contracts.py --check          # JSON Schema in sync with contracts.py
-cd web-remote ; npm ci ; npm run typecheck ; npm run lint ; npx vitest run ; npm run build
-npm run gen:contracts                               # regenerate src/contracts.gen.ts after changing contracts.py
-```
-
-Every hardware/network edge (Edge CDP, screen capture, Windows input, Whisper, LLMs, AWS) sits behind a `Protocol` with an
-in-repo fake, so most of the suite is deterministic. Live-check the daemon without a phone:
-
-```powershell
-python pc-daemon\main.py --dry-run
-curl.exe -N http://127.0.0.1:8765/events            # SSE: state.snapshot, then live events
-curl.exe http://127.0.0.1:8765/api/metrics          # latency, token use, DOM-vs-vision rates
-```
-
-### Status
-
-Version 0.2.0. Verified in automated tests (831 Python tests, 168 web tests): contracts, command queue, STT fallback chain, agent graph (including vision fallback and
-recovery), page-aware commands, DPI mapping, SSE/WebSocket API, Lambda relay (against moto), reconnect logic, LAN
-pairing, HUD rendering, the PWA (reducers, gestures, connection state machine, UI flows, a real-browser e2e suite) and
-the CDP executor against a real Edge. Exercised by hand against real services: a deployed AWS stack, Vercel, real Edge on a
-streaming site, local Ollama models. The packaged installer was installed, launched and uninstalled on the development PC; it has not yet been tried on a clean machine.
+Armrest is proprietary software; see [LICENSE](LICENSE). The source is visible here for transparency and review.
+Third-party components keep their own licences (`THIRD_PARTY_NOTICES.txt` ships with every build).

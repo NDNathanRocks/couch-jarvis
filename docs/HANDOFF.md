@@ -3,6 +3,17 @@
 Written 2026-10-25 for the next agent. Read this first, then `CLAUDE.md`, `AGENT_PROTOCOL.md` and `plan.md` sections 12
 (binding release rules) and 13 (the v1.0.0 plan, with status in 13.9 and decisions in 13.10).
 
+## Update 2026-10-26: v0.4.0 (field requests)
+- Done since this handoff: 5E code (fragment handoff, off until `VITE_HANDOFF_URL`), 5K Store listing + screenshots.
+- **0.4.0** (`pc-daemon/version.py`): commands follow the tab Edge shows (`/json/list` order), custom keyboard-shortcut
+  favourites, playback speed / exit fullscreen / duplicate tab (voice + buttons, `EXTRAS_SINCE`), seek bar no longer
+  remounts mid-drag, seek picks the real player (Netflix via its player API), touchpad acceleration + speed choice,
+  volume shows %. Apps row now shows for PCs >= 0.4.0.
+- README rewritten for the public; developer material in `docs/DEVELOPING.md`, commands in `docs/COMMANDS.md`,
+  settings table in `docs/INSTALL.md`.
+- **Phone app deployed** to Vercel production 2026-10-26 (now branded Armrest; legal pages are still drafts with
+  placeholders). The PC installer for 0.4.0 is not built or released yet: a direct build starts the 14-day trial.
+
 ## What this is
 "Couch Jarvis" was renamed **Armrest** (tagline "Your PC, within arm's reach"). The name is visible-only: internal ids
 stay `CouchJarvis`, so existing installs and pairings keep working. Do not rename the exe, the
