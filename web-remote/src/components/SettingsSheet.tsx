@@ -158,7 +158,7 @@ export function SettingsSheet({
               <div className="flex items-center gap-3 rounded-2xl bg-surface p-4 ring-1 ring-line">
                 <div className="min-w-0 flex-1">
                   <p className="text-[15px] font-medium">Also after button taps</p>
-                  <p className="mt-0.5 text-xs text-muted">Off: it only speaks after voice and typed commands.</p>
+                  <p className="mt-0.5 text-xs text-muted">Off: it only speaks after commands you say out loud.</p>
                 </div>
                 <Switch
                   label="Speak after button taps"

@@ -100,7 +100,7 @@ class VoiceState(_Model):
     enabled: bool = True
     style: ReplyStyle = "jarvis"
     voice: ReplyVoice = "british_male"
-    buttons: bool = False  # also speak after button taps (voice and typed commands always do)
+    buttons: bool = False  # also speak after button taps (spoken commands always do; typed ones never)
     engine: Literal["elevenlabs", "edge", "windows", "none"] = "none"  # what speaks right now
 
 
