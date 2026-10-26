@@ -12,7 +12,13 @@ Written 2026-10-25 for the next agent. Read this first, then `CLAUDE.md`, `AGENT
 - README rewritten for the public; developer material in `docs/DEVELOPING.md`, commands in `docs/COMMANDS.md`,
   settings table in `docs/INSTALL.md`.
 - **Phone app deployed** to Vercel production 2026-10-26 (now branded Armrest; legal pages are still drafts with
-  placeholders). The PC installer for 0.4.0 is not built or released yet: a direct build starts the 14-day trial.
+  placeholders) and to **Cloudflare Pages `armrest-app`** (https://armrest-app.pages.dev, deployed with `wrangler pages
+  deploy dist --project-name armrest-app --branch main` after a `vite build` with `VITE_RELAY_WS_URL`). Vercel is NOT
+  forwarding yet (no `VITE_HANDOFF_URL`): the user tests Cloudflare first. Do not take Vercel down without the
+  forwarder, or every paired phone and old QR breaks.
+- 0.x direct builds are a free preview (`licensing.is_preview`): no trial before 1.0.
+- 0.4.0 installer built (`installer/dist`, direct channel) and upgrade-tested 20/20 from the published 0.2.0. Release
+  notes: `docs/RELEASE_NOTES_0.4.0.md`. The user pushes, tags and publishes the release.
 
 ## What this is
 "Couch Jarvis" was renamed **Armrest** (tagline "Your PC, within arm's reach"). The name is visible-only: internal ids
