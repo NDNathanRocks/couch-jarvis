@@ -34,7 +34,7 @@ def test_matrix_is_deterministic_and_grows_with_payload() -> None:
 
 
 def test_pairing_url_length_stays_scannable() -> None:
-    url = "https://couch-jarvis.vercel.app/?room=" + "r" * 12 + "&secret=" + "s" * 32
+    url = "https://armrest-app.pages.dev/?room=" + "r" * 12 + "&secret=" + "s" * 32
     assert len(qr_matrix(url, border=0)) <= 41  # QR version <= 6: big modules, easy on a TV
 
 

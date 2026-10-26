@@ -43,11 +43,13 @@ def test_dpi_init_returns_bool() -> None:
     assert isinstance(init_dpi_awareness(), bool)
 
 
-def test_qr_address_moves_only_when_the_move_is_live() -> None:
+def test_qr_codes_never_point_at_the_retired_vercel_site() -> None:
     from brand import SITE_URL, qr_base_url
 
-    old = "https://couch-jarvis-remote.vercel.app"
-    assert qr_base_url(old, live=False) == old
-    assert qr_base_url(old + "/", live=True) == SITE_URL
-    assert qr_base_url("https://my.own.host", live=True) == "https://my.own.host"  # untouched
-    assert qr_base_url("http://localhost:5173", live=True) == "http://localhost:5173"
+    assert SITE_URL == "https://armrest-app.pages.dev"
+    assert qr_base_url("https://couch-jarvis-remote.vercel.app") == SITE_URL
+    assert qr_base_url("https://couch-jarvis-remote.vercel.app/") == SITE_URL
+    assert qr_base_url("https://couch-jarvis.vercel.app") == SITE_URL
+    assert qr_base_url(SITE_URL) == SITE_URL
+    assert qr_base_url("https://my.own.host") == "https://my.own.host"  # untouched
+    assert qr_base_url("http://localhost:5173") == "http://localhost:5173"

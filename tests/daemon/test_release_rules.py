@@ -84,19 +84,21 @@ def test_every_prompt_can_be_answered_by_a_silent_install_or_uninstall() -> None
     )
 
 
-def test_cloudflare_headers_match_the_vercel_policy() -> None:
-    """5E: the new host must send the same security headers as vercel.json."""
-    import json
+def test_the_phone_site_sends_its_security_headers() -> None:
+    """Cloudflare Pages serves public/_headers: the pairing link holds a secret (no-referrer), and
+    the page may only talk to itself and the relay."""
     from pathlib import Path
 
     web = Path(__file__).resolve().parents[2] / "web-remote"
-    vercel = json.loads((web / "vercel.json").read_text(encoding="utf-8"))
-    csp = next(
-        h["value"]
-        for rule in vercel["headers"]
-        for h in rule["headers"]
-        if h["key"] == "Content-Security-Policy"
-    )
     headers = (web / "public" / "_headers").read_text(encoding="utf-8")
-    assert f"Content-Security-Policy: {csp}" in headers
+    for line in (
+        "Referrer-Policy: no-referrer",
+        "X-Frame-Options: DENY",
+        "Permissions-Policy: microphone=(self), camera=(), geolocation=()",
+        "connect-src 'self' wss://*.execute-api.us-east-2.amazonaws.com;",
+        "script-src 'self';",
+        "frame-ancestors 'none'",
+    ):
+        assert line in headers
     assert "/*  /index.html  200" in (web / "public" / "_redirects").read_text(encoding="utf-8")
+    assert not (web / "vercel.json").exists()  # one host only

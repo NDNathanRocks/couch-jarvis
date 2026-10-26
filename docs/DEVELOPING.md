@@ -46,7 +46,7 @@ This is for people working on the code. For using the app, see the [README](../R
 | `installer/` | PyInstaller spec, Inno Setup script, `build.ps1`, MSIX packaging |
 | `scripts/` | Edge profile setup, start/restart wrappers, contract export, legal pages, licence keys, load test |
 | `tests/` | `daemon/` and `infra/` (pytest), `integration/` (real Edge), `e2e/` (real browser + live daemon) |
-| `docs/` | Install guide, command list, legal drafts, Store listing |
+| `docs/` | Install guide, command list, legal drafts, Store listing, release notes |
 
 ## Run from source
 
@@ -122,16 +122,21 @@ traffic. Measured cost and load numbers are in `plan.md` section 13.2.
 
 ## Deploy the phone app
 
-```bash
+The phone app is hosted on **Cloudflare Pages**, project `armrest-app`, at https://armrest-app.pages.dev (free,
+commercial use allowed). Log in once with `npx wrangler login`, then:
+
+```powershell
 cd web-remote
 npm ci
-vercel deploy --prod      # VITE_RELAY_WS_URL is a Vercel env var; the build command is `vite build`
+$env:VITE_RELAY_WS_URL = "wss://<api-id>.execute-api.us-east-2.amazonaws.com/prod"   # the relay's WebSocketUrl
+npm run build
+npx wrangler pages deploy dist --project-name armrest-app --branch main
 ```
 
-Set `CJ_PWA_BASE_URL` to the hosted URL so the TV's QR points at it. The phone app ships a strict CSP, `no-referrer`
-(the pairing link contains a secret) and a microphone-only permissions policy. **Redeploy after every UI commit**:
-phones load the hosted app, not the repo. The planned move to Cloudflare Pages (`armrest-app.pages.dev`) carries
-existing pairings across in the URL fragment (`src/utils/handoff.ts`, off until `VITE_HANDOFF_URL` is set).
+`CJ_PWA_BASE_URL` (and `brand.SITE_URL`) point the TV's QR code at this address. The security headers (strict CSP,
+`no-referrer` because the pairing link holds a secret, microphone-only permissions) come from `public/_headers`, and
+`public/_redirects` sends every path to the app. **Redeploy after every UI commit**: phones load the hosted app, not
+the repo. A phone's pairing is stored per web address, so changing the address unpairs every phone.
 
 ## Build the installer
 

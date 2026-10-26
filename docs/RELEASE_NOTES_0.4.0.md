@@ -10,8 +10,8 @@ counts from the day you first run 1.0.
 ## Update from 0.2.0
 
 Run the new `CouchJarvis-Setup.exe`. It finds your install and updates it in place: it closes the app, installs over
-it and starts it again. Your settings, paired phones, room keys and TV browser sign-ins are kept, and your phones stay
-paired. Future updates work the same way.
+it and starts it again. Your settings, room keys and TV browser sign-ins are kept. Phones pair again once, on the new address
+(see *Good to know*). Future updates work the same way.
 
 New here? Install normally, and a short welcome window walks you through the setup.
 
@@ -70,6 +70,10 @@ New here? Install normally, and a short welcome window walks you through the set
   anything you said.
 
 ## Good to know
+- **The phone app has a new address: https://armrest-app.pages.dev.** The old `couch-jarvis-remote.vercel.app`
+  address is gone. After updating, the TV shows a QR code for the new address (your settings file doesn't need
+  editing). **Scan it once more on each phone** to pair again; a home-screen icon made from the old address must be
+  added again too.
 - **Update the PC to see the new buttons.** The phone app updates by itself; the PC needs this installer. A phone
   connected to an older PC hides the controls that PC can't do.
 - **Spoken replies:** the free Microsoft online voices are no longer included. Replies use ElevenLabs if you add a
@@ -82,8 +86,8 @@ New here? Install normally, and a short welcome window walks you through the set
 ## Files
 | File | SHA-256 |
 |---|---|
-| `CouchJarvis-Setup.exe` (recommended) | `ecfa1f7e0feb684172888b4f75b6b781bc0bce160f73e3d7740f7cd01be9d2be` |
-| `CouchJarvis-portable-0.4.0.zip` | `027f1506861b2a47ca2653dcda31cfcf47c9f7a209be28e323199f12f69e19b0` |
+| `CouchJarvis-Setup.exe` (recommended) | `50c94189247d8311d4181c187fa984aad93266241ed682f2793cb1cc5f762535` |
+| `CouchJarvis-portable-0.4.0.zip` | `62ee9a74ad4d7591ba648a66e4d0e4f2057ca81d0f9e9bae366aea7db93501e2` |
 
 ## Checked before release
 Automated: 1,029 Python tests, 217 phone-app tests, 26 tests against a real Edge browser (including speed, seeking,

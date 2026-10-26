@@ -171,7 +171,7 @@ For whoever publishes Armrest (you, not the people installing it).
 - The repo set up for development (see the README: `uv venv`, `uv pip install -r requirements.txt`, Node 24+).
 - **Inno Setup 6** to produce the `.exe` installer: `winget install JRSoftware.InnoSetup`. Without it, the build still
   produces the portable zip.
-- Your cloud relay deployed and your phone app on Vercel (README: *Deploy the cloud relay*, *Deploy the phone app*), with
+- Your cloud relay deployed and your phone app on Cloudflare Pages ([DEVELOPING.md](DEVELOPING.md): *Deploy the cloud relay*, *Deploy the phone app*), with
   `CJ_RELAY_WS_URL` and `CJ_PWA_BASE_URL` set in the repo `.env` (or pass them as parameters below).
 
 ### Build
@@ -180,7 +180,7 @@ For whoever publishes Armrest (you, not the people installing it).
 powershell -ExecutionPolicy Bypass -File .\installer\build.ps1
 # or, to choose the endpoints and version explicitly:
 powershell -ExecutionPolicy Bypass -File .\installer\build.ps1 -RelayUrl wss://xxxx.execute-api.us-east-2.amazonaws.com/prod `
-    -PwaUrl https://your-app.vercel.app
+    -PwaUrl https://armrest-app.pages.dev
 ```
 
 It builds the phone app, writes the defaults, freezes the daemon with PyInstaller (a few minutes) and writes to
@@ -219,7 +219,7 @@ keys the first time it runs, so people can't see or control each other's PCs. Wh
 - **Cost.** Lambda and DynamoDB are effectively free at household scale. API Gateway WebSocket is free for the first
   12 months, then charges per message (the touchpad sends many small messages). Keep the budget alarm on (`BudgetEmail`)
   and watch usage if many people install it.
-- **Availability.** If your AWS or Vercel deployment goes down, every install stops working remotely (the local-network mode
+- **Availability.** If your AWS relay or the Cloudflare Pages site goes down, every install stops working remotely (the local-network mode
   still works). People can self-host by changing the two URLs in `config.env`.
 - **Abuse.** Anyone with the installer can create rooms on your relay. Throttling is on, but there are no accounts. If it
   becomes a problem, add an invite key to the relay or move users to their own deployment.

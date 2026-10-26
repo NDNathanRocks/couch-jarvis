@@ -11,11 +11,11 @@ Written 2026-10-25 for the next agent. Read this first, then `CLAUDE.md`, `AGENT
   volume shows %. Apps row now shows for PCs >= 0.4.0.
 - README rewritten for the public; developer material in `docs/DEVELOPING.md`, commands in `docs/COMMANDS.md`,
   settings table in `docs/INSTALL.md`.
-- **Phone app deployed** to Vercel production 2026-10-26 (now branded Armrest; legal pages are still drafts with
-  placeholders) and to **Cloudflare Pages `armrest-app`** (https://armrest-app.pages.dev, deployed with `wrangler pages
-  deploy dist --project-name armrest-app --branch main` after a `vite build` with `VITE_RELAY_WS_URL`). Vercel is NOT
-  forwarding yet (no `VITE_HANDOFF_URL`): the user tests Cloudflare first. Do not take Vercel down without the
-  forwarder, or every paired phone and old QR breaks.
+- **The phone app lives on Cloudflare Pages only:** project `armrest-app`, https://armrest-app.pages.dev (deploy steps in
+  `docs/DEVELOPING.md`). **Vercel was removed completely on 2026-10-26** (the user had no real users): the Vercel
+  project is deleted, `vercel.json` and the fragment-handoff code are gone, and QR codes use the new address.
+  `brand.qr_base_url` maps a `config.env` that still names the old Vercel address to the new site. Section 5E below
+  is therefore done.
 - 0.x direct builds are a free preview (`licensing.is_preview`): no trial before 1.0.
 - 0.4.0 installer built (`installer/dist`, direct channel) and upgrade-tested 20/20 from the published 0.2.0. Release
   notes: `docs/RELEASE_NOTES_0.4.0.md`. The user pushes, tags and publishes the release.
@@ -85,7 +85,7 @@ settings, the IndexedDB name `couch-jarvis`, or the voice-style id `jarvis`. The
   2. A screenshot script (TV overlay, Control Center, the phone at 3 sizes).
   (`build.ps1` already regenerates the website pages before the web build.)
 
-### 5E: the phone hosting move (needs the user)
+### 5E: the phone hosting move (DONE 2026-10-26: Cloudflare only, Vercel removed; kept for history)
 - **Move:** the phone app goes from Vercel Hobby (non-commercial) to Cloudflare Pages, project **`armrest-app`**,
   address `https://armrest-app.pages.dev`. Decided: that address, not the user's free `nathandsouza.dpdns.org` domain
   (see 13.10 for why).

@@ -1,4 +1,4 @@
-# Cloudflare Pages response headers (same policy as vercel.json; keep the two in step).
+# Cloudflare Pages response headers (checked by tests/daemon/test_release_rules.py).
 /*
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff

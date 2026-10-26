@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { backoffMs, isLanHost, resolveEndpoint } from "../utils/config";
 
-const vercel = { protocol: "https:", hostname: "jarvis.vercel.app", host: "jarvis.vercel.app" };
+const hosted = { protocol: "https:", hostname: "armrest-app.pages.dev", host: "armrest-app.pages.dev" };
 const lan = { protocol: "http:", hostname: "192.168.1.20", host: "192.168.1.20:8765" };
 const RELAY = "wss://abc123.execute-api.us-east-1.amazonaws.com/prod";
 
 describe("resolveEndpoint", () => {
   it("uses the AWS relay for the hosted PWA", () => {
-    const ep = resolveEndpoint(RELAY, vercel);
+    const ep = resolveEndpoint(RELAY, hosted);
     expect(ep.transport).toBe("cloud");
     const url = new URL(ep.tokenUrl({ roomId: "room-abcdef123", token: "a.b.c", name: "Pixel" }));
     expect(url.origin + url.pathname).toBe("wss://abc123.execute-api.us-east-1.amazonaws.com/prod");
@@ -24,20 +24,20 @@ describe("resolveEndpoint", () => {
   });
 
   it("falls back to the daemon when no relay was configured at build time", () => {
-    expect(resolveEndpoint(undefined, vercel).transport).toBe("lan");
-    expect(resolveEndpoint("  ", vercel).transport).toBe("lan");
-    expect(resolveEndpoint("", vercel).tokenUrl({ roomId: "r", token: "t", name: "n" }).startsWith("wss://jarvis.vercel.app/ws")).toBe(true);
+    expect(resolveEndpoint(undefined, hosted).transport).toBe("lan");
+    expect(resolveEndpoint("  ", hosted).transport).toBe("lan");
+    expect(resolveEndpoint("", hosted).tokenUrl({ roomId: "r", token: "t", name: "n" }).startsWith("wss://armrest-app.pages.dev/ws")).toBe(true);
   });
 
   it("url-encodes tokens and names so they cannot inject parameters", () => {
-    const ep = resolveEndpoint(RELAY, vercel);
+    const ep = resolveEndpoint(RELAY, hosted);
     const url = new URL(ep.tokenUrl({ roomId: "r", token: "x&role=pc", name: "n" }));
     expect(url.searchParams.get("role")).toBe("phone");
     expect(url.searchParams.get("token")).toBe("x&role=pc");
   });
 
   it("appends to a relay URL that already has a query string", () => {
-    const ep = resolveEndpoint(`${RELAY}?x=1`, vercel);
+    const ep = resolveEndpoint(`${RELAY}?x=1`, hosted);
     expect(new URL(ep.pairUrl({ roomId: "room-abcdef123", name: "n" })).searchParams.get("x")).toBe("1");
   });
 });
