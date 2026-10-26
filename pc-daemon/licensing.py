@@ -5,6 +5,8 @@
 - ``direct`` build: a licence key (Ed25519-signed, checked offline against the public key below),
   otherwise a free trial counted from the first run.
 - ``dev`` (source checkout): always licensed.
+- A ``direct`` build before 1.0.0 (the free preview): always licensed, and no trial clock
+  is started, so the 1.0.0 trial counts from the first run of 1.0.0 (``is_preview``).
 
 A licence that cannot be checked (no internet, the Store service down) keeps the last answer,
 and a first check that fails counts as licensed: a glitch must never lock out someone who paid.
@@ -36,7 +38,7 @@ from build_info import Channel
 log = logging.getLogger(__name__)
 
 Status = Literal["active", "trial", "expired"]
-Source = Literal["store", "key", "trial", "dev"]
+Source = Literal["store", "key", "trial", "dev", "preview"]
 TRIAL_DAYS = 14
 KEY_PREFIX = "ARMREST1."
 DAY_S = 86_400
@@ -58,6 +60,15 @@ class Licence:
 
 
 LICENSED_DEV = Licence("active", "dev")
+LICENSED_PREVIEW = Licence("active", "preview")
+
+
+def is_preview(version: str) -> bool:
+    """Versions before 1.0.0 are a free preview: no trial, no key."""
+    try:
+        return int(version.split(".")[0]) < 1
+    except ValueError:
+        return False
 
 
 # ----------------------------------------------------------------------------- keys
@@ -199,9 +210,11 @@ class LicenceManager:
         public_key_b64: str = PUBLIC_KEY_B64,
         clock: Callable[[], float] = time.time,
         open_url: Callable[[str], object] = webbrowser.open,
+        preview: bool = False,
     ) -> None:
         self._channel = channel
         self._uses_store = channel == "store" and packaged
+        self._preview = preview and not self._uses_store
         self._record = record
         self._store_query = store_query
         self._public_key = public_key_b64
@@ -209,7 +222,12 @@ class LicenceManager:
         self._open_url = open_url
         self._fast_until = 0.0
         self._poke = asyncio.Event()
-        self.current: Licence = LICENSED_DEV if channel == "dev" else self._from_record()
+        self.current: Licence = self._free() or self._from_record()
+
+    def _free(self) -> Licence | None:
+        if self._channel == "dev":
+            return LICENSED_DEV
+        return LICENSED_PREVIEW if self._preview else None
 
     @property
     def uses_store(self) -> bool:
@@ -243,8 +261,9 @@ class LicenceManager:
         return data
 
     async def refresh(self) -> Licence:
-        if self._channel == "dev":
-            self.current = LICENSED_DEV
+        free = self._free()
+        if free is not None:  # nothing recorded: the trial clock has not started
+            self.current = free
             return self.current
         data = self._touch()
         if self._uses_store:

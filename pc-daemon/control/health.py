@@ -94,7 +94,9 @@ def rows(
     out.append(speech)
 
     if licence_status == "active":
-        text = "Licensed." if licence_source != "dev" else "Developer build."
+        text = {"dev": "Developer build.", "preview": "Free preview."}.get(
+            licence_source, "Licensed."
+        )
         out.append(Row("Licence", "good", text))
     elif licence_status == "trial":
         days = f"{licence_days} days left" if licence_days is not None else "trial"

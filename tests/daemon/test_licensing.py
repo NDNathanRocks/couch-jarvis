@@ -26,7 +26,7 @@ from contracts import (
     envelope,
 )
 from event_bus import EventBus
-from licensing import DAY_S, Licence, LicenceFile, LicenceManager
+from licensing import DAY_S, Licence, LicenceFile, LicenceManager, is_preview
 from service import CommandService
 from support import AgentEnv
 from timers import TimerService
@@ -267,3 +267,42 @@ async def test_an_expired_trial_refuses_commands_but_buy_still_works(env: AgentE
     assert sync[0].type == "state.snapshot"  # phones still see the TV
     gate.allowed = True
     assert await service.handle_envelope(text, "phone-1") == []  # bought: accepted again
+
+
+# ----------------------------------------------------------------------------- the 0.x preview
+
+
+def test_versions_before_1_0_are_a_free_preview() -> None:
+    assert is_preview("0.4.0") and is_preview("0.10.2")
+    assert not is_preview("1.0.0") and not is_preview("2.3.1") and not is_preview("junk")
+
+
+async def test_a_preview_build_is_licensed_and_starts_no_trial_clock(tmp_path: Path) -> None:
+    clock = Clock()
+    preview = LicenceManager(
+        "direct", False, LicenceFile(tmp_path / "license.json"), clock=clock, preview=True
+    )
+    assert preview.current.status == "active" and preview.current.source == "preview"
+    clock.now += 60 * DAY_S
+    assert (await preview.refresh()).status == "active"
+    assert preview.state() is None  # phones show no trial banner
+    assert not (tmp_path / "license.json").exists()  # the 1.0 trial has not started
+
+    released = manager(tmp_path, clock=clock)  # the same PC, after updating to 1.0
+    assert (await released.refresh()).status == "trial"
+    assert released.current.days_left == 14
+
+
+async def test_the_store_build_ignores_the_preview_flag(tmp_path: Path) -> None:
+    store = LicenceManager(
+        "store",
+        True,
+        LicenceFile(tmp_path / "license.json"),
+        store_query=_store_trial,
+        preview=True,
+    )
+    assert (await store.refresh()).source == "store"
+
+
+async def _store_trial() -> Licence:
+    return Licence("trial", "store", 5)

@@ -52,7 +52,7 @@ from executors.vision_grounding import VisionGrounder
 from hud.qr import detect_lan_ip
 from hud.viewmodel import HudViewModel
 from lan_auth import LanAuth
-from licensing import Licence, LicenceFile, LicenceManager
+from licensing import Licence, LicenceFile, LicenceManager, is_preview
 from llm.base import TextLLM, VisionLLM
 from llm.fake import DryRunRouter
 from local_api import create_app
@@ -62,6 +62,7 @@ from service import CommandService
 from stt_engine import STTEngine, build_stt_engine
 from telemetry import Telemetry
 from timers import TimerService
+from version import __version__
 from voice import VoicePrefsStore, VoiceService
 from watchdog import EdgeWatchdog, make_edge_launcher, make_http_probe
 
@@ -279,7 +280,12 @@ def build_runtime(settings: Settings, *, dry_run: bool) -> Runtime:
 
 def start_licensing(rt: Runtime, settings: Settings) -> asyncio.Task[None]:
     """Check the licence now and then; phones see trial days left, and commands stop at expiry."""
-    manager = LicenceManager(channel(), is_packaged(), LicenceFile(settings.license_file))
+    manager = LicenceManager(
+        channel(),
+        is_packaged(),
+        LicenceFile(settings.license_file),
+        preview=is_preview(__version__),
+    )
     key = settings.license_key.get_secret_value() if settings.license_key else None
     if key and not manager.uses_store and manager.enter_key(key) is None:
         log.warning("CJ_LICENSE_KEY is not a valid %s licence key", APP_NAME)

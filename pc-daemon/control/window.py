@@ -417,18 +417,19 @@ class ControlWindow(QWidget):
         lic = self.backend.licence()
         if lic.status == "active":
             who = f" to {lic.holder}" if lic.holder else ""
-            text = (
-                "Developer build: always licensed."
-                if lic.source == "dev"
-                else f"{APP_NAME} is licensed{who}. Thank you!"
-            )
+            text = {
+                "dev": "Developer build: always licensed.",
+                "preview": f"This {APP_NAME} preview is free: no licence or trial before 1.0.",
+            }.get(lic.source, f"{APP_NAME} is licensed{who}. Thank you!")
         elif lic.status == "trial":
             text = f"Free trial: {lic.days_left} days left."
         else:
             text = "Your free trial has ended. Buy a licence to keep using your phones as a remote."
         self._licence_text.setText(text)
         self.buy_button.setVisible(lic.status != "active")
-        self._key_box.setVisible(not self.backend.uses_store() and lic.source != "key")
+        self._key_box.setVisible(
+            not self.backend.uses_store() and lic.source not in ("key", "preview")
+        )
 
     def activate_key(self) -> bool:
         ok = self.backend.enter_key(self.key_input.text())
