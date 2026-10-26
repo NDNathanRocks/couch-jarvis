@@ -87,6 +87,9 @@ Write-Host "==> relay $RelayUrl"
 Write-Host "==> phone app $PwaUrl"
 
 if (-not $SkipWeb) {
+    Write-Host '==> website pages (privacy, terms, licences...)'
+    & $python (Join-Path $repo 'scripts\legal_pages.py')
+    if ($LASTEXITCODE -ne 0) { throw 'legal pages failed' }
     Write-Host '==> building the phone app'
     Push-Location (Join-Path $repo 'web-remote')
     try {

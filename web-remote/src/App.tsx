@@ -366,6 +366,7 @@ export default function App() {
           }}
           tvs={tvs}
           currentRoom={self?.roomId ?? null}
+          guest={guest}
           onRenameTv={(roomId, label) => setTvs(renameTv(roomId, label))}
           onClose={() => setSettingsOpen(false)}
         />

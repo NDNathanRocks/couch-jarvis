@@ -49,6 +49,8 @@ interface Props {
   /** Every TV this phone paired with (rename here; scan another TV's QR to add one). */
   tvs?: Tv[];
   currentRoom?: string | null;
+  /** A guest phone: the PC refuses its settings changes, so they are not offered. */
+  guest?: boolean;
   onRenameTv?: (roomId: string, label: string) => void;
 }
 
@@ -65,6 +67,7 @@ export function SettingsSheet({
   tvs = [],
   currentRoom = null,
   onRenameTv,
+  guest = false,
 }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -86,6 +89,12 @@ export function SettingsSheet({
           </button>
         </header>
 
+        {guest ? (
+          <p className="rounded-2xl bg-surface p-4 text-sm text-zinc-400 ring-1 ring-line">
+            This phone is a guest: the TV&apos;s voice, browsing and QR settings are for the owner&apos;s phones.
+          </p>
+        ) : (
+          <>
         <section aria-labelledby="voice-h" className="space-y-3">
           <div className="flex items-center gap-3 rounded-2xl bg-surface p-4 ring-1 ring-line">
             <div className="min-w-0 flex-1">
@@ -232,6 +241,8 @@ export function SettingsSheet({
             Reset QR code
           </button>
         </section>
+          </>
+        )}
 
         <section aria-labelledby="mic-h" className="mt-6 space-y-2">
           <h3 id="mic-h" className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
