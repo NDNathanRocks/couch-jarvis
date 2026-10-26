@@ -54,9 +54,7 @@ settings, the IndexedDB name `couch-jarvis`, or the voice-style id `jarvis`. The
   2. **Accessibility pass**: labels, focus order, AA contrast, 200% text. Add axe (e.g. `vitest-axe` on the rendered
      App, or axe-core in the e2e tests).
   3. **Guest passes that expire after 24 h**: optional, from the plan.
-  4. **Settings sheet for guests**: it still shows the voice and pop-up toggles, which the PC refuses with a clear
-     message. Hiding them is nicer: pass `guest` into `SettingsSheet`.
-  5. **"Try the remote on this PC"**: loopback pairing for Store reviewers (listed in 5G).
+  4. **"Try the remote on this PC"**: loopback pairing for Store reviewers (listed in 5G).
 
 ### 5K: done and left
 - **Done (drafts):**
@@ -68,7 +66,7 @@ settings, the IndexedDB name `couch-jarvis`, or the voice-style id `jarvis`. The
   1. Store listing text, feature list, keywords, age-rating answers, and certification notes for reviewers (explain
      that the app drives Edge and the mouse, and how to test with a phone).
   2. A screenshot script (TV overlay, Control Center, the phone at 3 sizes).
-  3. Ask `build.ps1` to run `scripts/legal_pages.py` before the web build, so `licenses.html` stays current.
+  (`build.ps1` already regenerates the website pages before the web build.)
 
 ### 5E: the phone hosting move (needs the user)
 - **Move:** the phone app goes from Vercel Hobby (non-commercial) to Cloudflare Pages, project **`armrest-app`**,
