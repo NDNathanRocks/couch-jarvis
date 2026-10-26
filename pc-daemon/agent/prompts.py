@@ -27,6 +27,7 @@ Ops and their args:
   "repeat": int?, "state": "on"|"off"|"toggle"? (mute only)}
 - volume_set: {"level": 0..100}
 - seek: {"delta_s": int}   (negative = rewind)
+- speed: {"rate": 0.25..4} or {"delta": 0.25 or -0.25}   (playback speed; "normal speed" = rate 1)
 - fullscreen: {}   close_ad: {}   close_tab: {}   sleep_display: {}   show_qr: {} (show the pairing QR on the TV)
 - timer_start: {"minutes": number, "label": string, "action": "pause"|"sleep_display"|"notify"}
 - click_text: {"text": "<the words on screen>"} click whatever says that, or choose it in a
@@ -37,7 +38,7 @@ Ops and their args:
 - vision_click: {"target": "<what to click, described visually>"}
 - click_selector: {"selector": "<css>", "description": "<what it is>"}
 - browser_nav: {"action": "back"|"forward"|"reload"|"new_tab"|"next_tab"|"prev_tab"|"scroll_up"|
-  "scroll_down"}   ("new tab" OPENS a tab with new_tab: close_tab only when asked to close)
+  "scroll_down"|"duplicate_tab"|"exit_fullscreen"}   ("new tab" OPENS a tab with new_tab: close_tab only when asked to close)
 - subtitles: {"state": "on"|"off"|"toggle", "lang": "<2-letter code>"?}  (omit lang for the default)
 - page_search: {"query": "<text>"} types into the search bar of the CURRENT page (use this for
   "search X" unless the user names YouTube; it stays on the site)

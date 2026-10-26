@@ -53,6 +53,7 @@ StepOp = Literal[
     "bookmark",
     "choose",
     "press_key",
+    "speed",  # playback speed: {"rate": 1.25} or {"delta": 0.25}
 ]
 
 Tier = Literal["dom", "js", "vision", "os"]

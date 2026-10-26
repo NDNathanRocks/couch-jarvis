@@ -148,6 +148,12 @@ def _plan_browser(t: str) -> IntentPlan | None:
         return _browser("next_tab")
     if re.fullmatch(r"(?:previous|prev|last|switch to the previous|go to the previous) tab", t):
         return _browser("prev_tab")
+    if re.fullmatch(
+        r"(?:duplicate|clone|copy)(?: this| the(?: current)?)? tab"
+        r"|(?:open|make) (?:a )?(?:copy|duplicate) of (?:this|the(?: current)?) tab",
+        t,
+    ):
+        return _browser("duplicate_tab")
     m = re.fullmatch(r"scroll (up|down)(?: a (?:bit|little)| some| more| a lot)?", t)
     if m:
         return _browser(f"scroll_{m.group(1)}")
@@ -544,11 +550,60 @@ def _plan_keypress(t: str) -> IntentPlan | None:
     return _plan(Intent.SYSTEM, [ActionStep(op="press_key", args=args)])
 
 
+_SPEED_WORDS = {"half": 0.5, "normal": 1.0, "regular": 1.0, "double": 2.0}
+_RATE = r"(\d(?:\.\d{1,2})?|\.\d{1,2}|\d point \d{1,2})"
+_TIMES = r"(?: ?x| times| ?×)?"
+_SPEED_NOUN = r"(?:(?:playback|play|video|player) )?speed"
+
+
+def _speed(**args: float) -> IntentPlan:
+    return _plan(Intent.MEDIA_CONTROL, [ActionStep(op="speed", args=dict(args))])
+
+
+def _plan_speed(t: str) -> IntentPlan | None:
+    """ "change the speed of the player to 1.25 times speed", "play at 2x", "normal speed"."""
+    of = r"(?: of)?(?: the)?(?: video| player| playback)?"
+    m = (
+        re.fullmatch(
+            rf"(?:(?:set|change|put|make|turn)(?: the)? )?{_SPEED_NOUN}{of}"
+            rf"(?: to| at)? {_RATE}{_TIMES}(?: speed)?",
+            t,
+        )
+        or re.fullmatch(
+            r"(?:play|watch|go|run|set it|put it)(?: it| this| the video)?"
+            rf" (?:at|on) {_RATE}{_TIMES}(?: speed)?",
+            t,
+        )
+        or re.fullmatch(rf"{_RATE}{_TIMES} speed|speed {_RATE}{_TIMES}", t)
+    )
+    if m:
+        rate = float(next(g for g in m.groups() if g).replace(" point ", "."))
+        return _speed(rate=rate) if 0.25 <= rate <= 4 else None
+    words = "|".join(_SPEED_WORDS)
+    m = re.fullmatch(
+        r"(?:(?:set|change|put|go back to|back to|reset to|play at|play it at|use)(?: it)?"
+        rf"(?: to)?(?: the)? )?({words}) {_SPEED_NOUN}",
+        t,
+    )
+    if m:
+        return _speed(rate=_SPEED_WORDS[m.group(1)])
+    if re.fullmatch(rf"reset(?: the)? {_SPEED_NOUN}", t):
+        return _speed(rate=1.0)
+    up = rf"speed (?:it |this |the video )?up|play faster|faster|increase(?: the)? {_SPEED_NOUN}"
+    if re.fullmatch(up, t):
+        return _speed(delta=0.25)
+    down = rf"slow (?:it |this |the video )?down|play slower|slower|decrease(?: the)? {_SPEED_NOUN}"
+    if re.fullmatch(down, t):
+        return _speed(delta=-0.25)
+    return None
+
+
 def _plan_single(utterance: str) -> IntentPlan | None:
     t = normalize(utterance)
 
     page = (
         _plan_voice(t)
+        or _plan_speed(t)
         or _plan_keypress(t)
         or _plan_bookmarks(t)
         or _plan_browser_prefs(t)
@@ -593,8 +648,12 @@ def _plan_single(utterance: str) -> IntentPlan | None:
         r"(?:(?:make it |go |turn on |enter )?full ?screen|maximize(?: the video)?)", t
     ):
         return _plan(Intent.FULLSCREEN, [ActionStep(op="fullscreen", expect="is_fullscreen")])
-    if re.fullmatch(r"(?:exit|leave|get out of|close|stop)(?: the)? full ?screen(?: mode)?", t):
-        return _plan_keypress("press escape")
+    if re.fullmatch(
+        r"(?:exit|leave|get out of|close|stop|turn off|undo|cancel)(?: the)? full ?screen(?: mode)?"
+        r"|(?:un-?|no |not )full ?screen|(?:minimi[sz]e|shrink)(?: the)?(?: video| player)?",
+        t,
+    ):
+        return _browser("exit_fullscreen")
     if re.fullmatch(r"(?:play |go to |watch |start )?(?:the )?next episode", t):
         return _plan(Intent.NAVIGATE, [ActionStep(op="click_text", args={"text": "Next Episode"})])
     m = re.fullmatch(r"skip(?: the| this)? (intro|recap|credits|opening)", t)
@@ -708,5 +767,7 @@ def plan_button(
         "scroll_up": _browser("scroll_up"),
         "scroll_down": _browser("scroll_down"),
         "subtitles": _subtitles("toggle"),
+        "exit_fullscreen": _browser("exit_fullscreen"),
+        "duplicate_tab": _browser("duplicate_tab"),
     }
     return table[action]

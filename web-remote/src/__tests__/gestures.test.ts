@@ -121,3 +121,34 @@ describe("TouchpadGesture", () => {
     expect(events.at(-1)).toEqual({ action: "drag_end" });
   });
 });
+
+describe("pointer acceleration", () => {
+  const drag = (accel: number, stepPx: number, stepMs: number): number => {
+    events = [];
+    const g = new TouchpadGesture({ emit: (e) => events.push(e), now: () => clock, speed: 1, accel });
+    g.down(1, 0, 0);
+    g.move(1, 20, 0); // past the tap dead zone
+    advance(50);
+    events = [];
+    let x = 20;
+    for (let i = 0; i < 10; i++) {
+      advance(stepMs);
+      x += stepPx;
+      g.move(1, x, 0);
+    }
+    advance(50);
+    g.up(1);
+    return events.reduce((n, e) => n + (e.dx ?? 0), 0);
+  };
+
+  it("is off unless asked for: the cursor moves 1:1", () => {
+    expect(drag(0, 5, 100)).toBe(50);
+  });
+
+  it("a slow finger moves the cursor less, a quick flick moves it further", () => {
+    const slow = drag(1, 2, 100); // 0.02 px/ms
+    const fast = drag(1, 30, 16); // ~1.9 px/ms
+    expect(slow).toBeLessThan(20); // under 1:1 (20 px moved)
+    expect(fast).toBeGreaterThan(300 * 2); // well over 1:1 (300 px moved)
+  });
+});

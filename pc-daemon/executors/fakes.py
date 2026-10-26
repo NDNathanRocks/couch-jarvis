@@ -28,6 +28,7 @@ class FakeBrowser:
     def __init__(self) -> None:
         self.snap = BrowserSnapshot(url="https://www.youtube.com/", title="YouTube")
         self.calls: list[str] = []
+        self.speed = 1.0
         self.items: list[str] = []  # clickable things "on the page", in DOM order
         self.wakes = 0  # times the player controls were woken (mouse wiggle)
         self.search_bar = True  # the page has a search bar
@@ -160,6 +161,13 @@ class FakeBrowser:
             return ActionResult(False, "dom", "no media element", "no_media")
         self.snap = self.snap.model_copy(update={"position_s": position_s})
         return ActionResult(True, "dom")
+
+    async def set_speed(
+        self, rate: float | None = None, delta: float | None = None
+    ) -> ActionResult:
+        self._log(f"speed:{rate if rate is not None else f'{delta or 0:+g}'}")
+        self.speed = max(0.25, min(4.0, rate if rate is not None else self.speed + (delta or 0)))
+        return ActionResult(True, "dom", observed={"rate": self.speed})
 
     async def browser_action(self, action: str) -> ActionResult:
         self._log(f"browser_nav:{action}")

@@ -5,7 +5,7 @@ import { Favorites } from "../components/Favorites";
 import { NowPlayingCard } from "../components/NowPlayingCard";
 import { Slider } from "../components/Slider";
 import { VolumeSlider } from "../components/VolumeSlider";
-import { DEFAULT_FAVORITES, LIBRARY, SLOTS, assign, loadFavorites, saveFavorites } from "../utils/favorites";
+import { DEFAULT_FAVORITES, LIBRARY, SLOTS, assign, blockedReason, comboLabel, loadCustomKeys, loadFavorites, saveFavorites } from "../utils/favorites";
 import { resetAppCache } from "../utils/resetCache";
 import { createThrottle } from "../utils/throttle";
 import { versionAtLeast } from "../utils/version";
@@ -117,6 +117,20 @@ describe("seek slider on the Now Playing card", () => {
     expect(bar).toHaveAttribute("aria-valuetext", "8:20 of 16:40");
   });
 
+  it("a drag survives the PC reporting a new position mid-drag (each seek makes it report)", () => {
+    const onSeek = vi.fn();
+    const { rerender } = render(<NowPlayingCard playing={playing} pending={null} onSeek={onSeek} />);
+    const bar = screen.getByRole("slider", { name: "Seek" });
+    sizeTrack(bar);
+    fireEvent.pointerDown(bar, { clientX: 40, pointerId: 1 });
+    rerender(<NowPlayingCard playing={{ ...playing, position_s: 200 }} pending={null} onSeek={onSeek} />);
+    const still = screen.getByRole("slider", { name: "Seek" });
+    expect(still).toBe(bar); // the same element: the drag was not cut short
+    fireEvent.pointerMove(still, { clientX: 150, pointerId: 1 });
+    fireEvent.pointerUp(still, { clientX: 150, pointerId: 1 });
+    expect(onSeek).toHaveBeenLastCalledWith(750);
+  });
+
   it("is a plain progress bar when the PC cannot seek or the length is unknown", () => {
     const { rerender } = render(<NowPlayingCard playing={playing} pending={null} />);
     expect(screen.queryByRole("slider")).not.toBeInTheDocument();
@@ -152,7 +166,7 @@ describe("favourites", () => {
   it("shows 8 slots, sends the pressed one and edits through the picker", () => {
     const onSend = vi.fn();
     const onChange = vi.fn();
-    render(<Favorites slots={[...DEFAULT_FAVORITES]} connected keysAllowed onSend={onSend} onChange={onChange} />);
+    render(<Favorites daemonVersion="0.4.0" slots={[...DEFAULT_FAVORITES]} connected keysAllowed onSend={onSend} onChange={onChange} />);
     fireEvent.click(screen.getByRole("button", { name: "Mute" }));
     expect(onSend).toHaveBeenCalledWith(expect.objectContaining({ id: "mute" }));
 
@@ -165,7 +179,7 @@ describe("favourites", () => {
 
   it("an empty slot offers the picker, and Remove empties a slot", () => {
     const onChange = vi.fn();
-    render(<Favorites slots={["mute", null, null, null, null, null, null, null]} connected keysAllowed onSend={() => undefined} onChange={onChange} />);
+    render(<Favorites daemonVersion="0.4.0" slots={["mute", null, null, null, null, null, null, null]} connected keysAllowed onSend={() => undefined} onChange={onChange} />);
     fireEvent.click(screen.getByRole("button", { name: "Add a favourite to slot 2" }));
     expect(screen.getByRole("dialog", { name: "Choose a favourite" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "F5" }));
@@ -177,11 +191,60 @@ describe("favourites", () => {
   });
 
   it("disables everything when disconnected, and key buttons when remote input is off", () => {
-    const { rerender } = render(<Favorites slots={["mute", "key_f11"]} connected={false} keysAllowed onSend={() => undefined} onChange={() => undefined} />);
+    const { rerender } = render(<Favorites daemonVersion="0.4.0" slots={["mute", "key_f11"]} connected={false} keysAllowed onSend={() => undefined} onChange={() => undefined} />);
     expect(screen.getByRole("button", { name: "Mute" })).toBeDisabled();
-    rerender(<Favorites slots={["mute", "key_f11"]} connected keysAllowed={false} onSend={() => undefined} onChange={() => undefined} />);
+    rerender(<Favorites daemonVersion="0.4.0" slots={["mute", "key_f11"]} connected keysAllowed={false} onSend={() => undefined} onChange={() => undefined} />);
     expect(screen.getByRole("button", { name: "Mute" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Full screen (F11)" })).toBeDisabled();
+  });
+
+  it("builds a keyboard shortcut button, presses it, keeps it after a reload, and deletes it", () => {
+    const onSend = vi.fn();
+    const onChange = vi.fn();
+    const slots = ["mute", null, null, null, null, null, null, null];
+    const { unmount } = render(<Favorites daemonVersion="0.4.0" slots={slots} connected keysAllowed onSend={onSend} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add a favourite to slot 2" }));
+    fireEvent.click(screen.getByRole("button", { name: /New shortcut/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Ctrl" }));
+    fireEvent.click(screen.getByRole("button", { name: "Shift" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Key" }), { target: { value: "t" } });
+    expect(screen.getByText("Ctrl+Shift+T")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: /Name/ }), { target: { value: "Reopen tab" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add shortcut" }));
+
+    const made = loadCustomKeys();
+    expect(made).toEqual([expect.objectContaining({ label: "Reopen tab", key: "t", mods: ["ctrl", "shift"] })]);
+    const id = made[0]!.id;
+    expect(onChange).toHaveBeenCalledWith(["mute", id, null, null, null, null, null, null]);
+    saveFavorites(["mute", id]);
+    expect(loadFavorites().slice(0, 2)).toEqual(["mute", id]); // a custom id survives a reload
+    unmount();
+
+    render(<Favorites daemonVersion="0.4.0" slots={["mute", id]} connected keysAllowed onSend={onSend} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "Reopen tab" }));
+    expect(onSend).toHaveBeenCalledWith(expect.objectContaining({ send: { kind: "key", key: "t", mods: ["ctrl", "shift"] } }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change Reopen tab" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete Reopen tab" }));
+    expect(loadCustomKeys()).toEqual([]);
+    expect(onChange).toHaveBeenLastCalledWith(["mute", null]);
+  });
+
+  it("refuses shortcuts the PC blocks", () => {
+    expect(blockedReason("f4", ["alt"])).toMatch(/Alt\+F4/);
+    expect(blockedReason("delete", ["ctrl", "alt"])).toMatch(/Ctrl\+Alt/);
+    expect(blockedReason("esc", ["ctrl"])).not.toBeNull();
+    expect(blockedReason("t", ["ctrl", "shift"])).toBeNull();
+    expect(comboLabel("left", ["alt"])).toBe("Alt+←");
+  });
+
+  it("hides buttons an older PC cannot do, and greys them if already placed", () => {
+    render(<Favorites daemonVersion="0.3.0" slots={["exit_fullscreen", null]} connected keysAllowed onSend={() => undefined} onChange={() => undefined} />);
+    expect(screen.getByRole("button", { name: "Exit fullscreen" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Add a favourite to slot 2" }));
+    expect(screen.queryByRole("button", { name: "Duplicate tab" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New tab" })).toBeInTheDocument();
   });
 });
 

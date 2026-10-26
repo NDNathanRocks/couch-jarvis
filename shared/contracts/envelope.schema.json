@@ -622,7 +622,9 @@
             "subtitles",
             "volume_set",
             "seek_to",
-            "buy"
+            "buy",
+            "exit_fullscreen",
+            "duplicate_tab"
           ],
           "title": "Action",
           "type": "string"

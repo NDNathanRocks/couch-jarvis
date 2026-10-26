@@ -14,6 +14,8 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 from urllib.parse import quote_plus, urlparse
 
+import httpx
+
 from agent.policy import url_allowed
 from browser_prefs import BrowserPrefs
 from executors.base import ActionResult, BrowserSnapshot, MediaCommand, Tier
@@ -39,8 +41,23 @@ SKIP_AD_SELECTORS = ", ".join(
     ]
 )
 
-JS_SNAPSHOT = """() => {
-  const v = document.querySelector('video');
+# The media element a person means: a playing one first, then one with a known length, then the
+# biggest. Sites often keep a muted preview or an ad <video> ahead of the real player in the DOM.
+JS_PICK_MEDIA = """const pickMedia = () => {
+  const all = [...document.querySelectorAll('video, audio')];
+  const score = (m) => {
+    const r = m.getBoundingClientRect();
+    return (!m.paused && !m.ended ? 4 : 0) + (isFinite(m.duration) && m.duration > 0 ? 2 : 0)
+      + (r.width * r.height > 0 || m.tagName === 'AUDIO' ? 1 : 0) + Math.min(0.9, (r.width * r.height) / 4e6);
+  };
+  return all.sort((a, b) => score(b) - score(a))[0] || null;
+};"""
+
+JS_SNAPSHOT = (
+    "() => {"
+    + JS_PICK_MEDIA
+    + """
+  const v = pickMedia();
   const player = document.querySelector('#movie_player');
   const host = location.hostname;
   const musicTitle = document.querySelector('ytmusic-player-bar .title');
@@ -57,11 +74,16 @@ JS_SNAPSHOT = """() => {
     thumbnail_url: og ? og.content : null,
   };
 }"""
+)
 
 # name -> JS source. The router may only pick a name.
 ALLOWLISTED_JS: dict[str, str] = {
-    "play": "() => { const v = document.querySelector('video'); if (v) { v.play(); return true; } return false; }",
-    "pause": "() => { const v = document.querySelector('video'); if (v) { v.pause(); return true; } return false; }",
+    "play": "() => {"
+    + JS_PICK_MEDIA
+    + " const v = pickMedia(); if (v) { v.play(); return true; } return false; }",
+    "pause": "() => {"
+    + JS_PICK_MEDIA
+    + " const v = pickMedia(); if (v) { v.pause(); return true; } return false; }",
     "skip_ad": """() => {
       const player = document.querySelector('#movie_player');
       const v = document.querySelector('video');
@@ -282,10 +304,60 @@ SEARCH_OPENERS = ", ".join(
     ]
 )
 
-JS_VIDEO_STATE = """() => {
-  const v = document.querySelector('video');
+JS_VIDEO_STATE = (
+    "() => {"
+    + JS_PICK_MEDIA
+    + """
+  const v = pickMedia();
   return v ? {is_playing: !v.paused && !v.ended, position_s: v.currentTime,
               duration_s: isFinite(v.duration) ? v.duration : 0} : null;
+}"""
+)
+
+# {to} jumps to a time, {by} moves by seconds; clamped to the media's own length.
+JS_SEEK = (
+    "(a) => {"
+    + JS_PICK_MEDIA
+    + """
+  const v = pickMedia();
+  if (!v) return false;
+  const end = isFinite(v.duration) && v.duration > 0 ? v.duration : Infinity;
+  const t = a.to !== undefined ? a.to : v.currentTime + a.by;
+  v.currentTime = Math.max(0, Math.min(t, end));
+  return true;
+}"""
+)
+
+# Netflix stops playback with an error when the <video> time is changed: use its own player API.
+JS_NETFLIX_SEEK = """(a) => {
+  try {
+    const vp = window.netflix.appContext.state.playerApp.getAPI().videoPlayer;
+    const ids = vp.getAllPlayerSessionIds();
+    const p = vp.getVideoPlayerBySessionId(ids.find((s) => s.startsWith('watch')) || ids[0]);
+    if (!p) return false;
+    const ms = a.to !== undefined ? a.to * 1000 : p.getCurrentTime() + a.by * 1000;
+    p.seek(Math.max(0, Math.min(ms, p.getDuration() || ms)));
+    return true;
+  } catch (e) { return false; }
+}"""
+
+# {rate} sets the speed, {by} changes it; returns the speed now playing (0.25x - 4x).
+JS_SPEED = (
+    "(a) => {"
+    + JS_PICK_MEDIA
+    + """
+  const v = pickMedia();
+  if (!v) return false;
+  const want = a.rate !== undefined ? a.rate : v.playbackRate + a.by;
+  v.playbackRate = Math.max(0.25, Math.min(4, Math.round(want * 100) / 100));
+  return v.playbackRate;
+}"""
+)
+
+JS_EXIT_FULLSCREEN = """() => {
+  if (!document.fullscreenElement) return false;
+  document.exitFullscreen();
+  return true;
 }"""
 
 
@@ -437,6 +509,8 @@ class EdgeCDP:
     ) -> None:
         self._prefs = prefs
         self._hooked: set[int] = set()  # tabs that already report their popups to us
+        self._judging: set[int] = set()  # popups not yet allowed or closed
+        self._target_ids: dict[int, str] = {}  # id(page) -> CDP target id
         self._cdp_url = cdp_url
         self._ensure_edge = ensure_edge
         self._attempts = connect_attempts
@@ -474,25 +548,73 @@ class EdgeCDP:
             self._pw = self._browser = self._page_ref = None
 
     async def _page(self) -> Any:
+        """The tab on the TV right now. The user may switch tabs with the touchpad, a keyboard or
+        by hand, so this follows the tab Edge shows instead of the one we last used."""
         await self._connect()
-        if self._page_ref is not None and not self._page_ref.is_closed():
-            return self._page_ref  # sticky: an ad popup must never become the page we control
+        sticky = self._page_ref
+        if sticky is not None and sticky.is_closed():
+            sticky = None
+        order = await self._recent_tabs()
+        if not order and sticky is not None:
+            return sticky  # Edge could not say which tab is shown: keep what we had
         context = (
             self._browser.contexts[0]
             if self._browser.contexts
             else await self._browser.new_context()
         )
-        pages = [p for p in context.pages if not p.is_closed()]
-        media = [p for p in pages if _source_for(p.url) != "other"]
-        web = [p for p in pages if p.url.startswith(("http://", "https://"))]
-        if media:
-            page = media[-1]
-        elif web:
-            page = web[0]  # the oldest tab is the one the TV was already showing
-        else:
-            page = pages[-1] if pages else await context.new_page()
+        # A tab a site just opened is not ours until _on_popup has judged it (ads get closed).
+        pages = [p for p in context.pages if not p.is_closed() and id(p) not in self._judging]
+        page = await self._most_recent(pages, order)
+        if page is not None and page is sticky:
+            return page
+        if page is None and sticky is not None:
+            return sticky
+        if page is None:
+            media = [p for p in pages if _source_for(p.url) != "other"]
+            web = [p for p in pages if p.url.startswith(("http://", "https://"))]
+            if media:
+                page = media[-1]
+            elif web:
+                page = web[0]  # the oldest tab is the one the TV was already showing
+            else:
+                page = pages[-1] if pages else await context.new_page()
         self._adopt(page)  # ad scripts open popups when the player is clicked: close them
         return page
+
+    async def _recent_tabs(self) -> list[str]:
+        """Tab target ids, the one shown last first. Edge's /json/list keeps this order (a tab
+        moves to the front when it is shown, by a click, Ctrl+Tab or us), and reading it has no
+        side effects. Playwright fakes focus for every tab, so the page itself cannot tell."""
+        try:
+            async with httpx.AsyncClient(timeout=1.5) as client:
+                listed = (await client.get(f"{self._cdp_url}/json/list")).json()
+            return [str(t["id"]) for t in listed if t.get("type") == "page"]
+        except Exception:
+            return []
+
+    async def _target_id(self, page: Any) -> str | None:
+        key = id(page)
+        if key not in self._target_ids:
+            try:
+                session = await page.context.new_cdp_session(page)
+                try:
+                    info = await session.send("Target.getTargetInfo")
+                finally:
+                    await session.detach()
+                self._target_ids[key] = str(info["targetInfo"]["targetId"])
+            except Exception:
+                return None
+        return self._target_ids[key]
+
+    async def _most_recent(self, pages: list[Any], order: list[str]) -> Any:
+        """The page among `pages` that Edge showed last, or None if none of them is listed."""
+        if not order or not pages:
+            return None
+        live = {id(p) for p in pages}
+        for key in [k for k in self._target_ids if k not in live]:
+            del self._target_ids[key]  # closed tabs
+        by_id = {await self._target_id(p): p for p in pages}
+        return next((by_id[t] for t in order if t in by_id), None)
 
     @contextlib.asynccontextmanager
     async def _hold_origin(self, page: Any) -> AsyncIterator[list[str]]:
@@ -916,6 +1038,26 @@ class EdgeCDP:
         except Exception:
             log.warning("could not restore the Edge window", exc_info=True)
 
+    async def _leave_window_fullscreen(self, page: Any) -> bool:
+        """ "Exit fullscreen" also means the Edge window (ours or F11): show the tabs again."""
+        self._window_fs = None
+        try:
+            session = await page.context.new_cdp_session(page)
+            try:
+                win = await session.send("Browser.getWindowForTarget")
+                if win.get("bounds", {}).get("windowState") != "fullscreen":
+                    return False
+                await session.send(
+                    "Browser.setWindowBounds",
+                    {"windowId": win["windowId"], "bounds": {"windowState": "normal"}},
+                )
+                return True
+            finally:
+                await session.detach()
+        except Exception:
+            log.warning("could not leave window fullscreen", exc_info=True)
+            return False
+
     async def click_selector(self, selector: str, timeout_ms: int) -> ActionResult:
         async def click(page: Any) -> ActionResult:
             await page.locator(selector).first.click(timeout=timeout_ms)
@@ -939,30 +1081,34 @@ class EdgeCDP:
 
         return await self._guard(run)
 
-    async def seek(self, delta_s: int) -> ActionResult:
+    async def _seek(self, how: dict[str, float]) -> ActionResult:
         async def run(page: Any) -> ActionResult:
-            ok = await _first_in_frames(
-                page,
-                "(d) => { const v = document.querySelector('video'); if (!v) return false;"
-                " v.currentTime = Math.max(0, v.currentTime + d); return true; }",
-                delta_s,
-            )
-            return ActionResult(bool(ok), "dom", None if ok else "no media element")
+            ok = False
+            if (urlparse(page.url).hostname or "").endswith("netflix.com"):
+                ok = bool(await page.evaluate(JS_NETFLIX_SEEK, how))
+            ok = ok or bool(await _first_in_frames(page, JS_SEEK, how))
+            return ActionResult(ok, "dom", None if ok else "no media element")
 
         return await self._guard(run)
 
+    async def seek(self, delta_s: int) -> ActionResult:
+        return await self._seek({"by": delta_s})
+
     async def seek_to(self, position_s: float) -> ActionResult:
         """Jump to an absolute time (the timeline slider). Clamped to the media's own length."""
+        return await self._seek({"to": position_s})
+
+    async def set_speed(
+        self, rate: float | None = None, delta: float | None = None
+    ) -> ActionResult:
+        """Playback speed: an exact rate ("1.25x") or a step up/down. Reports the speed set."""
+        how = {"rate": rate} if rate is not None else {"by": delta or 0.0}
 
         async def run(page: Any) -> ActionResult:
-            ok = await _first_in_frames(
-                page,
-                "(t) => { const v = document.querySelector('video, audio'); if (!v) return false;"
-                " const end = Number.isFinite(v.duration) ? v.duration : t;"
-                " v.currentTime = Math.max(0, Math.min(t, end)); return true; }",
-                position_s,
-            )
-            return ActionResult(bool(ok), "dom", None if ok else "no media element")
+            now = await _first_in_frames(page, JS_SPEED, how)
+            if not now:
+                return ActionResult(False, "dom", "There is no video playing here.", "no_media")
+            return ActionResult(True, "dom", observed={"rate": float(now)})
 
         return await self._guard(run)
 
@@ -995,12 +1141,26 @@ class EdgeCDP:
                 await page.mouse.move(box["x"] + box["w"] / 2, box["y"] + box["h"] / 2)
                 await page.mouse.wheel(0, 600 if action == "scroll_down" else -600)
                 return ActionResult(True, "dom")
-            if action == "new_tab":
+            if action in ("new_tab", "duplicate_tab"):
+                url = page.url if action == "duplicate_tab" else "edge://newtab/"
+                if not url.startswith(("http://", "https://", "edge://")):
+                    url = "edge://newtab/"  # about:blank and the like: a copy is just a new tab
                 fresh = await page.context.new_page()
                 with contextlib.suppress(Exception):
-                    await fresh.goto("edge://newtab/", timeout=8000)
+                    await fresh.goto(url, wait_until="domcontentloaded", timeout=15000)
                 await fresh.bring_to_front()
                 self._adopt(fresh)
+                return ActionResult(True, "dom")
+            if action == "exit_fullscreen":
+                left = False
+                for frame in page.frames:  # the main frame first; a player frame may own it
+                    with contextlib.suppress(Exception):
+                        call = frame.evaluate(JS_EXIT_FULLSCREEN)
+                        left = bool(await asyncio.wait_for(call, 2.0)) or left
+                window_left = await self._leave_window_fullscreen(page)
+                if not (left or window_left):
+                    return ActionResult(True, "dom", observed={"already": True})
+                await asyncio.sleep(0.3)
                 return ActionResult(True, "dom")
             if action in ("next_tab", "prev_tab"):
                 tabs = [p for p in page.context.pages if not p.is_closed()]
@@ -1020,8 +1180,12 @@ class EdgeCDP:
         self._page_ref = page
         if id(page) not in self._hooked:
             self._hooked.add(id(page))
-            page.on("popup", lambda popup: asyncio.ensure_future(self._on_popup(page, popup)))
+            page.on("popup", lambda popup: self._judge(page, popup))
             page.on("close", lambda _: self._hooked.discard(id(page)))
+
+    def _judge(self, opener: Any, popup: Any) -> None:
+        self._judging.add(id(popup))  # at once, so _page never picks it up in the meantime
+        asyncio.ensure_future(self._on_popup(opener, popup))
 
     def _adblock(self) -> bool:
         return self._prefs.adblock if self._prefs is not None else True
@@ -1041,10 +1205,12 @@ class EdgeCDP:
             if allow:
                 await popup.bring_to_front()
                 self._adopt(popup)
+                self._judging.discard(id(popup))
                 return
         except Exception:
             pass  # the tab vanished while we looked at it
         await _close_quietly(popup)
+        self._judging.discard(id(popup))
 
     async def close_ad_dom(self) -> ActionResult:
         async def run(page: Any) -> ActionResult:
@@ -1133,10 +1299,14 @@ class EdgeCDP:
         try:
             page = await self._page()
             data = await page.evaluate(JS_SNAPSHOT)
-            if data["is_playing"] is None:  # no <video> up here: the player may be in a child frame
-                inner = await _first_in_frames(page, JS_VIDEO_STATE)
-                if inner:
-                    data = {**data, **inner}
+            if not data["duration_s"]:  # no real player up here: it may be in a child frame
+                for frame in page.frames[1:]:
+                    with contextlib.suppress(Exception):
+                        inner = await asyncio.wait_for(frame.evaluate(JS_VIDEO_STATE), 2.0)
+                        if inner and (inner["duration_s"] or data["is_playing"] is None):
+                            data = {**data, **inner}
+                            if inner["duration_s"]:
+                                break
             tabs = len([p for p in page.context.pages if not p.is_closed()])
             if self._window_fs is not None and not data["is_fullscreen"]:
                 await self._restore_window(page)

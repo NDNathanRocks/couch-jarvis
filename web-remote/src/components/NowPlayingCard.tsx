@@ -36,15 +36,22 @@ export function NowPlayingCard({ playing, pending, onSeek }: Props) {
       </section>
     );
   }
-  // The PC reports position every few seconds. Remounting on each report (key) restarts the local
-  // clock that interpolates in between, so the bar moves smoothly without drifting.
-  return <PlayingBody key={`${playing.title}|${playing.position_s}|${playing.is_playing}`} playing={playing} pending={pending} onSeek={onSeek} />;
+  // A new title starts afresh. Position reports must NOT remount the body: that would cut short
+  // a finger still dragging the seek bar (each seek makes the PC report a new position).
+  return <PlayingBody key={playing.title} playing={playing} pending={pending} onSeek={onSeek} />;
 }
 
 function PlayingBody({ playing, pending, onSeek }: { playing: NowPlaying; pending: string | null; onSeek?: (s: number) => void }) {
   const [elapsed, setElapsed] = useState(0);
   const [landed, setLanded] = useState<number | null>(null); // where you let go, until the PC reports back
   const isPlaying = playing.is_playing;
+  // Each report from the PC restarts the local clock that moves the bar smoothly in between.
+  const report = `${playing.position_s}|${isPlaying}`;
+  const [lastReport, setLastReport] = useState(report);
+  if (report !== lastReport) {
+    setLastReport(report);
+    setElapsed(0);
+  }
   useEffect(() => {
     if (!isPlaying) return;
     const id = setInterval(() => setElapsed((e) => e + 1), 1000);

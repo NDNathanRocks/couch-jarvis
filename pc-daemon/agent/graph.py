@@ -87,7 +87,18 @@ LEAVE_PAGE_MESSAGE = "I stayed on this page. Say 'search' or 'YouTube' if you wa
 # Failures that retrying cannot fix: end the command now with the step's own message.
 TERMINAL_REASONS = {"off_site", "item_not_found", "no_history", "no_search_bar"}
 BROWSER_NAV_ACTIONS = frozenset(
-    {"back", "forward", "reload", "new_tab", "next_tab", "prev_tab", "scroll_up", "scroll_down"}
+    {
+        "back",
+        "forward",
+        "reload",
+        "new_tab",
+        "next_tab",
+        "prev_tab",
+        "scroll_up",
+        "scroll_down",
+        "duplicate_tab",
+        "exit_fullscreen",
+    }
 )
 _ASKED_TO_SEARCH = re.compile(r"\b(?:you ?tube|music|search|look up)\b", re.I)
 _ASKED_FOR_NEW_TAB = re.compile(r"\bnew (?:tab|window)\b", re.I)
@@ -210,6 +221,10 @@ def success_message(plan: IntentPlan) -> str:
             return f"Pressed {(mods + ' ' + str(step.args.get('key', ''))).strip().upper()}"
         if step.op == "choose":
             return f"Playing {plan.slots.get('query', 'your pick')}"
+        if step.op == "speed" and "rate" in step.args:
+            return f"Speed {float(step.args['rate']):g}x"
+        if step.op == "speed":
+            return "Faster" if float(step.args.get("delta", 0)) > 0 else "Slower"
         if step.op == "bookmark":
             return {
                 "add": "Saved this page",
@@ -252,6 +267,8 @@ def success_message(plan: IntentPlan) -> str:
             "reload": "Reloaded",
             "next_tab": "Next tab",
             "prev_tab": "Previous tab",
+            "duplicate_tab": "Tab duplicated",
+            "exit_fullscreen": "Left fullscreen",
         }.get(str(nav), "Tab closed" if nav is None else "Done")
     return {
         Intent.VOLUME: "Volume updated",
@@ -501,6 +518,10 @@ def build_graph(deps: AgentDeps) -> Any:
             return await deps.os_ctl.set_volume(int(a["level"]))
         if op == "seek":
             return await deps.browser.seek(int(a["delta_s"]))
+        if op == "speed":
+            if "rate" in a:
+                return await deps.browser.set_speed(rate=float(a["rate"]))
+            return await deps.browser.set_speed(delta=float(a.get("delta", 0.25)))
         if op in ("fullscreen", "close_ad"):
             return await deps.fullscreener.dom_js_tiers(op)
         if op == "close_tab":

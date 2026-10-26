@@ -123,7 +123,7 @@ def test_naming_the_site_is_enough_to_skip_the_llm() -> None:
     [
         ("skip this song", "media_key", {"key": "next"}),
         ("volume 30", "volume_set", {"level": 30}),
-        ("exit fullscreen", "press_key", {"key": "esc"}),
+        ("exit fullscreen", "browser_nav", {"action": "exit_fullscreen"}),
         ("go back 30 seconds", "seek", {"delta_s": -30}),
         ("skip forward a minute", "seek", {"delta_s": 60}),
         ("rewind 2 minutes", "seek", {"delta_s": -120}),

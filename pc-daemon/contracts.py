@@ -42,6 +42,8 @@ QuickAction = Literal[
     "volume_set",  # args: level 0-100 (the slider; applied at once, never queued)
     "seek_to",  # args: position_s >= 0 (the timeline slider; applied at once)
     "buy",  # opens where to buy on the TV (Store page or website); PC 1.0.0+, see RoomState.license
+    "exit_fullscreen",  # PC 0.4.0+
+    "duplicate_tab",  # PC 0.4.0+
 ]
 
 PointerAction = Literal[

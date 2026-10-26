@@ -39,10 +39,22 @@ class FakeBrowser:
         return True
 
 
-def cdp_with(pages: list[FakePage]) -> EdgeCDP:
+def cdp_with(pages: list[FakePage], shown: list[FakePage] | None = None) -> EdgeCDP:
+    """An EdgeCDP over fake tabs. `shown` is Edge's tab list, the tab shown last first; it is
+    read at each call, so a test can reorder it as a user switching tabs would."""
     cdp = EdgeCDP("http://127.0.0.1:9222")
     cdp._browser = FakeBrowser(pages)
     cdp._pw = object()
+    order = shown if shown is not None else []
+
+    async def recent() -> list[str]:
+        return [f"t{id(p)}" for p in order]
+
+    async def target_id(page: Any) -> str:
+        return f"t{id(page)}"
+
+    cdp._recent_tabs = recent  # type: ignore[method-assign]
+    cdp._target_id = target_id  # type: ignore[method-assign]
     return cdp
 
 
@@ -128,3 +140,87 @@ async def test_locator_count_on_a_dead_frame_is_zero_not_a_hang() -> None:
 )
 def test_navigation_rule(start: str, target: str, blocked: bool) -> None:
     assert blocks_navigation(start, target) is blocked
+
+
+# ---- follow the tab on the TV, not the first one (switching tabs by hand or with the touchpad)
+
+
+class ShownPage(FakePage):
+    def __init__(self, url: str) -> None:
+        super().__init__(url)
+        self.context: Any = None
+        self.fronted = 0
+
+    async def bring_to_front(self) -> None:
+        self.fronted += 1
+
+
+async def test_commands_follow_the_tab_the_user_switched_to() -> None:
+    first, second = ShownPage("https://www.youtube.com/watch?v=1"), ShownPage("https://b.example/")
+    shown = [first, second]
+    cdp = cdp_with([first, second], shown)
+    assert await cdp._page() is first
+    shown.reverse()  # the user clicked the other tab
+    assert await cdp._page() is second
+    assert cdp._page_ref is second  # and its popups are watched from now on
+    assert "popup" in second.handlers
+
+
+async def test_the_tab_on_screen_beats_a_media_tab_in_the_background() -> None:
+    yt, docs = ShownPage("https://www.youtube.com/watch?v=1"), ShownPage("https://docs.example/")
+    assert await cdp_with([yt, docs], [docs, yt])._page() is docs
+
+
+async def test_keeps_the_tab_it_had_when_edge_cannot_say() -> None:
+    a, b = ShownPage("https://a.example/"), ShownPage("https://b.example/")
+    shown = [a, b]
+    cdp = cdp_with([a, b], shown)
+    assert await cdp._page() is a
+    shown.clear()  # /json/list failed
+    assert await cdp._page() is a
+
+
+async def test_a_popup_being_judged_is_never_the_tab_we_control() -> None:
+    tv = ShownPage("https://shows.example/")
+    shown: list[FakePage] = [tv]
+    cdp = cdp_with([tv], shown)
+    await cdp._page()
+    ad = ShownPage("https://casino.example/")
+    cdp._browser.contexts[0].pages.append(ad)
+    shown.insert(0, ad)  # Edge shows the ad tab for a moment
+    cdp._judging.add(id(ad))
+    assert await cdp._page() is tv
+
+
+class TabContext:
+    def __init__(self, pages: list[Any]) -> None:
+        self.pages = pages
+
+    async def new_page(self) -> Any:
+        fresh = GotoPage()
+        fresh.context = self
+        self.pages.append(fresh)
+        return fresh
+
+
+class GotoPage(ShownPage):
+    def __init__(self, url: str = "about:blank") -> None:
+        super().__init__(url)
+        self.visited: list[str] = []
+
+    async def goto(self, url: str, **_: Any) -> None:
+        self.visited.append(url)
+        self.url = url
+
+
+async def test_duplicate_tab_opens_the_same_page_and_shows_it() -> None:
+    page = GotoPage("https://www.youtube.com/watch?v=abc")
+    ctx = TabContext([page])
+    page.context = ctx
+    cdp = cdp_with([], [page])
+    cdp._browser.contexts = [ctx]
+    result = await cdp.browser_action("duplicate_tab")
+    assert result.ok and len(ctx.pages) == 2
+    copy = ctx.pages[1]
+    assert copy.visited == ["https://www.youtube.com/watch?v=abc"] and copy.fronted == 1
+    assert cdp._page_ref is copy

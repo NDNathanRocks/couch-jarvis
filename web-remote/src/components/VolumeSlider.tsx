@@ -54,7 +54,7 @@ export function VolumeSlider({ level, muted, disabled, onLevel, onToggleMute }: 
         label="Volume"
         value={shown}
         max={100}
-        step={5}
+        step={1}
         disabled={disabled}
         valueText={`${Math.round(effective)} percent${muted ? ", muted" : ""}`}
         onChange={(v) => {
@@ -79,8 +79,8 @@ export function VolumeSlider({ level, muted, disabled, onLevel, onToggleMute }: 
           </div>
         )}
       </Slider>
-      <output aria-live="off" className="w-9 flex-none text-right text-sm font-semibold tabular-nums text-zinc-200">
-        {Math.round(effective)}
+      <output aria-live="off" className="w-12 flex-none text-right text-sm font-semibold tabular-nums text-zinc-200">
+        {Math.round(effective)}%
       </output>
     </section>
   );

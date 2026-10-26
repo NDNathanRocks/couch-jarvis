@@ -182,3 +182,32 @@ async def asyncio_sleep(seconds: float) -> None:
     import asyncio
 
     await asyncio.sleep(seconds)
+
+
+async def test_speed_and_seek_to_for_real(cdp: EdgeCDP) -> None:
+    res = await cdp.set_speed(rate=1.25)
+    assert res.ok and res.observed["rate"] == 1.25
+    assert (await cdp.set_speed(delta=0.25)).observed["rate"] == 1.5
+    assert (await cdp.set_speed(rate=9)).observed["rate"] == 4  # clamped
+    assert (await cdp.seek_to(12)).ok
+    assert (await cdp.snapshot()).position_s == pytest.approx(12, abs=0.5)
+    assert (await cdp.seek_to(10_000)).ok
+    assert (await cdp.snapshot()).position_s <= 30.5  # clamped to the end
+
+
+async def test_exit_fullscreen_for_real(cdp: EdgeCDP) -> None:
+    await cdp.fullscreen_js()
+    assert (await cdp.browser_action("exit_fullscreen")).ok
+    await asyncio_sleep(0.3)
+    assert (await cdp.snapshot()).is_fullscreen is False
+
+
+async def test_duplicate_then_follow_the_tab_the_user_picks(cdp: EdgeCDP) -> None:
+    first = await cdp._page()  # noqa: SLF001
+    assert (await cdp.browser_action("duplicate_tab")).ok
+    copy = await cdp._page()  # noqa: SLF001
+    assert copy is not first and copy.url == first.url
+    await first.bring_to_front()  # the user clicks the first tab again (no command involved)
+    await asyncio_sleep(0.3)
+    assert await cdp._page() is first  # noqa: SLF001
+    await copy.close()

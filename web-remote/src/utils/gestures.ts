@@ -15,6 +15,8 @@ export interface GestureOptions {
   speed?: number;
   /** Fingers dragging up scroll the page down, like a phone. */
   naturalScroll?: boolean;
+  /** Pointer acceleration: 0 = none (1:1), 1 = like a laptop touchpad. */
+  accel?: number;
 }
 
 const TAP_MAX_MS = 260;
@@ -42,6 +44,8 @@ export class TouchpadGesture {
   private readonly now: () => number;
   private readonly speed: number;
   private readonly scrollSign: number;
+  private readonly accel: number;
+  private lastMoveAt = 0;
   private accX = 0;
   private accY = 0;
   private accScroll = 0;
@@ -58,10 +62,12 @@ export class TouchpadGesture {
     this.now = opts.now ?? Date.now;
     this.speed = opts.speed ?? 1.6;
     this.scrollSign = opts.naturalScroll === false ? -1 : 1;
+    this.accel = opts.accel ?? 0;
   }
 
   down(id: number, x: number, y: number): void {
     this.touches.set(id, { x, y, startX: x, startY: y, startAt: this.now() });
+    this.lastMoveAt = this.now();
     this.maxFingers = Math.max(this.maxFingers, this.touches.size);
     if (this.touches.size === 1) {
       this.moved = false;
@@ -133,10 +139,21 @@ export class TouchpadGesture {
     this.holdTimer = null;
   }
 
+  /** Slow finger: finer than 1:1 for aiming at small buttons. Quick flick: crosses the TV. */
+  private gain(dx: number, dy: number): number {
+    if (this.accel <= 0) return 1;
+    const at = this.now();
+    const dt = Math.max(8, at - this.lastMoveAt); // one touch frame at least
+    this.lastMoveAt = at;
+    const v = Math.hypot(dx, dy) / dt; // px per ms
+    return Math.min(1 + 2 * this.accel, Math.max(0.6, 0.6 + (v - 0.1) * 1.6 * this.accel));
+  }
+
   private moveBy(dx: number, dy: number): void {
     // keep sub-pixel remainders so slow drags are not rounded away
-    this.accX += dx * this.speed;
-    this.accY += dy * this.speed;
+    const k = this.speed * this.gain(dx, dy);
+    this.accX += dx * k;
+    this.accY += dy * k;
     const ix = Math.trunc(this.accX);
     const iy = Math.trunc(this.accY);
     this.accX -= ix;

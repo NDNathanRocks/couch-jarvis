@@ -105,6 +105,16 @@ PHRASES: dict[str, dict[str, tuple[str, ...]]] = {
         "friendly": ("fullscreen it is", "going big"),
         "brief": ("fullscreen",),
     },
+    "windowed": {
+        "jarvis": ("leaving fullscreen", "back to the normal view"),
+        "friendly": ("out of fullscreen", "back to normal"),
+        "brief": ("fullscreen off",),
+    },
+    "speed": {
+        "jarvis": ("speed adjusted", "playback speed changed"),
+        "friendly": ("speed changed", "there's your new speed"),
+        "brief": ("speed set",),
+    },
     "ad": {
         "jarvis": ("ad dismissed", "the ad is out of the way"),
         "friendly": ("ad skipped", "that ad is gone"),
@@ -215,7 +225,11 @@ def _clause(step: ActionStep, plan: IntentPlan) -> Clause | None:
         return Clause("screen_off")
     if op == "show_qr":
         return Clause("qr")
+    if op == "speed":
+        return Clause("speed")
     if op == "browser_nav":
+        if a.get("action") == "exit_fullscreen":
+            return Clause("windowed")
         return Clause("new_tab" if a.get("action") == "new_tab" else "tab")
     if op == "media_key":
         key = str(a.get("key", ""))

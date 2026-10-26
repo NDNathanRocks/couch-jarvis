@@ -123,6 +123,14 @@ const PATHS: Record<string, ReactNode> = {
   refresh: <path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" />,
   download: <path d="M12 4v11M7 11l5 5 5-5M5 20h14" />,
   stop: <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />,
+  exitFullscreen: <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />,
+  copy: (
+    <>
+      <rect x="8" y="8" width="12" height="12" rx="2" />
+      <path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" />
+    </>
+  ),
+  speed: <path d="M4 17a8 8 0 1 1 16 0M12 17l4-5" />,
 };
 
 export type IconName = keyof typeof PATHS;

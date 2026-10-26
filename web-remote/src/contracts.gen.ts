@@ -83,7 +83,9 @@ export type Action =
   | "subtitles"
   | "volume_set"
   | "seek_to"
-  | "buy";
+  | "buy"
+  | "exit_fullscreen"
+  | "duplicate_tab";
 export type CommandId = string;
 export type IdempotencyKey = string;
 export type ReplyTo3 = string | null;

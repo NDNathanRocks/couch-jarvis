@@ -1,7 +1,8 @@
 import type { Modifier, QuickAction } from "../protocol";
 import type { IconName } from "../components/Icon";
+import { EXTRAS_SINCE, versionAtLeast } from "./version";
 
-export type FavGroup = "Playback" | "Volume" | "Display" | "Browser" | "Keys" | "Say";
+export type FavGroup = "Custom" | "Playback" | "Volume" | "Display" | "Browser" | "Keys" | "Say";
 
 /** What pressing a favourite does: a PC button, a keyboard key, or a spoken-style command. */
 export type FavSend =
@@ -20,12 +21,21 @@ export interface Fav {
   since?: string;
 }
 
-const action = (id: string, label: string, group: FavGroup, icon: IconName, a: QuickAction): Fav => ({
+const action = (id: string, label: string, group: FavGroup, icon: IconName, a: QuickAction, since?: string): Fav => ({
   id,
   label,
   group,
   icon,
   send: { kind: "action", action: a },
+  since,
+});
+const say = (id: string, label: string, icon: IconName, text: string, since?: string): Fav => ({
+  id,
+  label,
+  group: "Say",
+  icon,
+  send: { kind: "text", text },
+  since,
 });
 const key = (id: string, label: string, k: string, icon?: IconName): Fav => ({
   id,
@@ -47,6 +57,7 @@ export const LIBRARY: readonly Fav[] = [
   action("vol_up", "Volume up", "Volume", "speakerHigh", "vol_up"),
   action("mute", "Mute", "Volume", "speakerMute", "mute"),
   action("fullscreen", "Fullscreen", "Display", "fullscreen", "fullscreen"),
+  action("exit_fullscreen", "Exit fullscreen", "Display", "exitFullscreen", "exit_fullscreen", EXTRAS_SINCE),
   action("subtitles", "Subtitles", "Display", "cc", "subtitles"),
   action("skip_ad", "Skip ad", "Display", "skipAd", "skip_ad"),
   action("sleep_display", "Screen off", "Display", "moon", "sleep_display"),
@@ -55,6 +66,7 @@ export const LIBRARY: readonly Fav[] = [
   action("forward", "Forward page", "Browser", "forward", "forward"),
   action("reload", "Reload", "Browser", "reload", "reload"),
   action("new_tab", "New tab", "Browser", "plus", "new_tab"),
+  action("duplicate_tab", "Duplicate tab", "Browser", "copy", "duplicate_tab", EXTRAS_SINCE),
   action("close_tab", "Close tab", "Browser", "close", "close_tab"),
   action("prev_tab", "Tab left", "Browser", "tabLeft", "prev_tab"),
   action("next_tab", "Tab right", "Browser", "tabRight", "next_tab"),
@@ -65,12 +77,19 @@ export const LIBRARY: readonly Fav[] = [
   key("key_space", "Space", "space"),
   key("key_enter", "Enter", "enter"),
   ...Array.from({ length: 12 }, (_, i) => key(`key_f${i + 1}`, `F${i + 1}`, `f${i + 1}`)).filter((f) => f.id !== "key_f11"),
-  { id: "say_subs_on", label: "Subtitles on", group: "Say", icon: "cc", send: { kind: "text", text: "subtitles on" } },
-  { id: "say_subs_off", label: "Subtitles off", group: "Say", icon: "cc", send: { kind: "text", text: "subtitles off" } },
-  { id: "say_fullscreen", label: "Go fullscreen", group: "Say", icon: "fullscreen", send: { kind: "text", text: "fullscreen" } },
+  say("say_subs_on", "Subtitles on", "cc", "subtitles on"),
+  say("say_subs_off", "Subtitles off", "cc", "subtitles off"),
+  say("say_fullscreen", "Go fullscreen", "fullscreen", "fullscreen"),
+  say("say_speed_up", "Faster", "speed", "speed up", EXTRAS_SINCE),
+  say("say_speed_down", "Slower", "speed", "slow down", EXTRAS_SINCE),
+  say("say_speed_125", "Speed 1.25×", "speed", "play at 1.25x", EXTRAS_SINCE),
+  say("say_speed_normal", "Normal speed", "speed", "normal speed", EXTRAS_SINCE),
 ];
 
-export const FAV_GROUPS: readonly FavGroup[] = ["Playback", "Volume", "Display", "Browser", "Keys", "Say"];
+export const FAV_GROUPS: readonly FavGroup[] = ["Custom", "Playback", "Volume", "Display", "Browser", "Keys", "Say"];
+
+/** False when the PC app is too old to understand this favourite (it is then hidden or greyed). */
+export const favSupported = (fav: Fav, daemonVersion: string): boolean => !fav.since || versionAtLeast(daemonVersion, fav.since);
 export const SLOTS = 8;
 export const DEFAULT_FAVORITES: readonly (string | null)[] = [
   "fullscreen",
@@ -84,7 +103,115 @@ export const DEFAULT_FAVORITES: readonly (string | null)[] = [
 ];
 
 const byId = new Map(LIBRARY.map((f) => [f.id, f]));
-export const findFav = (id: string | null): Fav | null => (id ? (byId.get(id) ?? null) : null);
+/** A library button, or one of the user's own shortcuts. */
+export const findFav = (id: string | null, custom: readonly CustomKey[] = []): Fav | null => {
+  if (!id) return null;
+  const mine = custom.find((c) => c.id === id);
+  return mine ? customFav(mine) : (byId.get(id) ?? null);
+};
+
+// ---- the user's own keyboard-shortcut buttons ("Ctrl+Shift+T", "Alt+Left", "F5")
+
+export interface CustomKey {
+  id: string;
+  label: string;
+  key: string;
+  mods: Modifier[];
+}
+
+const CUSTOM_KEY = "cj.favorites.custom.v1";
+export const MAX_CUSTOM = 24;
+const MODS: readonly Modifier[] = ["ctrl", "alt", "shift"];
+export const MOD_LABEL: Record<Modifier, string> = { ctrl: "Ctrl", alt: "Alt", shift: "Shift" };
+
+/** Named keys a shortcut can use, as the PC names them, with what the phone shows. */
+export const NAMED_KEYS: readonly (readonly [string, string])[] = [
+  ["enter", "Enter"],
+  ["esc", "Esc"],
+  ["space", "Space"],
+  ["tab", "Tab"],
+  ["backspace", "Backspace"],
+  ["delete", "Delete"],
+  ["left", "←"],
+  ["right", "→"],
+  ["up", "↑"],
+  ["down", "↓"],
+  ["home", "Home"],
+  ["end", "End"],
+  ["pageup", "Page Up"],
+  ["pagedown", "Page Down"],
+  ...Array.from({ length: 12 }, (_, i) => [`f${i + 1}`, `F${i + 1}`] as const),
+  ["-", "-"],
+  ["=", "="],
+];
+const NAMED = new Map(NAMED_KEYS);
+
+/** A key the PC accepts from a phone (contracts REMOTE_KEY_PATTERN). */
+export const validKey = (key: string): boolean => /^[a-z0-9]$/.test(key) || NAMED.has(key);
+
+/** "Ctrl+Shift+T". */
+export function comboLabel(key: string, mods: readonly Modifier[]): string {
+  const name = NAMED.get(key) ?? key.toUpperCase();
+  return [...MODS.filter((m) => mods.includes(m)).map((m) => MOD_LABEL[m]), name].join("+");
+}
+
+/** Why the PC would refuse this shortcut (pc-daemon/remote_input.py), or null when it is fine. */
+export function blockedReason(key: string, mods: readonly Modifier[]): string | null {
+  const has = (m: Modifier) => mods.includes(m);
+  const only = (...want: Modifier[]) => mods.length === want.length && want.every(has);
+  if (has("ctrl") && has("alt")) return "Ctrl+Alt shortcuts are blocked for safety.";
+  if (key === "f4" && only("alt")) return "Alt+F4 would close the TV browser, so it is blocked.";
+  if (key === "esc" && (only("ctrl") || only("alt") || only("ctrl", "shift"))) return "That shortcut is blocked for safety.";
+  if ((key === "delete" || key === "backspace") && only("ctrl", "shift")) return "That shortcut is blocked for safety.";
+  return null;
+}
+
+const customFav = (c: CustomKey): Fav => ({
+  id: c.id,
+  label: c.label || comboLabel(c.key, c.mods),
+  group: "Custom",
+  icon: "keyboard",
+  send: { kind: "key", key: c.key, mods: [...c.mods] },
+});
+
+const isCustom = (v: unknown): v is CustomKey => {
+  if (typeof v !== "object" || v === null) return false;
+  const c = v as Record<string, unknown>;
+  return (
+    typeof c.id === "string" &&
+    c.id.startsWith("custom_") &&
+    typeof c.label === "string" &&
+    c.label.length <= 40 &&
+    typeof c.key === "string" &&
+    validKey(c.key) &&
+    Array.isArray(c.mods) &&
+    c.mods.every((m) => MODS.includes(m as Modifier))
+  );
+};
+
+export function loadCustomKeys(): CustomKey[] {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(CUSTOM_KEY) ?? "[]");
+    if (Array.isArray(raw)) return raw.filter(isCustom).slice(0, MAX_CUSTOM);
+  } catch {
+    /* blocked or corrupt storage */
+  }
+  return [];
+}
+
+export function saveCustomKeys(list: readonly CustomKey[]): void {
+  try {
+    localStorage.setItem(CUSTOM_KEY, JSON.stringify(list.slice(0, MAX_CUSTOM)));
+  } catch {
+    /* private mode: the shortcuts last until the page closes */
+  }
+}
+
+/** A new shortcut button; an empty label shows the shortcut itself. */
+export function makeCustomKey(label: string, key: string, mods: readonly Modifier[]): CustomKey {
+  const id = `custom_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  return { id, label: label.trim().slice(0, 40), key, mods: MODS.filter((m) => mods.includes(m)) };
+}
 
 const STORAGE_KEY = "cj.favorites.v1";
 
@@ -93,7 +220,8 @@ export function loadFavorites(): (string | null)[] {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
     if (Array.isArray(raw)) {
-      const slots = raw.slice(0, SLOTS).map((v) => (typeof v === "string" && byId.has(v) ? v : null));
+      const mine = new Set(loadCustomKeys().map((c) => c.id));
+      const slots = raw.slice(0, SLOTS).map((v) => (typeof v === "string" && (byId.has(v) || mine.has(v)) ? v : null));
       while (slots.length < SLOTS) slots.push(null);
       return slots;
     }

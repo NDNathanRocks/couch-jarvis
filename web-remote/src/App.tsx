@@ -333,7 +333,7 @@ export default function App() {
                   </div>
                 )}
                 {hasApps && <AppsRow disabled={!connected} onOpen={sendCommand} />}
-                <Favorites slots={favorites} connected={connected} keysAllowed={inputAllowed} onSend={sendFavorite} onChange={changeFavorites} />
+                <Favorites slots={favorites} connected={connected} keysAllowed={inputAllowed} daemonVersion={view.room.daemon_version} onSend={sendFavorite} onChange={changeFavorites} />
                 {inputAllowed ? <TouchPad disabled={!connected} onPointer={(e) => actions.sendPointer(e)} /> : inputOff}
                 <TimerList timers={view.room.timers} />
                 <FriendsBar devices={selectDevices(view)} selfId={self?.deviceId ?? null} />

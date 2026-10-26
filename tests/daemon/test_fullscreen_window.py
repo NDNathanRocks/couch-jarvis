@@ -69,6 +69,7 @@ class _Context:
 
 class _Page:
     url = "https://www.youtube.com/watch?v=1"
+    frames: list[Any] = []
 
     def __init__(self, *, window_fs: bool = False) -> None:
         self.window_fs = window_fs
@@ -79,7 +80,7 @@ class _Page:
     def is_closed(self) -> bool:
         return False
 
-    async def evaluate(self, script: str) -> dict[str, Any]:
+    async def evaluate(self, script: str) -> Any:
         return {
             "url": self.url,
             "title": "t",
@@ -96,7 +97,12 @@ def _edge(page: _Page) -> EdgeCDP:
     edge = EdgeCDP("http://127.0.0.1:9222")
     edge._page_ref = page
     edge._connect = _noop  # type: ignore[method-assign]
+    edge._recent_tabs = _no_tabs  # type: ignore[method-assign]
     return edge
+
+
+async def _no_tabs() -> list[str]:
+    return []  # Edge's tab list is not part of these tests: keep the tab we have
 
 
 async def _noop() -> None:
