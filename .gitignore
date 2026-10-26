@@ -22,3 +22,6 @@ installer/THIRD_PARTY_NOTICES.txt
 
 # keep the plan and release rules in the repo even though a global ignore may hide plan.md
 !plan.md
+
+# local tool state (Serena)
+.serena/
